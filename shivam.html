@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRoute - Women Safety Route Checker</title>
+    <link rel="stylesheet" href="xenon.css">
+    <script src="java.js"></script>
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Splash Screen -->
+    <div id="splashScreen" class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-shield">
+                <div class="shield-ring ring1"></div>
+                <div class="shield-ring ring2"></div>
+                <div class="shield-ring ring3"></div>
+                <div class="splash-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+            </div>
+            <h1>SafeRoute</h1>
+            <p>Your Safety, Our Priority</p>
+            <div class="splash-loader">
+                <div class="loader-bar"></div>
+            </div>
+            <span class="splash-sub">Analyzing safety data...</span>
+        </div>
+    </div>
+
+    <!-- Warning Banner -->
+    <div id="warningBanner" class="warning-banner hidden">
+        <div class="warning-content">
+            <div class="warning-pulse-dot"></div>
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="warningText">⚠️ You are entering an unsafe area! Stay alert and aware.</span>
+            <button onclick="dismissWarning()" class="warning-close">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Night Mode Indicator -->
+    <div id="nightIndicator" class="night-indicator hidden">
+        <i class="fas fa-moon"></i>
+        <span>Night Mode Active — Extra caution advised</span>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="app-container">
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="logo-text">
+                        <span class="logo-name">SafeRoute</span>
+                        <span class="logo-tag">Safety First</span>
+                    </div>
+                </div>
+                <button class="sidebar-close" onclick="toggleSidebar()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="sidebar-body">
+                <!-- Route Planning -->
+                <div class="section route-planner">
+                    <div class="section-title">
+                        <i class="fas fa-route"></i>
+                        <span>Plan Your Safe Route</span>
+                    </div>
+
+                    <div class="input-group">
+                        <div class="input-wrapper">
+                            <div class="input-dot start-dot"></div>
+                            <input type="text" id="startLocation" placeholder="Enter starting point..." autocomplete="off">
+                            <button class="input-action" onclick="useCurrentLocation()" title="Use current location">
+                                <i class="fas fa-crosshairs"></i>
+                            </button>
+                        </div>
+                        <div class="input-connector">
+                            <div class="connector-dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                            <button class="swap-btn" onclick="swapLocations()" title="Swap locations">
+                                <i class="fas fa-exchange-alt fa-rotate-90"></i>
+                            </button>
+                        </div>
+                        <div class="input-wrapper">
+                            <div class="input-dot end-dot"></div>
+                            <input type="text" id="destination" placeholder="Enter destination..." autocomplete="off">
+                            <button class="input-action clear-btn" onclick="clearDestination()" title="Clear">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Travel Mode -->
+                    <div class="travel-modes">
+                        <button class="mode-btn active" onclick="setTravelMode(this, 'DRIVING')" title="Driving">
+                            <i class="fas fa-car"></i>
+                        </button>
+                        <button class="mode-btn" onclick="setTravelMode(this, 'WALKING')" title="Walking">
+                            <i class="fas fa-walking"></i>
+                        </button>
+                        <button class="mode-btn" onclick="setTravelMode(this, 'TRANSIT')" title="Transit">
+                            <i class="fas fa-bus"></i>
+                        </button>
+                        <button class="mode-btn" onclick="setTravelMode(this, 'BICYCLING')" title="Bicycling">
+                            <i class="fas fa-bicycle"></i>
+                        </button>
+                    </div>
+
+                    <button class="find-route-btn" id="findRouteBtn" onclick="findRoutes()">
+                        <i class="fas fa-search-location"></i>
+                        <span>Find Safest Route</span>
+                        <div class="btn-shine"></div>
+                    </button>
+
+                    <!-- Quick Locations -->
+                    <div class="quick-section">
+                        <p class="quick-label">Quick Locations</p>
+                        <div class="quick-chips">
+                            <button class="chip" onclick="setQuickLocation('start', 'Connaught Place, New Delhi')">
+                                <i class="fas fa-map-pin"></i> CP Delhi
+                            </button>
+                            <button class="chip" onclick="setQuickLocation('dest', 'India Gate, New Delhi')">
+                                <i class="fas fa-map-pin"></i> India Gate
+                            </button>
+                            <button class="chip" onclick="setQuickLocation('start', 'Mumbai Central, Mumbai')">
+                                <i class="fas fa-map-pin"></i> Mumbai Central
+                            </button>
+                            <button class="chip" onclick="setQuickLocation('dest', 'Gateway of India, Mumbai')">
+                                <i class="fas fa-map-pin"></i> Gateway of India
+                            </button>
+                            <button class="chip" onclick="setQuickLocation('start', 'MG Road, Bangalore')">
+                                <i class="fas fa-map-pin"></i> MG Road BLR
+                            </button>
+                            <button class="chip" onclick="setQuickLocation('dest', 'Lalbagh, Bangalore')">
+                                <i class="fas fa-map-pin"></i> Lalbagh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Routes Results -->
+                <div class="section routes-results hidden" id="routesSection">
+                    <div class="section-title">
+                        <i class="fas fa-map-signs"></i>
+                        <span>Route Analysis</span>
+                        <span class="route-count" id="routeCount">0</span>
+                    </div>
+                    <div id="routesList" class="routes-list"></div>
+                </div>
+
+                <!-- Safety Tips -->
+                <div class="section safety-tips">
+                    <div class="section-title">
+                        <i class="fas fa-lightbulb"></i>
+                        <span>Safety Tips</span>
+                    </div>
+                    <div class="tips-list">
+                        <div class="tip-item">
+                            <i class="fas fa-share-alt"></i>
+                            <span>Share your live location with trusted contacts</span>
+                        </div>
+                        <div class="tip-item">
+                            <i class="fas fa-road"></i>
+                            <span>Prefer well-lit main roads, especially at night</span>
+                        </div>
+                        <div class="tip-item">
+                            <i class="fas fa-phone"></i>
+                            <span>Keep emergency numbers on speed dial</span>
+                        </div>
+                        <div class="tip-item">
+                            <i class="fas fa-battery-full"></i>
+                            <span>Ensure your phone is fully charged before traveling</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="section legend">
+                    <div class="section-title">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Safety Legend</span>
+                    </div>
+                    <div class="legend-items">
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background: #10b981;"></span>
+                            <span>Safe (7–10)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background: #f59e0b;"></span>
+                            <span>Medium Risk (4–6)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background: #ef4444;"></span>
+                            <span>Unsafe (0–3)</span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-dot" style="background: #f97316;"></span>
+                            <span>User Reported</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Map Area -->
+        <main class="map-area">
+            <div id="map"></div>
+
+            <!-- Mobile Header -->
+            <div class="mobile-header">
+                <button class="menu-btn" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="mobile-logo">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>SafeRoute</span>
+                </div>
+                <button class="menu-btn" onclick="centerOnUser()">
+                    <i class="fas fa-location-arrow"></i>
+                </button>
+            </div>
+
+            <!-- Map Controls -->
+            <div class="map-controls">
+                <button class="ctrl-btn" onclick="centerOnUser()" title="My Location">
+                    <i class="fas fa-location-arrow"></i>
+                </button>
+                <button class="ctrl-btn active" id="toggleZonesBtn" onclick="toggleUnsafeZones()" title="Toggle Unsafe Zones">
+                    <i class="fas fa-eye"></i>
+                </button>
+                <button class="ctrl-btn" onclick="toggleTraffic()" title="Traffic Layer" id="trafficBtn">
+                    <i class="fas fa-traffic-light"></i>
+                </button>
+                <button class="ctrl-btn" onclick="toggleStreetView()" title="Street View">
+                    <i class="fas fa-street-view"></i>
+                </button>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="stats-bar" id="statsBar">
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-route"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="statDistance">—</span>
+                        <span class="stat-label">Distance</span>
+                    </div>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="statTime">—</span>
+                        <span class="stat-label">Duration</span>
+                    </div>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-card">
+                    <div class="stat-icon"><i class="fas fa-shield-alt"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="statSafety">—</span>
+                        <span class="stat-label">Safety</span>
+                    </div>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat-card">
+                    <div class="stat-icon warning-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="statZones">—</span>
+                        <span class="stat-label">Alerts</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SOS Button -->
+            <button class="sos-btn" id="sosButton" onclick="triggerSOS()">
+                <div class="sos-pulse-ring"></div>
+                <div class="sos-inner">
+                    <i class="fas fa-phone-alt"></i>
+                    <span>SOS</span>
+                </div>
+            </button>
+
+            <!-- Report Button -->
+            <button class="report-btn" onclick="openReportModal()">
+                <i class="fas fa-flag"></i>
+                <span>Report Area</span>
+            </button>
+
+            <!-- Live Tracking Indicator -->
+            <div class="tracking-badge" id="trackingBadge">
+                <div class="tracking-dot"></div>
+                <span>Live Tracking</span>
+            </div>
+        </main>
+    </div>
+
+    <!-- SOS Modal -->
+    <div class="modal-overlay hidden" id="sosModal">
+        <div class="modal sos-modal">
+            <div class="sos-header">
+                <div class="sos-anim-bg">
+                    <div class="sos-wave w1"></div>
+                    <div class="sos-wave w2"></div>
+                    <div class="sos-wave w3"></div>
+                </div>
+                <div class="sos-icon-wrap">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h2>EMERGENCY SOS</h2>
+                <p>Help is on the way</p>
+            </div>
+            <div class="modal-body">
+                <div class="sos-location-card" id="sosLocationCard">
+                    <div class="loc-icon"><i class="fas fa-map-pin"></i></div>
+                    <div class="loc-info">
+                        <span class="loc-label">Your Current Location</span>
+                        <span class="loc-value" id="sosLocationText">Detecting location...</span>
+                    </div>
+                    <div class="loc-status"><i class="fas fa-satellite-dish"></i></div>
+                </div>
+
+                <div class="sos-timer">
+                    <span>Alert sent</span>
+                    <span class="timer-value" id="sosTimer">00:00</span>
+                    <span>ago</span>
+                </div>
+
+                <div class="sos-actions">
+                    <a href="tel:112" class="sos-action-btn emergency">
+                        <i class="fas fa-phone-alt"></i>
+                        <div>
+                            <strong>Emergency Services</strong>
+                            <span>Call 112</span>
+                        </div>
+                    </a>
+                    <a href="tel:1091" class="sos-action-btn women-help">
+                        <i class="fas fa-female"></i>
+                        <div>
+                            <strong>Women Helpline</strong>
+                            <span>Call 1091</span>
+                        </div>
+                    </a>
+                    <a href="tel:100" class="sos-action-btn police">
+                        <i class="fas fa-user-shield"></i>
+                        <div>
+                            <strong>Police</strong>
+                            <span>Call 100</span>
+                        </div>
+                    </a>
+                    <button class="sos-action-btn whatsapp" onclick="shareLocation()">
+                        <i class="fab fa-whatsapp"></i>
+                        <div>
+                            <strong>Share Location</strong>
+                            <span>via WhatsApp</span>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="sos-contacts-section">
+                    <h4><i class="fas fa-users"></i> Emergency Contacts Notified</h4>
+                    <div class="sos-contact">
+                        <div class="contact-avatar">M</div>
+                        <div class="contact-info">
+                            <span class="contact-name">Mom</span>
+                            <span class="contact-phone">+91 98XXX XXXXX</span>
+                        </div>
+                        <div class="contact-status sent">
+                            <i class="fas fa-check-double"></i>
+                        </div>
+                    </div>
+                    <div class="sos-contact">
+                        <div class="contact-avatar">D</div>
+                        <div class="contact-info">
+                            <span class="contact-name">Dad</span>
+                            <span class="contact-phone">+91 97XXX XXXXX</span>
+                        </div>
+                        <div class="contact-status sent">
+                            <i class="fas fa-check-double"></i>
+                        </div>
+                    </div>
+                    <div class="sos-contact">
+                        <div class="contact-avatar">S</div>
+                        <div class="contact-info">
+                            <span class="contact-name">Sanya (Friend)</span>
+                            <span class="contact-phone">+91 99XXX XXXXX</span>
+                        </div>
+                        <div class="contact-status sending">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="cancel-sos-btn" onclick="cancelSOS()">
+                    <i class="fas fa-times"></i> Cancel SOS
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Modal -->
+    <div class="modal-overlay hidden" id="reportModal">
+        <div class="modal report-modal">
+            <div class="modal-top">
+                <h2><i class="fas fa-flag"></i> Report Unsafe Area</h2>
+                <button class="close-modal" onclick="closeReportModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label><i class="fas fa-map-marker-alt"></i> Location</label>
+                    <div class="report-loc-display" id="reportLocationDisplay">
+                        <i class="fas fa-crosshairs"></i>
+                        <span>Click on map or use current location</span>
+                    </div>
+                    <button class="use-loc-btn" onclick="useCurrentForReport()">
+                        <i class="fas fa-location-arrow"></i> Use My Location
+                    </button>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-exclamation-circle"></i> Type of Issue</label>
+                    <div class="issue-grid">
+                        <button class="issue-card" onclick="selectIssue(this, 'harassment')">
+                            <i class="fas fa-hand-paper"></i>
+                            <span>Harassment</span>
+                        </button>
+                        <button class="issue-card" onclick="selectIssue(this, 'poor-lighting')">
+                            <i class="fas fa-lightbulb"></i>
+                            <span>Poor Lighting</span>
+                        </button>
+                        <button class="issue-card" onclick="selectIssue(this, 'isolated')">
+                            <i class="fas fa-road"></i>
+                            <span>Isolated Area</span>
+                        </button>
+                        <button class="issue-card" onclick="selectIssue(this, 'suspicious')">
+                            <i class="fas fa-user-secret"></i>
+                            <span>Suspicious</span>
+                        </button>
+                        <button class="issue-card" onclick="selectIssue(this, 'no-cctv')">
+                            <i class="fas fa-video-slash"></i>
+                            <span>No CCTV</span>
+                        </button>
+                        <button class="issue-card" onclick="selectIssue(this, 'other')">
+                            <i class="fas fa-ellipsis-h"></i>
+                            <span>Other</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-pen"></i> Description</label>
+                    <textarea id="reportDesc" placeholder="Describe what happened or what you observed..." rows="3"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-clock"></i> Time of Incident</label>
+                    <div class="time-chips">
+                        <button class="time-chip active" onclick="selectTime(this)">Now</button>
+                        <button class="time-chip" onclick="selectTime(this)">Morning</button>
+                        <button class="time-chip" onclick="selectTime(this)">Afternoon</button>
+                        <button class="time-chip" onclick="selectTime(this)">Evening</button>
+                        <button class="time-chip" onclick="selectTime(this)">Night</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-star"></i> Severity</label>
+                    <div class="severity-slider">
+                        <input type="range" id="severityRange" min="1" max="5" value="3">
+                        <div class="severity-labels">
+                            <span>Low</span>
+                            <span>Moderate</span>
+                            <span>High</span>
+                            <span>Severe</span>
+                            <span>Critical</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="submit-btn" onclick="submitReport()">
+                    <i class="fas fa-paper-plane"></i>
+                    Submit Report
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Key Modal -->
+    <div class="modal-overlay" id="apiKeyModal">
+        <div class="modal api-key-modal">
+            <div class="modal-top">
+                <h2><i class="fas fa-key"></i> Google Maps API Key</h2>
+            </div>
+            <div class="modal-body">
+                <p class="api-info">Enter your Google Maps API key to enable all features including directions, places autocomplete, and street view.</p>
+                <div class="api-steps">
+                    <div class="api-step">
+                        <span class="step-num">1</span>
+                        <span>Go to <a href="https://console.cloud.google.com/apis" target="_blank">Google Cloud Console</a></span>
+                    </div>
+                    <div class="api-step">
+                        <span class="step-num">2</span>
+                        <span>Enable Maps JavaScript API, Directions API, Places API</span>
+                    </div>
+                    <div class="api-step">
+                        <span class="step-num">3</span>
+                        <span>Create credentials and copy your API key</span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <input type="text" id="apiKeyInput" placeholder="Paste your API key here..." class="api-input">
+                </div>
+                <div class="api-buttons">
+                    <button class="submit-btn" onclick="loadGoogleMaps()">
+                        <i class="fas fa-check"></i> Load Map
+                    </button>
+                    <button class="skip-btn" onclick="skipApiKey()">
+                        Skip (Demo Mode)
+                    </button>
+                </div>
+                <p class="api-note"><i class="fas fa-lock"></i> Your key is stored locally and never sent to any server.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
