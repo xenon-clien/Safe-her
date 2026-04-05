@@ -1,61 +1,755 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SafeRoute - Women Safety Route Checker</title>
+    <title>Safe Her - Advanced Women's Security App</title>
 
-    <!-- ✅ Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-
-    <link rel="stylesheet" href="xenon.css">
-    <script src="java.js"></script>
+    <!-- OpenStreetMap (Leaflet) CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- Leaflet Routing Machine CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <!-- Leaflet Geocoder CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
 
-    <!-- ✅ Map Style -->
-    <style>
-        #map {
-            height: 100%;
-            width: 100%;
+    <!-- Razorpay Checkout Script -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Tailwind CSS (For Premium UI) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'premium-gold': '#ffcc00',
+                        'safety-purple': '#9d4edd',
+                    }
+                }
+            }
         }
-    </style>
+    </script>
 </head>
+
 <body>
 
-<!-- ✅ (Tumhara pura UI SAME rahega, kuch change nahi kiya) -->
+    <!-- ========= LOADING SCREEN ========= -->
+    <div id="loaderScreen" class="loader-screen">
+        <div class="loader-content">
+            <div class="loader-shield">
+                <i class="fas fa-shield-halved"></i>
+                <div class="shield-pulse"></div>
+            </div>
+            <h1 class="loader-brand">Safe Her</h1>
+            <p class="loader-tagline">Your Personal Safety Companion</p>
+            <div class="loader-bar-track">
+                <div class="loader-bar-fill" id="loaderBar"></div>
+            </div>
+            <span class="loader-status" id="loaderStatus">Initializing safety systems...</span>
+        </div>
+    </div>
+    <!-- ===================================== -->
 
-<div class="app-container">
-    <main class="map-area">
-        <div id="map"></div>
+    <!-- Full Screen Panic Strobe Overlay -->
+    <div id="strobeOverlay" class="strobe-overlay"></div>
+
+    <!-- Fake Call Incoming Screen Overlay -->
+    <div id="fakeCallScreen" class="fake-call-screen" style="display: none;">
+        <div class="fake-call-caller">
+            <div class="caller-avatar"><i class="fas fa-user-tie"></i></div>
+            <h2>Dad</h2>
+            <p>Mobile: +1 432-849-009</p>
+        </div>
+        <div class="fake-call-actions">
+            <button class="call-decline" onclick="stopFakeCall()"><i class="fas fa-phone-slash"></i></button>
+            <button class="call-answer" onclick="answerFakeCall()"><i class="fas fa-phone"></i></button>
+        </div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fas fa-shield-halved"></i> Safe Her
+        </div>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="#home" class="active" onclick="switchSection('home')">Home</a></li>
+            <li><a href="#route" onclick="switchSection('route')"><i class="fas fa-route" style="margin-right:5px;"></i>Route</a></li>
+            <li><a href="#contacts" onclick="switchSection('contacts')">Contacts</a></li>
+            <li><a href="#tips" onclick="switchSection('tips')">Tips</a></li>
+            <li id="premiumNavLink" style="display:none;"><a href="#premium" onclick="switchSection('premium')" class="text-premium-gold font-bold"><i class="fas fa-crown"></i> Pro</a></li>
+            <li><a href="#auth" class="btn-login" onclick="switchSection('auth')">Login</a></li>
+            <li id="goPremiumNav"><button onclick="initiateRazorpayPayment()" class="bg-gradient-to-r from-premium-gold to-yellow-600 text-black px-4 py-2 rounded-full font-bold ml-2 hover:scale-105 transition-transform"><i class="fas fa-crown"></i> Go Premium</button></li>
+        </ul>
+        <div class="hamburger" onclick="toggleMobileMenu()">
+            <i class="fas fa-bars"></i>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-container">
+
+        <!-- 1. HOME SECTION -->
+        <section id="home" class="section-container active-section">
+            <div class="hero-header">
+                <h1>We are here to help you.</h1>
+                <p>Your personal safety companion — armed with AI-powered tools.</p>
+            </div>
+
+            <!-- Safety Dashboard Stats -->
+            <div class="safety-dashboard">
+                <div class="dash-stat">
+                    <i class="fas fa-location-arrow"></i>
+                    <div>
+                        <span class="dash-val" id="dashArea">Detecting...</span>
+                        <span class="dash-lbl">Your Area</span>
+                    </div>
+                </div>
+                <div class="dash-stat">
+                    <i class="fas fa-shield-halved" style="color:#4caf50;"></i>
+                    <div>
+                        <span class="dash-val" id="dashScore" style="color:#4caf50;">--</span>
+                        <span class="dash-lbl">Safety Score</span>
+                    </div>
+                </div>
+                <div class="dash-stat">
+                    <i class="fas fa-clock" style="color:#ff9800;"></i>
+                    <div>
+                        <span class="dash-val" id="dashTime">--:--</span>
+                        <span class="dash-lbl">Local Time</span>
+                    </div>
+                </div>
+                <div class="dash-stat">
+                    <i class="fas fa-satellite-dish" style="color:#9d4edd;"></i>
+                    <div>
+                        <span class="dash-val" id="dashGps">Detecting...</span>
+                        <span class="dash-lbl">GPS Signal</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Daily Safety Forecast UI -->
+            <div class="safety-forecast-row">
+                <div class="forecast-card">
+                    <i class="fas fa-sun text-yellow-400"></i>
+                    <span class="forecast-time">Morning</span>
+                    <span class="forecast-score" id="scoreMorning">--</span>
+                </div>
+                <div class="forecast-card">
+                    <i class="fas fa-cloud-sun text-orange-400"></i>
+                    <span class="forecast-time">Evening</span>
+                    <span class="forecast-score" id="scoreEvening">--</span>
+                </div>
+                <div class="forecast-card">
+                    <i class="fas fa-moon text-blue-400"></i>
+                    <span class="forecast-time">Night</span>
+                    <span class="forecast-score" id="scoreNight">--</span>
+                </div>
+            </div>
+
+            <!-- SOS Button -->
+            <div class="sos-container">
+                <button id="sosBtn" class="sos-btn" onclick="triggerSOS()">
+                    <span class="sos-text">SOS</span>
+                </button>
+                <div class="pulse-ring"></div>
+                <p id="sosStatus" class="sos-status"></p>
+                <!-- Digital Blackbox Status -->
+                <div id="blackboxStatus" class="blackbox-status" style="display: none;">
+                    <span class="dot"></span> 🔴 RECORDING EVIDENCE (Digital Blackbox)
+                </div>
+            </div>
+
+            <!-- Advanced Safety Tools Grid -->
+            <div class="tactical-tools">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="m-0"><i class="fas fa-toolbox"></i> Safety Arsenal</h3>
+                    <span class="text-xs bg-premium-gold/20 text-premium-gold px-2 py-1 rounded border border-premium-gold/30">PRO UNLOCKED</span>
+                </div>
+                <div class="tools-grid">
+
+                    <!-- Fake Call (PREMIUM GATED) -->
+                    <div class="premium-tool-wrapper" id="fakeCallWrapper">
+                        <button class="tool-btn" id="fakeCallBtn" onclick="initiateFakeCall()" title="Fake incoming call to escape">
+                            <i class="fas fa-phone-volume"></i>
+                            <span>Fake Call</span>
+                        </button>
+                        <div class="lock-overlay" onclick="showPremiumPopup()">
+                            <i class="fas fa-lock text-2xl mb-2"></i>
+                            <span class="text-[10px] font-bold uppercase tracking-wider">Unlock Pro</span>
+                        </div>
+                    </div>
+
+                    <!-- Voice SOS -->
+                    <button class="tool-btn" id="voiceSOSBtn" onclick="toggleVoiceSOS()" title="Say 'Help' or 'Bachao' to trigger SOS">
+                        <i class="fas fa-microphone"></i>
+                        <span>Voice SOS</span>
+                    </button>
+
+                    <!-- Check-In Timer -->
+                    <button class="tool-btn" onclick="openCheckInPanel()" title="Set a safety timer">
+                        <i class="fas fa-hourglass-half"></i>
+                        <span>Check-In Timer</span>
+                    </button>
+
+                    <!-- Quick Share Location -->
+                    <button class="tool-btn" onclick="quickShareLocation()" title="Share live location instantly">
+                        <i class="fas fa-share-nodes"></i>
+                        <span>Share Location</span>
+                    </button>
+
+                    <!-- Shake to SOS -->
+                    <button class="tool-btn" id="shakeBtn" onclick="toggleShakeSOS()" title="Shake phone 3x to trigger SOS (mobile)">
+                        <i class="fas fa-mobile-screen-button"></i>
+                        <span>Shake SOS</span>
+                    </button>
+
+                    <!-- Blackbox (PREMIUM GATED) -->
+                    <div class="premium-tool-wrapper" id="blackboxWrapper">
+                        <button class="tool-btn" id="blackboxBtn" onclick="toggleEvidenceLocker()" title="Start 10s audio evidence recording">
+                            <i class="fas fa-file-audio"></i>
+                            <span>Blackbox</span>
+                        </button>
+                        <div class="lock-overlay" onclick="showPremiumPopup()">
+                            <i class="fas fa-lock text-2xl mb-2"></i>
+                            <span class="text-[10px] font-bold uppercase tracking-wider">Unlock Pro</span>
+                        </div>
+                    </div>
+
+                    <!-- Safe Haven Radar -->
+                    <button class="tool-btn" id="radarBtn" onclick="scanSafeHavens()" title="Find nearest Police and Hospitals">
+                        <i class="fas fa-tower-broadcast"></i>
+                        <span>Safe Haven Radar</span>
+                    </button>
+
+                    <!-- Refresh GPS / Tracking -->
+                    <button class="tool-btn" onclick="startTracking()" title="Manually update current location">
+                        <i class="fas fa-location-crosshairs"></i>
+                        <span>Refresh GPS</span>
+                    </button>
+
+                </div>
+            </div>
+
+            <!-- Check-In Timer Panel (hidden by default) -->
+            <div class="checkin-panel" id="checkinPanel" style="display:none;">
+                <div class="checkin-header">
+                    <i class="fas fa-hourglass-half"></i>
+                    <h4>Safety Check-In Timer</h4>
+                    <button onclick="closeCheckInPanel()" class="close-panel-btn"><i class="fas fa-times"></i></button>
+                </div>
+                <p>Set a timer. If you don't check-in before it ends, alerts will be sent to your contacts automatically.</p>
+                <div class="checkin-controls">
+                    <select id="checkinDuration">
+                        <option value="5">5 minutes</option>
+                        <option value="10">10 minutes</option>
+                        <option value="15" selected>15 minutes</option>
+                        <option value="30">30 minutes</option>
+                        <option value="60">1 hour</option>
+                    </select>
+                    <button class="start-timer-btn" id="timerToggleBtn" onclick="toggleCheckInTimer()">Start Timer</button>
+                </div>
+                <div class="timer-display" id="timerDisplay" style="display:none;">
+                    <div class="timer-ring">
+                        <span id="timerCountdown">15:00</span>
+                    </div>
+                    <p id="timerStatusMsg">Stay safe! Timer running...</p>
+                    <button class="checkin-now-btn" onclick="checkInNow()"><i class="fas fa-check"></i> I'm Safe — Check In</button>
+                </div>
+            </div>
+
+            <!-- Map -->
+            <div class="location-container">
+                <h2><i class="fas fa-map-marker-alt"></i> Live Location</h2>
+                <div class="coords" id="coordsDisplay">Fetching coordinates...</div>
+                
+                <div class="map-wrapper" style="position: relative;">
+                    <div id="map" class="main-map"></div>
+                    <!-- Map Overlay Controls -->
+                    <div class="map-controls-overlay">
+                        <button class="map-overlay-btn report-btn" onclick="reportDangerAtCenter()" title="Report danger at map center">
+                            <i class="fas fa-triangle-exclamation"></i> Report Danger
+                        </button>
+                    </div>
+                </div>
+
+                <button class="track-btn" onclick="startTracking()">
+                    <i class="fas fa-location-crosshairs"></i> Refresh Location
+                </button>
+            </div>
+
+            <!-- User Feedback Section -->
+            <div class="feedback-container mt-12 bg-zinc-900/60 p-8 rounded-3xl border border-white/5">
+                <h3 class="text-2xl font-bold text-white mb-4 flex items-center">
+                    <i class="fas fa-comment-dots mr-3 text-safety-purple"></i> Your Experience Matters
+                </h3>
+                <p class="text-gray-400 mb-6 italic">Help us improve Safe Her by sharing your safety feedback or reporting app issues.</p>
+                <form id="feedbackForm" onsubmit="submitFeedback(event)" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input type="text" id="fbName" placeholder="Your Name (Optional)" class="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-safety-purple outline-none">
+                        <select id="fbCategory" class="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-safety-purple outline-none">
+                            <option value="General">General Feedback</option>
+                            <option value="Safety">Safety Concern</option>
+                            <option value="Feature">Feature Request</option>
+                            <option value="Bug">Technical Bug</option>
+                        </select>
+                    </div>
+                    <textarea id="fbMessage" rows="3" placeholder="Tell us about your experience..." class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-safety-purple outline-none" required></textarea>
+                    <div class="flex items-center justify-between">
+                        <div class="flex space-x-2 text-yellow-500" id="fbRating">
+                            <i class="fas fa-star cursor-pointer hover:scale-110 transiton-transform" onclick="setFbRating(1)"></i>
+                            <i class="fas fa-star cursor-pointer hover:scale-110 transiton-transform" onclick="setFbRating(2)"></i>
+                            <i class="fas fa-star cursor-pointer hover:scale-110 transiton-transform" onclick="setFbRating(3)"></i>
+                            <i class="fas fa-star cursor-pointer hover:scale-110 transiton-transform" onclick="setFbRating(4)"></i>
+                            <i class="fas fa-star cursor-pointer hover:scale-110 transiton-transform" onclick="setFbRating(5)"></i>
+                        </div>
+                        <button type="submit" class="bg-gradient-to-r from-safety-purple to-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-purple-500/20 transition-all">Submit Feedback</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- ROUTE PLANNER SECTION -->
+        <section id="route" class="section-container" style="display: none;">
+            <div class="section-header">
+                <h2><i class="fas fa-route"></i> Safe Route Planner</h2>
+                <p>Apni location se destination tak ka safe rasta chuno — danger zones avoid karo.</p>
+            </div>
+
+            <div class="route-planner-card">
+                <!-- From / To Inputs -->
+                <div class="route-inputs">
+                    <div class="route-field">
+                        <label><i class="fas fa-circle" style="color:#4caf50;font-size:10px;"></i> Starting Point</label>
+                        <input type="text" id="routeFrom" placeholder="Your current location (auto-detected)" readonly>
+                    </div>
+                    <div class="route-arrow"><i class="fas fa-arrow-down"></i></div>
+                    <div class="route-field">
+                        <label><i class="fas fa-location-dot" style="color:#ff3366;"></i> Destination</label>
+                        <input type="text" id="routeTo" placeholder="Search destination...">
+                    </div>
+                </div>
+
+                <!-- Route Mode Selector -->
+                <div class="route-modes">
+                    <button class="route-mode-btn active" id="modeSafe" onclick="setRouteMode('safe')">
+                        <i class="fas fa-shield-halved"></i> Safest Route
+                    </button>
+                    <button class="route-mode-btn" id="modeFast" onclick="setRouteMode('fast')">
+                        <i class="fas fa-bolt"></i> Fastest Route
+                    </button>
+                    <button class="route-mode-btn" id="modeWalk" onclick="setRouteMode('walk')">
+                        <i class="fas fa-person-walking"></i> Walking
+                    </button>
+                </div>
+
+                <!-- Calculate Button -->
+                <button class="calculate-route-btn" onclick="calculateRoute()">
+                    <i class="fas fa-map-location-dot"></i> Find Safe Route
+                </button>
+
+                <!-- Route Info Panel (shown after route found) -->
+                <div class="route-info-panel" id="routeInfoPanel" style="display:none;">
+                    <div class="route-stat">
+                        <i class="fas fa-clock"></i>
+                        <div>
+                            <span class="stat-label">Estimated Time</span>
+                            <span class="stat-value" id="routeTime">--</span>
+                        </div>
+                    </div>
+                    <div class="route-stat">
+                        <i class="fas fa-road"></i>
+                        <div>
+                            <span class="stat-label">Distance</span>
+                            <span class="stat-value" id="routeDistance">--</span>
+                        </div>
+                    </div>
+                    <div class="route-stat">
+                        <i class="fas fa-shield-halved"></i>
+                        <div>
+                            <span class="stat-label">Current Risk</span>
+                            <span class="stat-value" id="routeSafety" style="color:#4caf50;">--</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ROUTE TIME FORECAST -->
+                <div class="route-forecast-container" id="routeForecast" style="display:none;">
+                    <div class="forecast-item">
+                        <i class="fas fa-sun text-yellow-400"></i>
+                        <span class="f-lbl">Morning</span>
+                        <span class="f-val" id="routeScoreMorning">--</span>
+                    </div>
+                    <div class="forecast-item">
+                        <i class="fas fa-cloud-sun text-orange-400"></i>
+                        <span class="f-lbl">Evening</span>
+                        <span class="f-val" id="routeScoreEvening">--</span>
+                    </div>
+                    <div class="forecast-item">
+                        <i class="fas fa-moon text-blue-400"></i>
+                        <span class="f-lbl">Night</span>
+                        <span class="f-val" id="routeScoreNight">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Route Map -->
+            <div id="routeMap" style="width:100%;height:420px;border-radius:14px;
+                 border:1px solid rgba(255,255,255,0.1);margin-top:1.5rem;
+                 overflow:hidden;"></div>
+
+            <p class="route-hint">
+                <i class="fas fa-info-circle"></i>
+                Red zones = High crime area. Green zones = Safe. Route line avoids danger zones automatically.
+            </p>
+        </section>
+
+        <!-- 2. CONTACTS SECTION -->
+        <section id="contacts" class="section-container" style="display: none;">
+            <div class="section-header">
+                <h2>Emergency Contacts</h2>
+                <p>Your trusted circle and emergency services.</p>
+            </div>
+
+            <div class="add-contact-container">
+                <h3><i class="fas fa-user-plus"></i> Add Personal Contact</h3>
+                <form id="addContactForm" class="add-contact-form" onsubmit="addCustomContact(event)">
+                    <div class="input-row">
+                        <input type="text" id="contactName" placeholder="Contact Name (e.g. Alice)" required>
+                        <input type="tel" id="contactPhone" placeholder="Phone Number" required>
+                        <button type="submit" class="add-btn">Save Contact</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="contacts-grid" id="contactsGrid">
+                <!-- Immutable Emergency Services -->
+                <div class="contact-card police">
+                    <div class="contact-icon"><i class="fas fa-bullhorn"></i></div>
+                    <div class="contact-info">
+                        <h3>Police / Emergency</h3>
+                        <p>112 / 100</p>
+                    </div>
+                    <a href="tel:112" class="call-btn-link">Call</a>
+                </div>
+                <div class="contact-card help">
+                    <div class="contact-icon"><i class="fas fa-female"></i></div>
+                    <div class="contact-info">
+                        <h3>Women Helpline</h3>
+                        <p>1091</p>
+                    </div>
+                    <a href="tel:1091" class="call-btn-link">Call</a>
+                </div>
+                <!-- Dynamic Personal Contacts will be injected here via JavaScript -->
+            </div>
+        </section>
+
+        <!-- 3. SAFETY TIPS SECTION -->
+        <section id="tips" class="section-container" style="display: none;">
+            <div class="section-header">
+                <h2>Safety Tips & Guidelines</h2>
+                <p>Keep these in mind for your personal security.</p>
+            </div>
+
+            <div class="tips-grid">
+                <!-- ... existing tips ... -->
+                <div class="tip-card">
+                    <div class="tip-icon"><i class="fas fa-walking"></i></div>
+                    <h4>Stay Aware</h4>
+                    <p>Avoid distractions like texting while walking alone. Be mindful of your surroundings at all times.</p>
+                </div>
+                <!-- ... other cards ... -->
+            </div>
+
+            <!-- PREMIUM SAFETY SHOP -->
+            <div class="mt-12 bg-zinc-900 overflow-hidden rounded-3xl border border-premium-gold/20 shadow-2xl shadow-premium-gold/5">
+                <div class="bg-gradient-to-r from-premium-gold to-yellow-600 p-6 flex justify-between items-center">
+                    <div>
+                        <h3 class="text-2xl font-black text-black m-0 uppercase tracking-tighter">Premium Safety Shop</h3>
+                        <p class="text-black/70 font-bold text-xs">Professional-grade security gear for modern women.</p>
+                    </div>
+                    <i class="fas fa-shopping-cart text-3xl text-black/40"></i>
+                </div>
+                <div class="p-8">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Product 1 -->
+                        <div class="bg-black/60 p-5 rounded-2xl border border-white/5 hover:border-premium-gold/50 transition-all group">
+                            <div class="h-44 bg-zinc-800/50 rounded-xl mb-4 flex items-center justify-center overflow-hidden relative">
+                                <span class="absolute top-2 left-2 bg-premium-gold text-black text-[10px] font-black px-2 py-1 rounded">BEST SELLER</span>
+                                <i class="fas fa-shield-virus text-6xl text-premium-gold/30 group-hover:scale-125 transition-transform duration-500"></i>
+                            </div>
+                            <h4 class="text-white font-bold text-lg">Police Grade CS Spray</h4>
+                            <p class="text-gray-500 text-xs mb-6">Invisible UV dye for suspect identification. 15ft blast range.</p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-white text-xl font-black">₹499 <span class="text-[10px] text-gray-600 line-through">₹899</span></span>
+                                <button class="bg-premium-gold text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">Buy Now</button>
+                            </div>
+                        </div>
+                        <!-- Product 2 -->
+                        <div class="bg-black/60 p-5 rounded-2xl border border-white/5 hover:border-premium-gold/50 transition-all group">
+                            <div class="h-44 bg-zinc-800/50 rounded-xl mb-4 flex items-center justify-center overflow-hidden">
+                                <i class="fas fa-bolt-lightning text-6xl text-premium-gold/30 group-hover:scale-125 transition-transform duration-500"></i>
+                            </div>
+                            <h4 class="text-white font-bold text-lg">Stun Flashlight Pro</h4>
+                            <div class="flex space-x-1 mb-2">
+                                <i class="fas fa-star text-premium-gold text-[10px]"></i>
+                                <i class="fas fa-star text-premium-gold text-[10px]"></i>
+                                <i class="fas fa-star text-premium-gold text-[10px]"></i>
+                                <i class="fas fa-star text-premium-gold text-[10px]"></i>
+                                <i class="fas fa-star text-premium-gold text-[10px]"></i>
+                            </div>
+                            <p class="text-gray-500 text-xs mb-6">5 million volt discharge. Ultra-bright blinding CREE LED.</p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-white text-xl font-black">₹1,299</span>
+                                <button class="bg-premium-gold text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">Buy Now</button>
+                            </div>
+                        </div>
+                        <!-- Product 3 -->
+                        <div class="bg-black/60 p-5 rounded-2xl border border-white/5 hover:border-premium-gold/50 transition-all group">
+                            <div class="h-44 bg-zinc-800/50 rounded-xl mb-4 flex items-center justify-center overflow-hidden">
+                                <i class="fas fa-satellite text-6xl text-premium-gold/30 group-hover:scale-125 transition-transform duration-500"></i>
+                            </div>
+                            <h4 class="text-white font-bold text-lg">Smart GPS Jewelry</h4>
+                            <p class="text-gray-500 text-xs mb-6">Discrete necklace with one-tap location broadcasting.</p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-white text-xl font-black">₹2,499</span>
+                                <button class="bg-premium-gold text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">Buy Now</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FREE SAFETY KIT (PRO-BONO FEATURE) -->
+            <div class="mt-12 bg-green-900/20 p-6 rounded-2xl border border-green-500/30">
+                <h3 class="text-2xl font-bold text-white mb-2 flex items-center">
+                    <i class="fas fa-gift mr-3 text-green-400"></i> Free Safety Kit Initiative
+                </h3>
+                <p class="text-gray-400 mb-6 italic text-sm">Safe Her initiative: Request essential safety tools for free. Priority for students and night-shifters.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Product 1 -->
+                    <div class="bg-black/40 p-4 rounded-xl border border-white/10 hover:border-premium-gold transition-all group">
+                        <div class="h-40 bg-zinc-800 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                             <i class="fas fa-spray-can text-5xl text-gray-500 group-hover:scale-110 transition-transform"></i>
+                        </div>
+                        <h4 class="text-white font-bold">Max-Strength Pepper Spray</h4>
+                        <p class="text-gray-400 text-sm mb-4">Quick-release keychain, 10ft range.</p>
+                        <div class="flex items-center justify-between">
+                            <span class="text-green-400 font-bold">FREE</span>
+                            <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-opacity-80" onclick="showToast('Request Received! We will contact you for delivery.', 'success')">Claim Free</button>
+                        </div>
+                    </div>
+                    <!-- Product 2 -->
+                    <div class="bg-black/40 p-4 rounded-xl border border-white/10 hover:border-premium-gold transition-all group">
+                        <div class="h-40 bg-zinc-800 rounded-lg mb-4 flex items-center justify-center">
+                             <i class="fas fa-bullhorn text-5xl text-gray-500 group-hover:scale-110 transition-transform"></i>
+                        </div>
+                        <h4 class="text-white font-bold">Personal Safety Alarm</h4>
+                        <p class="text-gray-400 text-sm mb-4">130dB siren with LED flashlight.</p>
+                        <div class="flex items-center justify-between">
+                            <span class="text-green-400 font-bold">FREE</span>
+                            <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-opacity-80" onclick="showToast('Request Received! We will contact you for delivery.', 'success')">Claim Free</button>
+                        </div>
+                    </div>
+                    <!-- Product 3 -->
+                    <div class="bg-black/40 p-4 rounded-xl border border-white/10 hover:border-premium-gold transition-all group">
+                        <div class="h-40 bg-zinc-800 rounded-lg mb-4 flex items-center justify-center">
+                             <i class="fas fa-location-dot text-5xl text-gray-500 group-hover:scale-110 transition-transform"></i>
+                        </div>
+                        <h4 class="text-white font-bold">Hidden GPS Tracker</h4>
+                        <p class="text-gray-400 text-sm mb-4">Mini real-time tracking for bags.</p>
+                        <div class="flex items-center justify-between">
+                            <span class="text-green-400 font-bold">FREE</span>
+                            <button class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-opacity-80" onclick="showToast('Request Received! We will contact you for delivery.', 'success')">Claim Free</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. PREMIUM DASHBOARD SECTION -->
+        <section id="premium" class="section-container" style="display: none;">
+            <div class="max-w-4xl mx-auto py-12 px-6">
+                <div class="bg-zinc-900 border border-premium-gold/30 rounded-[2rem] overflow-hidden">
+                    <div class="p-8 md:p-12 bg-gradient-to-br from-zinc-800 to-black">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12">
+                            <div>
+                                <h2 class="text-4xl font-black text-white mb-2 italic uppercase">Premium Dashboard</h2>
+                                <p class="text-premium-gold font-bold tracking-widest text-xs uppercase">Level Up Your Security Status</p>
+                            </div>
+                            <div class="mt-6 md:mt-0 bg-premium-gold text-black px-6 py-3 rounded-2xl font-black shadow-lg shadow-premium-gold/20 flex items-center">
+                                <i class="fas fa-crown mr-3"></i> ACTIVE PRO MEMBER
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                            <div class="bg-black/40 border border-white/5 p-6 rounded-3xl">
+                                <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">Billing Cycle</p>
+                                <h4 class="text-white font-black text-xl">Monthly</h4>
+                                <p class="text-zinc-600 text-[10px] mt-2">Next payment: May 5, 2026</p>
+                            </div>
+                            <div class="bg-black/40 border border-white/5 p-6 rounded-3xl">
+                                <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">Plan Cost</p>
+                                <h4 class="text-white font-black text-xl">₹99.00 <span class="text-xs text-gray-600">/mo</span></h4>
+                                <p class="text-green-500 text-[10px] mt-2 flex items-center"><i class="fas fa-check-circle mr-1"></i> Auto-renewal ON</p>
+                            </div>
+                            <div class="bg-black/40 border border-white/5 p-6 rounded-3xl">
+                                <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">Current Status</p>
+                                <h4 class="text-premium-gold font-black text-xl italic uppercase">Verified Pro</h4>
+                                <div class="w-full bg-zinc-800 h-1.5 mt-3 rounded-full overflow-hidden">
+                                    <div class="bg-premium-gold w-[92%] h-full"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-6">
+                            <div class="flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-premium-gold/20 rounded-2xl flex items-center justify-center mr-4">
+                                        <i class="fas fa-credit-card text-premium-gold"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-white font-bold">Payment Methods</h4>
+                                        <p class="text-gray-500 text-xs">Manage your UPI and cards</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-700"></i>
+                            </div>
+                            <div class="flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-premium-gold/20 rounded-2xl flex items-center justify-center mr-4">
+                                        <i class="fas fa-receipt text-premium-gold"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-white font-bold">Billing History</h4>
+                                        <p class="text-gray-500 text-xs">View and download invoices</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-700"></i>
+                            </div>
+                        </div>
+
+                        <button class="w-full mt-12 py-5 text-gray-500 font-bold text-xs uppercase tracking-[0.2em] border border-white/5 hover:text-red-500 hover:border-red-500/30 transition-all rounded-3xl">
+                            Cancel Subscription
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. AUTHENTICATION SECTION -->
+        <section id="auth" class="section-container" style="display: none;">
+            <div class="auth-box">
+                <div class="auth-header">
+                    <h2><i class="fas fa-user-circle"></i> Account</h2>
+                </div>
+                <div class="auth-tabs">
+                    <button class="auth-tab" id="tabLogin" onclick="switchAuthTab('login')">Login</button>
+                    <button class="auth-tab active" id="tabSignup" onclick="switchAuthTab('signup')">Sign Up</button>
+                </div>
+
+                <!-- Login Form -->
+                <form id="loginForm" class="auth-form" style="display: none;">
+                    <div class="input-group">
+                        <label>Email Address</label>
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" placeholder="Enter your email" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Password</label>
+                        <i class="fas fa-lock"></i>
+                        <input type="password" placeholder="Enter password" required>
+                    </div>
+                    <button type="submit" class="auth-submit">Proceed to Login</button>
+                </form>
+
+                <!-- Signup Form -->
+                <form id="signupForm" class="auth-form active">
+                    <div class="input-group">
+                        <label>Full Name</label>
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="signupName" placeholder="Enter your name" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Email Address</label>
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="signupEmail" placeholder="Enter your email" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Phone Number</label>
+                        <i class="fas fa-phone"></i>
+                        <input type="tel" id="signupPhone" placeholder="Enter your phone number" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Password</label>
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="signupPassword" placeholder="Create a password" required>
+                    </div>
+                    <button type="submit" class="auth-submit">Create Account</button>
+                </form>
+            </div>
+        </section>
+
     </main>
-</div>
 
-<!-- ✅ Leaflet JS -->
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- FLOATING FAKE CHAT ASSISTANT -->
+    <div class="chat-wrapper">
+        <div class="chat-container" id="chatBox">
+            <div class="chat-header">
+                <div>
+                    <i class="fas fa-robot"></i>
+                    <span>Safety Assistant</span>
+                </div>
+                <button class="close-chat" onclick="toggleChat()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="chat-body" id="chatBody">
+                <div class="message bot">
+                    Hello! I'm your digital safety assistant. How can I help you today?
+                </div>
+            </div>
+            <div class="chat-footer">
+                <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="handleChatEnter(event)">
+                <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+        <button class="chat-fab" onclick="toggleChat()">
+            <i class="fas fa-comment-dots"></i>
+        </button>
+    </div>
 
-<!-- ✅ Map Script -->
-<script>
-  var map = L.map('map').setView([20.5937, 78.9629], 5);
+    <!-- Low Battery Guardian Modal -->
+    <div id="batteryModal" class="battery-modal" style="display: none;">
+        <div class="battery-modal-content">
+            <div class="battery-icon-large">
+                <i class="fas fa-battery-empty pulse-red"></i>
+            </div>
+            <h2>Low Battery Warning!</h2>
+            <p>Your battery is below 15%. For your safety, please check-in within 2 minutes or an emergency alert will be sent to your contacts.</p>
+            <div class="battery-timer" id="batteryCountdown">120</div>
+            <button class="battery-checkin-btn" onclick="batteryCheckIn()"><i class="fas fa-check"></i> I'M ALRIGHT</button>
+        </div>
+    </div>
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-  }).addTo(map);
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
 
-  // Live location
-  navigator.geolocation.getCurrentPosition(function(position) {
-    var lat = position.coords.latitude;
-    var lon = position.coords.longitude;
+    <!-- Scripts -->
+    <!-- OpenStreetMap Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Leaflet Routing Machine JS -->
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    <!-- Leaflet Geocoder JS -->
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
-    map.setView([lat, lon], 14);
-
-    L.marker([lat, lon]).addTo(map)
-      .bindPopup("You are here").openPopup();
-  });
-</script>
-
-<script src="script.js"></script>
-
+    <!-- Custom Logic -->
+    <script src="script.js"></script>
 </body>
 </html>
