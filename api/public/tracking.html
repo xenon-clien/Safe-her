@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safe Her - Family Tracking Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #050510;
+            color: white;
+        }
+        .glass {
+            background: rgba(15, 15, 35, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 24px;
+            z-index: 1;
+        }
+        .pulse-danger {
+            animation: pulse-red 2s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(255, 51, 102, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(255, 51, 102, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 51, 102, 0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+    <div class="max-w-6xl mx-auto space-y-8">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 glass p-6 rounded-[2rem]">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i class="fas fa-shield-heart text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight">FAMILY TRACKING</h1>
+                    <p class="text-xs text-zinc-400 font-medium uppercase tracking-widest">Safe Her Emergency Relay</p>
+                </div>
+            </div>
+            <div id="statusBadge" class="flex items-center gap-3 bg-red-500/10 text-red-500 px-4 py-2 rounded-full border border-red-500/20 font-bold text-sm pulse-danger">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                SOS ACTIVE
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Map and Stats -->
+            <div class="lg:col-span-2 space-y-8">
+                <div id="map" class="shadow-2xl border border-white/5"></div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="glass p-6 rounded-[2rem]">
+                        <p class="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2">Last Reported Location</p>
+                        <h3 id="locationCoords" class="text-lg font-bold">Waiting for coordinates...</h3>
+                    </div>
+                    <div class="glass p-6 rounded-[2rem]">
+                        <p class="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2">Update Recency</p>
+                        <h3 id="lastUpdate" class="text-lg font-bold">Live Tracking Enabled</h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Records Feed -->
+            <div class="space-y-6">
+                <div class="glass p-8 rounded-[2rem] h-full">
+                    <h3 class="text-lg font-extrabold mb-6 flex items-center gap-3">
+                        <i class="fas fa-list-ul text-indigo-500"></i>
+                        LIVE EVENT FEED
+                    </h3>
+                    <div id="eventFeed" class="space-y-4">
+                        <!-- Events injected here -->
+                        <div class="text-zinc-600 text-xs italic text-center py-12">Waiting for relay data...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const userId = window.location.pathname.split('/').pop();
+        let map, marker, circle;
+
+        function initMap() {
+            map = L.map('map').setView([0, 0], 2);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors'
+            }).addTo(map);
+        }
+
+        async function updateDashboard() {
+            try {
+                const response = await fetch(`/api/public/status/${userId}`);
+                const data = await response.json();
+
+                if (data.status === 'offline') {
+                    document.getElementById('statusBadge').innerHTML = "USER OFFLINE";
+                    document.getElementById('statusBadge').classList.remove('pulse-danger', 'text-red-500', 'border-red-500/20');
+                    document.getElementById('statusBadge').classList.add('text-zinc-500', 'border-zinc-500/20');
+                    return;
+                }
+
+                // Update Map
+                const { latitude, longitude } = data.location;
+                const pos = [latitude, longitude];
+                
+                if (!marker) {
+                    marker = L.marker(pos).addTo(map);
+                    circle = L.circle(pos, { radius: 50, color: '#ff3366', fillOpacity: 0.1 }).addTo(map);
+                    map.setView(pos, 15);
+                } else {
+                    marker.setLatLng(pos);
+                    circle.setLatLng(pos);
+                }
+
+                document.getElementById('locationCoords').innerText = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+                document.getElementById('lastUpdate').innerText = new Date(data.updatedAt).toLocaleTimeString();
+
+                // Update Feed
+                renderFeed(data.logs);
+
+            } catch (err) {
+                console.error("Dashboard Sync Error:", err);
+            }
+        }
+
+        function renderFeed(logs) {
+            const feed = document.getElementById('eventFeed');
+            if (logs.length === 0) {
+                feed.innerHTML = '<div class="text-zinc-600 text-xs italic text-center py-12">No event records found.</div>';
+                return;
+            }
+
+            feed.innerHTML = logs.map(log => `
+                <div class="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-black uppercase tracking-widest ${log.status === 'error' ? 'text-red-500' : 'text-indigo-400'}">${log.type}</span>
+                        <span class="text-[9px] text-zinc-500">${log.time}</span>
+                    </div>
+                    <p class="text-xs font-bold text-white">${log.message}</p>
+                </div>
+            `).join('');
+        }
+
+        initMap();
+        updateDashboard();
+        setInterval(updateDashboard, 5000); // Poll every 5 seconds
+    </script>
+</body>
+</html>

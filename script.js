@@ -3,10 +3,44 @@
 ========================================= */
 
 let map;
-let userMarker; 
+let userMarker;
 let isSosActive = false;
 let audioContext, oscillator, gainNode;
 let userLatLng = { lat: 30.901, lng: 75.8573 }; // Default Ludhiana
+const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') 
+    ? 'http://localhost:5000/api' 
+    : '/api';
+
+/**
+ * Sends the initial SOS alert to the backend.
+ */
+async function sendSOSAlert() {
+    const user = JSON.parse(localStorage.getItem('hersafety_user') || '{"id":"demo_user_123", "name":"Demo User"}');
+    
+    const payload = {
+        userId: user.id || user._id,
+        userName: user.name,
+        location: userLatLng,
+        message: "Emergency SOS triggered! Please monitor my live location link.",
+        timestamp: new Date().toISOString()
+    };
+
+    try {
+        const response = await fetch(`${API_URL}/send-alert`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        console.log("SOS Alert Response:", data);
+        
+        if (response.ok) {
+            addSecurityLog('SOS', 'Emergency Alert Broadcasted to Family');
+        }
+    } catch (error) {
+        console.error("Failed to send SOS alert:", error);
+    }
+}
 
 // REAL-WORLD CRIME HOTSPOTS (Ludhiana Focus)
 const CRIME_HOTSPOTS = [
@@ -33,8 +67,8 @@ function initMap(lat, lng) {
             .bindPopup("<b>You are here</b>").openPopup();
 
         // Fix leaflet blank space/grey tile issue on resize/zoom load 
-        setTimeout(() => { 
-            map.invalidateSize(); 
+        setTimeout(() => {
+            map.invalidateSize();
             fetchDangerZones(); // Lal, peele aur hare ghere mangwane ke liye
         }, 500);
 
@@ -47,7 +81,7 @@ function initMap(lat, lng) {
     // 2. Taki location update hone par properly pan kare
     else {
         if (userMarker) {
-            userMarker.setLatLng([lat, lng]); 
+            userMarker.setLatLng([lat, lng]);
         }
         // Properly pan map preventing blank bounds drift
         map.panTo([lat, lng]);
@@ -59,7 +93,7 @@ function initMap(lat, lng) {
 let dangerZoneTimeout;
 function fetchDangerZonesDebounced() {
     clearTimeout(dangerZoneTimeout);
-    dangerZoneTimeout = setTimeout(fetchDangerZones, 400); 
+    dangerZoneTimeout = setTimeout(fetchDangerZones, 400);
 }
 
 // --- REAL CRIME ANALYTICS & COMMUNITY DATA ---
@@ -73,7 +107,7 @@ function fetchDangerZones() {
     window.dangerLayers = [];
 
     const bounds = map.getBounds();
-    
+
     // 1. RENDER REAL-WORLD HOTSPOTS
     CRIME_HOTSPOTS.forEach(spot => {
         if (bounds.contains([spot.lat, spot.lng])) {
@@ -124,7 +158,7 @@ function reportDangerAtCenter() {
     if (!map) return;
     const center = map.getCenter();
     const reason = prompt("Enter danger reason (e.g., Slun area, No street lights, Recent snatching):");
-    
+
     if (reason) {
         const reports = getCommunityReports();
         reports.push({ lat: center.lat, lng: center.lng, reason: reason, time: Date.now() });
@@ -213,7 +247,7 @@ function runLoader() {
                 loader.classList.add('fade-out');
                 document.body.classList.add('loaded'); // Force scroll enablement
                 // Remove from DOM after transition ends
-                setTimeout(() => { if(loader) loader.style.display = 'none'; }, 650);
+                setTimeout(() => { if (loader) loader.style.display = 'none'; }, 650);
             }, 400);
             // Start app logic with safety catch
             try {
@@ -269,7 +303,7 @@ function updateDashboardGPS(lat, lng) {
         .then(data => {
             const area = data.address.suburb || data.address.city_district || data.address.city || 'Your Area';
             if (areaEl) areaEl.innerText = area;
-        }).catch(() => { if(areaEl) areaEl.innerText = 'GPS Active'; });
+        }).catch(() => { if (areaEl) areaEl.innerText = 'GPS Active'; });
 }
 
 // Real Safety Score Logic
@@ -279,7 +313,7 @@ function refreshSafetyScore() {
 
     // Calculate Current Score
     let currentScore = calculateDynamicScore(new Date().getHours());
-    
+
     // Update Main Score UI
     scoreEl.innerText = `${currentScore.score} / 10`;
     scoreEl.style.color = currentScore.color;
@@ -296,24 +330,24 @@ function refreshSafetyScore() {
 
 function calculateDynamicScore(hour) {
     let baseScore = 9.5;
-    
+
     // Time factor (Night is riskier)
-    if (hour >= 22 || hour < 5) baseScore -= 2.5; 
+    if (hour >= 22 || hour < 5) baseScore -= 2.5;
     else if (hour >= 18) baseScore -= 1.0;
 
     // Proximity to Real Hotspots factor
     let minDistance = Infinity;
     const allHotspots = [...CRIME_HOTSPOTS, ...getCommunityReports()];
-    
+
     if (userLatLng) {
         allHotspots.forEach(spot => {
             const dist = getDistance(userLatLng.lat, userLatLng.lng, spot.lat, spot.lng);
             if (dist < minDistance) minDistance = dist;
         });
 
-        if (minDistance < 0.5) baseScore -= 5.0; 
-        else if (minDistance < 1.0) baseScore -= 2.5; 
-        else if (minDistance < 2.0) baseScore -= 1.0; 
+        if (minDistance < 0.5) baseScore -= 5.0;
+        else if (minDistance < 1.0) baseScore -= 2.5;
+        else if (minDistance < 2.0) baseScore -= 1.0;
     }
 
     const finalScore = Math.max(1.0, Math.min(10, baseScore)).toFixed(1);
@@ -330,62 +364,13 @@ function getDistance(lat1, lon1, lat2, lon2) {
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     return R * c;
 }
 
-// ============================================================
-//  VOICE SOS - Web Speech API
-// ============================================================
-let voiceRecognition = null;
-let isVoiceSOSActive = false;
-
-function toggleVoiceSOS() {
-    const btn = document.getElementById('voiceSOSBtn');
-
-    if (isVoiceSOSActive) {
-        // Turn OFF
-        if (voiceRecognition) voiceRecognition.stop();
-        isVoiceSOSActive = false;
-        btn.classList.remove('active-red');
-        btn.querySelector('span').innerText = 'Voice SOS';
-        showToast('Voice SOS deactivated', 'success');
-        return;
-    }
-
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        showToast('Voice recognition not supported in this browser', 'error');
-        return;
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    voiceRecognition = new SpeechRecognition();
-    voiceRecognition.continuous = true;
-    voiceRecognition.interimResults = false;
-    voiceRecognition.lang = 'en-IN';
-
-    voiceRecognition.onresult = (event) => {
-        const last = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
-        if (last.includes('help') || last.includes('bachao') || last.includes('danger') || last.includes('sos')) {
-            showToast('🚨 Voice SOS triggered! "' + last + '"', 'error');
-            triggerSOS();
-        }
-    };
-
-    voiceRecognition.onerror = () => {
-        isVoiceSOSActive = false;
-        btn.classList.remove('active-red');
-        btn.querySelector('span').innerText = 'Voice SOS';
-    };
-
-    voiceRecognition.start();
-    isVoiceSOSActive = true;
-    btn.classList.add('active-red');
-    btn.querySelector('span').innerText = '🎙 Listening...';
-    showToast('Voice SOS ON — Say "Help" or "Bachao" to alert!', 'success');
-}
+// (Note: Voice SOS logic has been moved to the Tactical Tools section at the end of the script for professional consolidation)
 
 // ============================================================
 //  CHECK-IN TIMER
@@ -444,7 +429,7 @@ function updateTimerDisplay() {
     const m = Math.floor(checkInSecsLeft / 60);
     const s = checkInSecsLeft % 60;
     document.getElementById('timerCountdown').innerText =
-        `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+        `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 function checkInNow() {
@@ -480,7 +465,7 @@ function quickShareLocation() {
                 text: `🚨 My location: https://maps.google.com/?q=${lat},${lng}`,
                 url: `https://maps.google.com/?q=${lat},${lng}`
             }).then(() => showToast('Location shared!', 'success'))
-              .catch(() => {});
+                .catch(() => { });
         } else {
             // Fallback: WhatsApp
             window.open(`https://wa.me/?text=${msg}`, '_blank');
@@ -491,73 +476,7 @@ function quickShareLocation() {
     });
 }
 
-// ============================================================
-//  SHAKE TO SOS - DeviceMotion API (Mobile)
-// ============================================================
-let shakeSOSActive = false;
-let lastShakeTime = 0;
-let shakeCount = 0;
-const SHAKE_THRESHOLD = 15;
-
-function toggleShakeSOS() {
-    const btn = document.getElementById('shakeBtn');
-
-    if (shakeSOSActive) {
-        window.removeEventListener('devicemotion', handleShake);
-        shakeSOSActive = false;
-        btn.classList.remove('active-red');
-        btn.querySelector('span').innerText = 'Shake SOS';
-        showToast('Shake SOS deactivated', 'success');
-        return;
-    }
-
-    if (typeof DeviceMotionEvent === 'undefined') {
-        showToast('Shake detection not supported. Use a mobile device.', 'error');
-        return;
-    }
-
-    // iOS 13+ needs permission
-    if (typeof DeviceMotionEvent.requestPermission === 'function') {
-        DeviceMotionEvent.requestPermission().then(state => {
-            if (state === 'granted') {
-                activateShakeSOS(btn);
-            } else {
-                showToast('Motion permission denied', 'error');
-            }
-        });
-    } else {
-        activateShakeSOS(btn);
-    }
-}
-
-function activateShakeSOS(btn) {
-    window.addEventListener('devicemotion', handleShake);
-    shakeSOSActive = true;
-    btn.classList.add('active-red');
-    btn.querySelector('span').innerText = '📳 Shake ON';
-    showToast('Shake SOS activated! Shake phone 3x to send SOS.', 'success');
-}
-
-function handleShake(e) {
-    const acc = e.accelerationIncludingGravity;
-    if (!acc) return;
-    const total = Math.abs(acc.x) + Math.abs(acc.y) + Math.abs(acc.z);
-
-    if (total > SHAKE_THRESHOLD) {
-        const now = Date.now();
-        if (now - lastShakeTime < 1500) {
-            shakeCount++;
-            if (shakeCount >= 3) {
-                shakeCount = 0;
-                showToast('📳 Shake detected! Triggering SOS...', 'error');
-                triggerSOS();
-            }
-        } else {
-            shakeCount = 1;
-        }
-        lastShakeTime = now;
-    }
-}
+// (Note: Shake SOS logic has been moved to the Tactical Tools section at the end of the script for professional consolidation)
 
 
 // --- Web Audio API Advanced Siren Synthesis ---
@@ -569,27 +488,27 @@ function playAlarm() {
     oscillator = audioContext.createOscillator();
     gainNode = audioContext.createGain();
 
-    oscillator.type = 'sawtooth'; // Harsher waveform for police siren
-    oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+    oscillator.type = 'sine'; // Smoother, professional alert sound
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
 
-    // Dynamic Police Siren Frequency Sweep
+    // Decent Alert Tone Sequence
     let isHigh = false;
     window.sirenInterval = setInterval(() => {
         if (!isSosActive) return;
-        const targetFreq = isHigh ? 600 : 1200;
-        oscillator.frequency.linearRampToValueAtTime(targetFreq, audioContext.currentTime + 0.4);
+        const targetFreq = isHigh ? 880 : 660; // Alternating A5 and E5 for a "decent" alert
+        oscillator.frequency.exponentialRampToValueAtTime(targetFreq, audioContext.currentTime + 0.1);
         isHigh = !isHigh;
-    }, 400);
+    }, 600); // Slower, less aggressive interval
 
     oscillator.connect(gainNode);
     gainNode.connect(audioContext.destination);
 
-    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime); // High volume
+    gainNode.gain.setValueAtTime(0.4, audioContext.currentTime); // Balanced volume
     oscillator.start();
-    
-    // Activate Intense Visual Strobe Overlay
+
+    // Activate Smooth Visual Pulse Overlay
     let strobe = document.getElementById('strobeOverlay');
-    if(strobe) strobe.classList.add('strobe-active');
+    if (strobe) strobe.classList.add('strobe-active');
 }
 
 function stopAlarm() {
@@ -601,10 +520,10 @@ function stopAlarm() {
     }
     // Deactivate Strobe
     let strobe = document.getElementById('strobeOverlay');
-    if(strobe) strobe.classList.remove('strobe-active');
+    if (strobe) strobe.classList.remove('strobe-active');
 }
 
-// Duplicate Fake Call functions removed. Premium-gated versions remain below.
+// Duplicate Fake Call functions removed.
 // --- SOS Logic ---
 function triggerSOS() {
     const sosContainer = document.querySelector('.sos-container');
@@ -616,39 +535,33 @@ function triggerSOS() {
         sosContainer.classList.add('sos-active');
         document.querySelector('.sos-text').innerText = 'STOP';
 
-        // 2. Alarm Chalao (Line 73 wala function call)
+        // 2. Alarm Chalao
         if (typeof playAlarm === "function") {
             playAlarm();
         }
 
-        // 2.5 Start Digital Blackbox (Evidence Recording)
-        startDigitalBlackbox();
+        // 3. Start Digital Blackbox (Evidence Recording)
+        if (typeof startDigitalBlackbox === "function") {
+            startDigitalBlackbox();
+        }
 
-        // 3. Backend Data Taiyar karo
-        const sosData = {
-            userId: "64aa0f8b1c4b7b20c8f5f4b5",
-            location: {
-                latitude: 28.6139,
-                longitude: 77.2090
-            },
-            message: "Emergency SOS triggered from Frontend!"
-        };
+        // 4. Start Live Tracking Beacon (for Family Dashboard)
+        if (typeof startLiveBeacon === "function") {
+            startLiveBeacon();
+        }
 
-        // 4. Backend ko Bhejo
-        fetch('http://localhost:5000/api/send-alert', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(sosData)
-        })
-            .then(res => res.json())
-            .then(data => {
-                console.log("Success:", data);
-                if (statusText) statusText.innerText = "Alert Sent! ✅";
-            })
-            .catch(err => {
-                console.error("Error:", err);
-                if (statusText) statusText.innerText = "Server Error ❌";
-            });
+        // 5. Show Tracking Link (In Console for Demo)
+        const user = JSON.parse(localStorage.getItem('hersafety_user') || '{"id":"demo_user_123"}');
+        const trackingLink = `${window.location.origin}/track/${user.id}`;
+        console.log(`%c🚨 EMERGENCY RELAY ACTIVE`, "background: #ff4757; color: white; padding: 10px; font-weight: bold;");
+        console.log(`%cTracking link sent to family: ${trackingLink}`, "color: #00d2ff; font-weight: bold;");
+        
+        if (typeof showToast === 'function') {
+            showToast("Tracking link shared with family!", "error");
+        }
+
+        // 6. Send initial Alert to API
+        sendSOSAlert();
 
     } else {
         // --- SOS OFF KARO ---
@@ -656,7 +569,7 @@ function triggerSOS() {
         sosContainer.classList.remove('sos-active');
         document.querySelector('.sos-text').innerText = 'SOS';
 
-        // Alarm Band karo (Line 95 wala function call)
+        // Alarm Band karo
         if (typeof stopAlarm === "function") {
             stopAlarm();
         }
@@ -666,7 +579,7 @@ function triggerSOS() {
             if (statusText) statusText.innerHTML = '';
         }, 3000);
     }
-} // <--- Ye bracket function ko yahan band karega (Line 154 ke paas)
+}
 
 
 
@@ -678,6 +591,9 @@ function switchSection(sectionId) {
     });
     // Show selected
     document.getElementById(sectionId).style.display = 'block';
+
+    // Update Background Animation Mode
+    if (window.changeBgMode) window.changeBgMode(sectionId);
 
     // Update Nav active states
     document.querySelectorAll('.nav-links a').forEach(link => {
@@ -854,7 +770,7 @@ function showToast(message, type) {
         console.warn("Toast skipped: #toastContainer not found.");
         return;
     }
-    
+
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
 
@@ -876,61 +792,105 @@ let routeMap = null;
 let routeControl = null;
 let currentRouteMode = 'safe';
 userLatLng = null; // Global coordinates
-let isPremium = localStorage.getItem('herSafety_premium') === 'true';
+let isPremium = localStorage.getItem('hersafety_premium') === 'true';
 
-// ============================================================
-//  PREMIUM & PAYMENT LOGIC
-// ============================================================
 function updatePremiumUI() {
+    console.log("Updating Premium UI...");
+
+    // 1. Elements dhoondo
+    const premiumSection = document.getElementById('premium');
+    const upgradeButton = document.getElementById('upgrade-btn');
     const fakeCallWrap = document.getElementById('fakeCallWrapper');
     const blackboxWrap = document.getElementById('blackboxWrapper');
     const premiumNav = document.getElementById('premiumNavLink');
     const goPremiumNav = document.getElementById('goPremiumNav');
 
-    if (isPremium) {
-        if (fakeCallWrap) fakeCallWrap.classList.remove('premium-locked');
-        if (blackboxWrap) blackboxWrap.classList.remove('premium-locked');
+    // 2. Premium Status Check (LocalStorage se)
+    const isPremiumActive = localStorage.getItem('hersafety_premium') === 'true';
+
+    if (isPremiumActive) {
+        // PRO Unlocked Logic
+        if (premiumSection) premiumSection.style.display = 'block';
+        if (upgradeButton) upgradeButton.style.display = 'none';
+
         if (premiumNav) premiumNav.style.display = 'block';
         if (goPremiumNav) goPremiumNav.style.display = 'none';
-        
-        // Update any "PRO UNLOCKED" badges
+
+        // Badge show karna
         document.querySelectorAll('.text-premium-gold').forEach(el => el.style.display = 'inline-block');
+
+        console.log("👑 Premium Features Enabled!");
     } else {
-        if (fakeCallWrap) fakeCallWrap.classList.add('premium-locked');
-        if (blackboxWrap) blackboxWrap.classList.add('premium-locked');
-        if (premiumNav) premiumNav.style.display = 'none';
-        if (goPremiumNav) goPremiumNav.style.display = 'block';
+        if (premiumSection) premiumSection.style.display = 'none';
+        if (upgradeButton) upgradeButton.style.display = 'block';
+    }
+
+    // 3. Ensuring NOW-FREE features are always unlocked
+    if (fakeCallWrap) fakeCallWrap.classList.remove('premium-locked');
+    if (blackboxWrap) blackboxWrap.classList.remove('premium-locked');
+}
+
+async function initiateRazorpayPayment() {
+    // Pehle confirm karein
+    if (!confirm("You are about to upgrade to Premium (₹99). Continue?")) return;
+
+    try {
+        // 1. Backend se Order ID mangwana (URL check karein)
+        const response = await fetch('http://localhost:5000/api/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: 99, currency: "INR" })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to create order');
+        }
+
+        const order = await response.json();
+        console.log("Razorpay Order Created:", order);
+
+        // 2. Open Razorpay Checkout
+        const options = {
+            "key": "rzp_test_5W0K6m8vVzR6m8", // Yahan apni Dashboard wali key dalein
+            "amount": order.amount,
+            "currency": order.currency,
+            "name": "Safe Her Premium",
+            "description": "24/7 Security & Cloud Evidence Locker",
+            "order_id": order.id,
+            "handler": function (response) {
+                // Success logic
+                console.log("Payment Success:", response);
+                localStorage.setItem('hersafety_premium', 'true');
+
+                // UI update karne ke liye
+                if (typeof updatePremiumUI === "function") updatePremiumUI();
+                if (typeof switchSection === "function") switchSection('premium');
+
+                alert("👑 Pro Unlocked: Digital Blackbox & Fake Call active!");
+            },
+            "prefill": {
+                "name": "User Name",
+                "email": "user@example.com"
+            },
+            "theme": { "color": "#ff4757" }
+        };
+
+        const rzp1 = new Razorpay(options);
+
+        rzp1.on('payment.failed', function (response) {
+            alert("Payment Failed: " + response.error.description);
+        });
+
+        rzp1.open();
+
+    } catch (err) {
+        console.error("Payment Process Error:", err);
+        alert("System Error: " + err.message);
     }
 }
 
-function initiateRazorpayPayment() {
-    const options = {
-        "key": "rzp_test_YOUR_KEY_HERE", // Replace with your real key
-        "amount": "9900", // 99.00 INR
-        "currency": "INR",
-        "name": "Safe Her Premium",
-        "description": "Monthly Safety Subscription",
-        "image": "https://cdn-icons-png.flaticon.com/512/1162/1162456.png",
-        "handler": function (response) {
-            console.log("Payment Success:", response);
-            isPremium = true;
-            localStorage.setItem('herSafety_premium', 'true');
-            updatePremiumUI();
-            showToast("👑 Welcome to Safe Her Pro!", "success");
-            switchSection('premium');
-        },
-        "prefill": {
-            "name": "User",
-            "email": "user@example.com",
-            "contact": "9999999999"
-        },
-        "theme": {
-            "color": "#ffcc00"
-        }
-    };
-    const rzp1 = new Razorpay(options);
-    rzp1.open();
-}
+
 
 function showPremiumPopup() {
     const modal = document.createElement('div');
@@ -1040,9 +1000,9 @@ function calculateRoute() {
             const lngSpan = Math.abs(destLng - fromLng) + 0.04;
 
             // Night mode: more red zones
-            const redCount   = isNight ? 8 : 4;
+            const redCount = isNight ? 8 : 4;
             const yellowCount = isNight ? 5 : 4;
-            const greenCount  = isNight ? 4 : 8;
+            const greenCount = isNight ? 4 : 8;
 
             function addZone(lat, lng, sLat, sLng, color, fill, title, info) {
                 const box = [[lat - sLat, lng - sLng], [lat + sLat, lng + sLng]];
@@ -1091,10 +1051,10 @@ function calculateRoute() {
 
             // ─── Green Route Line (Safe Corridor) ───────────────────
             const routeColor = currentRouteMode === 'safe' ? '#4caf50'
-                             : currentRouteMode === 'fast' ? '#2196f3' : '#ff9800';
+                : currentRouteMode === 'fast' ? '#2196f3' : '#ff9800';
 
             routeControl = L.Routing.control({
-                waypoints: [ L.latLng(fromLat, fromLng), L.latLng(destLat, destLng) ],
+                waypoints: [L.latLng(fromLat, fromLng), L.latLng(destLat, destLng)],
                 router: L.Routing.osrmv1({
                     serviceUrl: 'https://router.project-osrm.org/route/v1',
                     profile: currentRouteMode === 'walk' ? 'foot' : 'driving'
@@ -1111,27 +1071,27 @@ function calculateRoute() {
             }).addTo(routeMap);
 
             // Custom markers
-            const greenIcon = L.divIcon({ html: `<div style="background:#4caf50;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px #4caf50;"></div>`, iconSize: [14,14], className: '' });
-            const redIcon   = L.divIcon({ html: `<div style="background:#f44336;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px #f44336;"></div>`, iconSize: [14,14], className: '' });
+            const greenIcon = L.divIcon({ html: `<div style="background:#4caf50;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px #4caf50;"></div>`, iconSize: [14, 14], className: '' });
+            const redIcon = L.divIcon({ html: `<div style="background:#f44336;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px #f44336;"></div>`, iconSize: [14, 14], className: '' });
 
             L.marker([fromLat, fromLng], { icon: greenIcon }).addTo(routeMap).bindPopup('<b>📍 Your Location</b>').openPopup();
             L.marker([destLat, destLng], { icon: redIcon }).addTo(routeMap).bindPopup(`<b>🏁 ${dest.display_name.split(',')[0]}</b>`);
 
-            routeMap.fitBounds([[fromLat, fromLng],[destLat, destLng]], { padding: [40, 40] });
+            routeMap.fitBounds([[fromLat, fromLng], [destLat, destLng]], { padding: [40, 40] });
 
             // Stats
-            routeControl.on('routesfound', function(e) {
+            routeControl.on('routesfound', function (e) {
                 const route = e.routes[0];
                 const summary = route.summary;
                 const km = (summary.totalDistance / 1000).toFixed(1);
                 const mins = Math.round(summary.totalTime / 60);
-                
+
                 // --- DYNAMIC ROUTE SAFETY ANALYSIS ---
                 const coords = route.coordinates;
                 const morning = calculateRouteAverageScore(coords, 9);
                 const evening = calculateRouteAverageScore(coords, 19);
-                const night   = calculateRouteAverageScore(coords, 2);
-                
+                const night = calculateRouteAverageScore(coords, 2);
+
                 // Current context score
                 const currentHour = new Date().getHours();
                 const current = calculateRouteAverageScore(coords, currentHour);
@@ -1145,7 +1105,7 @@ function calculateRoute() {
                 document.getElementById('routeScoreMorning').innerText = morning.score;
                 document.getElementById('routeScoreEvening').innerText = evening.score;
                 document.getElementById('routeScoreNight').innerText = night.score;
-                
+
                 document.getElementById('routeForecast').style.display = 'grid';
                 document.getElementById('routeInfoPanel').style.display = 'flex';
             });
@@ -1162,7 +1122,7 @@ function calculateRouteAverageScore(coords, hour) {
     // Sample coordinates (e.g., every 5th point to keep it fast)
     let totalScore = 0;
     let sampleCount = 0;
-    const step = Math.max(1, Math.floor(coords.length / 20)); 
+    const step = Math.max(1, Math.floor(coords.length / 20));
 
     for (let i = 0; i < coords.length; i += step) {
         const pt = coords[i];
@@ -1228,7 +1188,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         // 2. Loader Start Karo
         runLoader();
-        
+
         // 3. Battery Monitor Start Karo
         initBatteryGuardian();
 
@@ -1249,36 +1209,36 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function addCustomContact(e) {
-    if(e) e.preventDefault();
+    if (e) e.preventDefault();
     const nameInput = document.getElementById('contactName');
     const phoneInput = document.getElementById('contactPhone');
-    
-    if(!nameInput || !phoneInput) return;
-    
+
+    if (!nameInput || !phoneInput) return;
+
     const name = nameInput.value.trim();
     const phone = phoneInput.value.trim();
-    
-    if(!name || !phone) return;
-    
+
+    if (!name || !phone) return;
+
     let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
     contacts.push({ id: Date.now(), name, phone });
     localStorage.setItem('herSafety_contacts', JSON.stringify(contacts));
-    
+
     nameInput.value = '';
     phoneInput.value = '';
-    
-    if(typeof showToast === 'function') {
+
+    if (typeof showToast === 'function') {
         showToast("Contact Saved Successfully", "success");
     }
-    
+
     renderCustomContacts();
 }
 
-window.deleteContact = function(id) {
+window.deleteContact = function (id) {
     let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
     contacts = contacts.filter(c => c.id !== id);
     localStorage.setItem('herSafety_contacts', JSON.stringify(contacts));
-    if(typeof showToast === 'function') {
+    if (typeof showToast === 'function') {
         showToast("Contact Deleted", "success");
     }
     renderCustomContacts();
@@ -1286,14 +1246,14 @@ window.deleteContact = function(id) {
 
 function renderCustomContacts() {
     const grid = document.getElementById('contactsGrid');
-    if(!grid) return;
-    
+    if (!grid) return;
+
     document.querySelectorAll('.dynamic-contact').forEach(el => el.remove());
-    
+
     let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
-    
+
     // Default mock data for first-time visitors
-    if(contacts.length === 0 && !localStorage.getItem('herSafety_initialized_contacts')) {
+    if (contacts.length === 0 && !localStorage.getItem('herSafety_initialized_contacts')) {
         contacts = [
             { id: 1, name: 'Dad', phone: '+1 234 567 8900' },
             { id: 2, name: 'Mom', phone: '+1 987 654 3210' }
@@ -1301,7 +1261,7 @@ function renderCustomContacts() {
         localStorage.setItem('herSafety_contacts', JSON.stringify(contacts));
         localStorage.setItem('herSafety_initialized_contacts', 'true');
     }
-    
+
     contacts.forEach(contact => {
         const div = document.createElement('div');
         div.className = 'contact-card family dynamic-contact';
@@ -1464,62 +1424,254 @@ async function startDigitalBlackbox() {
     }
 }
 
-function uploadEvidenceMock(blob) {
-    console.log("☁️ Evidence Locker: Uploading encrypted audio blob...", blob.size, "bytes");
-    // Simulate progress
+// ============================================================
+//  EVIDENCE LOCKER & LOGGING SYSTEM (PROFESSIONAL)
+// ============================================================
+function addSecurityLog(type, message, status = 'success') {
+    const history = JSON.parse(localStorage.getItem('safeher_logs') || '[]');
+    const newLog = {
+        id: Date.now(),
+        type: type,
+        message: message,
+        time: new Date().toLocaleTimeString(),
+        date: new Date().toLocaleDateString(),
+        status: status
+    };
+    history.unshift(newLog); // Newest first
+    localStorage.setItem('safeher_logs', JSON.stringify(history.slice(0, 10))); // Keep last 10
+    renderSecurityLogs();
+
+    // Multi-channel Simulation (Console for Demo)
+    console.log(`%c[ALERT SYNC] Sending ${type} to Emergency Contacts via SMS/WhatsApp...`, 'color: #ff4757; font-weight: bold;');
+}
+
+function renderSecurityLogs() {
+    const container = document.getElementById('evidenceHistory');
+    if (!container) return;
+    
+    const history = JSON.parse(localStorage.getItem('safeher_logs') || '[]');
+    
+    if (history.length === 0) {
+        container.innerHTML = '<div class="text-zinc-600 text-[10px] italic text-center py-4 uppercase tracking-widest">No recent security logs found in cloud sync.</div>';
+        return;
+    }
+
+    container.innerHTML = history.map(log => `
+        <div class="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5 animate-fadeIn">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center ${log.status === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">
+                <i class="fas ${log.type === 'SOS' ? 'fa-triangle-exclamation' : 'fa-shield-halved'} text-xs"></i>
+            </div>
+            <div class="flex-1">
+                <p class="text-white text-[11px] font-bold">${log.message}</p>
+                <div class="flex items-center gap-2 text-[9px] text-zinc-500 uppercase tracking-tighter">
+                    <span>${log.time}</span> • <span>${log.date}</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function clearLogs() {
+    if (confirm("Clear local security history? Cloud backups will remain.")) {
+        localStorage.removeItem('safeher_logs');
+        renderSecurityLogs();
+    }
+}
+
+// ============================================================
+//  VOICE SOS (WEB SPEECH API)
+// ============================================================
+let voiceRecognition = null;
+let isVoiceActive = false;
+
+function toggleVoiceSOS() {
+    const btn = document.getElementById('voiceSOSBtn');
+    
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        showToast("Voice SOS not supported in this browser.", "error");
+        return;
+    }
+
+    if (isVoiceActive) {
+        stopVoiceSOS();
+    } else {
+        startVoiceSOS();
+    }
+}
+
+function startVoiceSOS() {
+    isVoiceActive = true;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    voiceRecognition = new SpeechRecognition();
+    voiceRecognition.continuous = true;
+    voiceRecognition.interimResults = false;
+    voiceRecognition.lang = 'en-US';
+
+    voiceRecognition.onstart = () => {
+        document.getElementById('voiceSOSBtn').classList.add('active-red');
+        showToast("Voice recognition active. Say 'Help' to trigger SOS.", "info");
+    };
+
+    voiceRecognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+        console.log("Speech detected:", transcript);
+        if (transcript.includes('help') || transcript.includes('emergency')) {
+            triggerSOS();
+            addSecurityLog('SOS', 'Voice Trigger: "Help" keyword detected', 'error');
+            stopVoiceSOS();
+        }
+    };
+
+    voiceRecognition.onerror = (event) => {
+        console.error("Voice SOS error:", event.error);
+        stopVoiceSOS();
+    };
+
+    voiceRecognition.onend = () => {
+        if (isVoiceActive) voiceRecognition.start(); // Auto-restart if active
+    };
+
+    voiceRecognition.start();
+}
+
+function stopVoiceSOS() {
+    isVoiceActive = false;
+    if (voiceRecognition) voiceRecognition.stop();
+    document.getElementById('voiceSOSBtn').classList.remove('active-red');
+}
+
+// ============================================================
+//  SHAKE SOS (DEVICEMOTION API)
+// ============================================================
+let isShakeActive = false;
+let lastShakeTime = 0;
+
+function toggleShakeSOS() {
+    if (isShakeActive) {
+        isShakeActive = false;
+        document.getElementById('shakeBtn').classList.remove('active-red');
+        window.removeEventListener('devicemotion', handleShake);
+        showToast("Shake SOS deactivated.", "info");
+    } else {
+        if (typeof DeviceMotionEvent.requestPermission === 'function') {
+            DeviceMotionEvent.requestPermission()
+                .then(permissionState => {
+                    if (permissionState === 'granted') activateShakeListener();
+                })
+                .catch(console.error);
+        } else {
+            activateShakeListener();
+        }
+    }
+}
+
+function activateShakeListener() {
+    isShakeActive = true;
+    document.getElementById('shakeBtn').classList.add('active-red');
+    window.addEventListener('devicemotion', handleShake);
+    showToast("Shake SOS active. Shake phone 3x to trigger.", "info");
+}
+
+let beaconInterval = null;
+
+function startLiveBeacon() {
+    if (beaconInterval) clearInterval(beaconInterval);
+    
+    // Sync location every 5 seconds during SOS
+    beaconInterval = setInterval(() => {
+        if (!isSosActive) {
+            clearInterval(beaconInterval);
+            return;
+        }
+        
+        navigator.geolocation.getCurrentPosition(pos => {
+            const { latitude, longitude } = pos.coords;
+            const user = JSON.parse(localStorage.getItem('hersafety_user'));
+            
+            fetch(`${API_URL}/send-alert`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user.id,
+                    location: { latitude, longitude },
+                    message: "LIVE SOS BEACON UPDATING..."
+                })
+            }).then(() => console.log("📡 SOS Beacon Synced"));
+            
+        });
+    }, 5000);
+}
+
+function handleShake(event) {
+    const acc = event.accelerationIncludingGravity;
+    if (!acc) return;
+
+    const threshold = 15;
+    const { x, y, z } = acc;
+    const magnitude = Math.sqrt(x*x + y*y + z*z);
+
+    if (magnitude > threshold) {
+        const now = Date.now();
+        if (now - lastShakeTime > 1000) { // Throttle
+            triggerSOS();
+            addSecurityLog('SOS', 'Shake Trigger: Rapid device motion detected', 'error');
+            lastShakeTime = now;
+        }
+    }
+}
+
+// ============================================================
+//  PROFESSIONAL FAKE CALL
+// ============================================================
+function initiateProfessionalFakeCall() {
+    showToast("Fake Call scheduled in 10 seconds...", "success");
+    addSecurityLog('INFO', 'Fake Call Scheduled (10s delay)');
+    
     setTimeout(() => {
-        showToast("🔒 Evidence Locker: Audio uploaded to secure cloud storage.", "success");
-    }, 2000);
+        const overlay = document.getElementById('fakeCallOverlay');
+        const audio = document.getElementById('fakeRelayAudio');
+        overlay.classList.remove('hidden');
+        overlay.classList.add('flex');
+        audio.play();
+    }, 10000);
+}
+
+function stopProfessionalFakeCall() {
+    const overlay = document.getElementById('fakeCallOverlay');
+    const audio = document.getElementById('fakeRelayAudio');
+    overlay.classList.add('hidden');
+    overlay.classList.remove('flex');
+    audio.pause();
+    audio.currentTime = 0;
+    addSecurityLog('INFO', 'Fake Call Terminated');
+}
+
+function answerProfessionalFakeCall() {
+    const audio = document.getElementById('fakeRelayAudio');
+    audio.pause();
+    audio.currentTime = 0;
+    
+    document.querySelector('#fakeCallOverlay h2').innerText = "Connected...";
+    document.querySelector('#fakeCallOverlay p').innerText = "Automated Safety Relay Active";
+    
+    addSecurityLog('INFO', 'Fake Call Answered: Relay Active');
+    
+    setTimeout(() => {
+        stopProfessionalFakeCall();
+        showToast("Relay call ended.", "info");
+    }, 15000);
 }
 
 function toggleEvidenceLocker() {
-    if (!isPremium) {
-        showPremiumPopup();
-        return;
-    }
-    // Directly trigger blackbox logic
     startDigitalBlackbox();
+    addSecurityLog('INFO', 'Blackbox Evidence Recording Started');
     showToast("Evidence Locker Activated: Recording 10s audio...", "success");
 }
 
-// ============================================================
-//  FAKE CALL MODULE
-// ============================================================
-function initiateFakeCall() {
-    if (!isPremium) {
-        showPremiumPopup();
-        return;
-    }
-    
-    showToast("Fake call scheduled in 3 seconds...", "success");
-    setTimeout(() => {
-        document.getElementById('fakeCallScreen').style.display = 'flex';
-        // Play ringtone
-        const ringtone = new Audio('https://www.soundjay.com/phone/phone-calling-1.mp3');
-        ringtone.id = 'fakeRingtone';
-        ringtone.loop = true;
-        document.body.appendChild(ringtone);
-        ringtone.play();
-    }, 3000);
-}
-
-function stopFakeCall() {
-    document.getElementById('fakeCallScreen').style.display = 'none';
-    const ringtone = document.getElementById('fakeRingtone');
-    if (ringtone) {
-        ringtone.pause();
-        ringtone.remove();
-    }
-}
-
-function answerFakeCall() {
-    const callerInfo = document.querySelector('.fake-call-caller h2');
-    callerInfo.innerText = "Connected...";
-    setTimeout(() => {
-        stopFakeCall();
-        showToast("Fake call ended.", "info");
-    }, 5000);
-}
+// Initialize logs UI
+window.addEventListener('DOMContentLoaded', () => {
+    renderSecurityLogs();
+});
 
 // ============================================================
 //  LOW BATTERY GUARDIAN
@@ -1553,7 +1705,7 @@ function checkBatteryStatus(battery) {
 function startBatteryCountdown() {
     let timeLeft = 120; // 2 minutes
     const display = document.getElementById('batteryCountdown');
-    
+
     batteryCheckInTimer = setInterval(() => {
         timeLeft--;
         if (display) display.innerText = timeLeft;
@@ -1610,7 +1762,7 @@ function scanSafeHavens() {
         const marker = L.marker([haven.lat, haven.lng], { icon })
             .addTo(routeMap)
             .bindPopup(`<b>🛡️ Safe Haven: ${haven.name}</b><br>Secured Location`);
-        
+
         window.radarLayers.push(marker);
     });
 
