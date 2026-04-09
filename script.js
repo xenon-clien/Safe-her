@@ -1015,7 +1015,7 @@ async function initiateRazorpayPayment() {
             "prefill": {
                 "name": user.name || "SafeHer User",
                 "email": user.email || "user@example.com",
-                "contact": user.phone || ""
+                "contact": "" // Cleared so Razorpay asks user for number
             },
             "theme": { "color": "#9d4edd" },
             "modal": {
