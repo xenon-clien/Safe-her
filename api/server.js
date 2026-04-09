@@ -251,11 +251,18 @@ app.post('/api/create-order', async (req, res) => {
     }
 });
 
-// In-memory OTP store (for demo — use Redis in production)
-const otpStore = new Map(); // key: email, value: { otp, expires, paymentData }
+// Mongoose OTP Schema for Vercel Serverless compatibility
+const otpSchema = new mongoose.Schema({
+    email: { type: String, required: true },
+    otp: { type: String, required: true },
+    payment_id: { type: String, required: true },
+    order_id: String,
+    expiresAt: { type: Date, required: true, index: { expires: '0s' } } // Auto-delete document upon expiration
+});
+const OtpRecord = mongoose.models.OtpRecord || mongoose.model('OtpRecord', otpSchema);
 
 // 6. Direct OTP Generation for Simulator (Bypasses Razorpay Signature)
-app.post('/api/request-otp', (req, res) => {
+app.post('/api/request-otp', async (req, res) => {
     try {
         const { email, phone } = req.body;
         if (!email) return res.status(400).json({ status: "error", message: "Email required for OTP" });
@@ -263,10 +270,15 @@ app.post('/api/request-otp', (req, res) => {
         console.log(`💎 Simulator Payment Request! Generating OTP for ${email}...`);
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const expires = Date.now() + 5 * 60 * 1000; // 5 mins
-        const payment_id = `sim_${Date.now()}`; // Simulated payment ID
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 mins
+        const payment_id = `sim_${Date.now()}`;
 
-        otpStore.set(email, { otp, expires, razorpay_payment_id: payment_id });
+        // Upsert OTP record
+        await OtpRecord.findOneAndUpdate(
+            { email },
+            { otp, payment_id, expiresAt },
+            { upsert: true, new: true }
+        );
 
         const maskedPhone = phone
             ? phone.replace(/(\d{2})(\d+)(\d{4})$/, (_, a, b, c) => `${a}${'*'.repeat(b.length)}${c}`)
@@ -288,7 +300,7 @@ app.post('/api/request-otp', (req, res) => {
 });
 
 // 6. Payment Verification — verifies signature then generates OTP
-app.post('/api/verify-payment', (req, res) => {
+app.post('/api/verify-payment', async (req, res) => {
     try {
         const { razorpay_order_id, razorpay_payment_id, razorpay_signature, email, phone } = req.body;
         console.log(`🛡️ Verifying Payment: ${razorpay_payment_id}`);
@@ -304,11 +316,15 @@ app.post('/api/verify-payment', (req, res) => {
 
             // Generate 6-digit OTP
             const otp = Math.floor(100000 + Math.random() * 900000).toString();
-            const expires = Date.now() + 5 * 60 * 1000; // 5 minutes
+            const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
             // Store OTP linked to email
-            const key = email || razorpay_payment_id;
-            otpStore.set(key, { otp, expires, razorpay_payment_id, razorpay_order_id });
+            const keyEmail = email || `guest-${razorpay_payment_id}@safety.test`;
+            await OtpRecord.findOneAndUpdate(
+                { email: keyEmail },
+                { otp, payment_id: razorpay_payment_id, order_id: razorpay_order_id, expiresAt },
+                { upsert: true, new: true }
+            );
 
             // Mask phone for display: +91 98765 ***** → show last 4 digits
             const maskedPhone = phone
@@ -336,18 +352,19 @@ app.post('/api/verify-payment', (req, res) => {
 });
 
 // 6b. OTP Verification — confirm OTP then activate premium
-app.post('/api/verify-otp', (req, res) => {
+app.post('/api/verify-otp', async (req, res) => {
     try {
         const { email, otp, payment_id } = req.body;
-        const key = email || payment_id;
-        const record = otpStore.get(key);
+        const keyEmail = email && email !== 'guest' ? email : (payment_id ? `guest-${payment_id}@safety.test` : null);
+        
+        const record = await OtpRecord.findOne({ $or: [{ email: keyEmail }, { payment_id }] });
 
         if (!record) {
             return res.status(400).json({ status: "error", message: "OTP expired or not found. Please retry payment." });
         }
 
-        if (Date.now() > record.expires) {
-            otpStore.delete(key);
+        if (record.expiresAt < new Date()) {
+            await OtpRecord.deleteOne({ _id: record._id });
             return res.status(400).json({ status: "error", message: "OTP has expired. Please retry." });
         }
 
@@ -356,8 +373,8 @@ app.post('/api/verify-otp', (req, res) => {
         }
 
         // OTP matched — clean up and activate premium
-        otpStore.delete(key);
-        console.log(`✅ OTP Verified for ${key}. Premium activated!`);
+        await OtpRecord.deleteOne({ _id: record._id });
+        console.log(`✅ OTP Verified. Premium activated!`);
 
         res.status(200).json({
             status: "success",
