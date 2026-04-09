@@ -1126,28 +1126,38 @@ function startOtpTimer(seconds) {
 }
 
 async function verifySecurityCode() {
-    const inputs = document.querySelectorAll('.otp-digit');
-    const otp = [...inputs].map(i => i.value).join('').trim();
-
-    if (otp.length !== 6) {
-        showToast("Please enter the complete 6-digit OTP", "error");
-        return;
-    }
-
-    const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
     const btn = document.getElementById('otpConfirmBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
-
+    
     try {
+        const inputs = document.querySelectorAll('.otp-digit');
+        const otp = [...inputs].map(i => i.value).join('').trim();
+
+        if (otp.length !== 6) {
+            showToast("Please enter the complete 6-digit OTP", "error");
+            return;
+        }
+
+        const userStr = localStorage.getItem('herSafety_user');
+        const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : {};
+        
+        if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+
+        // Fetch with timeout to prevent freezing
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
         const res = await fetch(`${API_URL}/verify-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                email: currentOtpEmail || user.email,
+                email: currentOtpEmail || user.email || 'guest',
                 otp,
-                payment_id: currentPaymentId
-            })
+                payment_id: currentPaymentId || 'sim_unknown'
+            }),
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
 
         const data = await res.json();
 
@@ -1157,14 +1167,18 @@ async function verifySecurityCode() {
 
             // ✅ Grant Premium
             localStorage.setItem('hersafety_premium', 'true');
-            recordTransaction({
-                payment_id: currentPaymentId || data.payment_id,
-                amount: 1,
-                status: 'Success',
-                date: new Date().toLocaleDateString(),
-                time: new Date().toLocaleTimeString()
-            });
-            addSecurityLog('INFO', 'Premium Activated via OTP Verification', 'success');
+            if (typeof recordTransaction === 'function') {
+                recordTransaction({
+                    payment_id: currentPaymentId || data.payment_id || 'sim_tx_1',
+                    amount: 1,
+                    status: 'Success',
+                    date: new Date().toLocaleDateString(),
+                    time: new Date().toLocaleTimeString()
+                });
+            }
+            if (typeof addSecurityLog === 'function') {
+                addSecurityLog('INFO', 'Premium Activated via OTP Verification', 'success');
+            }
             if (typeof updatePremiumUI === "function") updatePremiumUI();
             if (typeof switchSection === "function") switchSection('pro-center');
             showToast("👑 Premium Unlocked! Welcome to Pro.", "success");
@@ -1176,7 +1190,11 @@ async function verifySecurityCode() {
 
     } catch (err) {
         console.error("OTP verify error:", err);
-        showToast("Network error. Please try again.", "error");
+        if (err.name === 'AbortError') {
+            showToast("Server took too long to respond. Please try again.", "error");
+        } else {
+            showToast("System Error. Please check your connection.", "error");
+        }
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-shield-halved mr-2"></i> Confirm & Unlock Premium'; }
     }
 }
