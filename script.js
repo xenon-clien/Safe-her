@@ -965,68 +965,62 @@ async function initiateRazorpayPayment() {
 
         const order = await response.json();
 
-        const options = {
-            "key": "rzp_test_SaxSkQwrcuFvNW",
-            "amount": order.amount,
-            "currency": order.currency,
-            "name": "Safe Her Premium",
-            "description": "24/7 Security & Cloud Evidence Locker",
-            "order_id": order.id,
-            "handler": async function (rzpResponse) {
-                // ✅ Payment completed — now verify signature + get OTP
-                showToast("🔐 Payment received! Sending OTP to your phone...", "info");
+        // Replace Razorpay logic with Custom Simulator
+        const simulatorModal = document.getElementById('customPaymentSimulator');
+        if (simulatorModal) {
+            document.getElementById('simOrderId').textContent = order.id;
+            simulatorModal.classList.remove('hidden');
+            simulatorModal.classList.add('flex');
+            
+            // Expose a global function to handle the mock result
+            window.handleSimulatedPayment = async function(isSuccess) {
+                simulatorModal.classList.add('hidden');
+                simulatorModal.classList.remove('flex');
+                
+                if (!isSuccess) {
+                    showToast("Payment Failed or Cancelled by User.", "error");
+                    return;
+                }
 
+                // If success, directly hit /api/request-otp to bypass signature checks
+                showToast("🔐 Secure payment successful! Generating OTP...", "info");
                 try {
-                    const verifyResponse = await fetch(`${API_URL}/verify-payment`, {
+                    const otpResponse = await fetch(`${API_URL}/request-otp`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            razorpay_order_id: rzpResponse.razorpay_order_id,
-                            razorpay_payment_id: rzpResponse.razorpay_payment_id,
-                            razorpay_signature: rzpResponse.razorpay_signature,
                             email: user.email,
                             phone: user.phone || ''
                         })
                     });
 
-                    const verifyData = await verifyResponse.json();
+                    const verifyData = await otpResponse.json();
 
-                    if (verifyResponse.ok && verifyData.status === 'otp_required') {
-                        // Store for later use in verifySecurityCode
+                    if (otpResponse.ok && verifyData.status === 'success') {
                         currentOtpEmail = user.email;
-                        currentPaymentId = rzpResponse.razorpay_payment_id;
+                        currentPaymentId = verifyData.payment_id;
 
-                        // Show OTP modal with user's masked phone
+                        // Show OTP modal directly
                         openOtpModal({
                             maskedPhone: verifyData.maskedPhone,
-                            paymentId: rzpResponse.razorpay_payment_id,
-                            devOtp: verifyData.dev_otp // shown in dev mode only
+                            paymentId: verifyData.payment_id,
+                            devOtp: verifyData.dev_otp
                         });
-
                     } else {
-                        showToast(verifyData.message || "Verification failed", "error");
+                        showToast(verifyData.message || "OTP Generation failed", "error");
                     }
-
                 } catch (err) {
-                    console.error("Verification error:", err);
+                    console.error("OTP error:", err);
                     showToast("Network error. Please contact support.", "error");
                 }
-            },
-            "prefill": {
-                "name": user.name || "SafeHer User",
-                "email": user.email || "user@example.com",
-                "contact": "" // Cleared so Razorpay asks user for number
-            },
-            "theme": { "color": "#9d4edd" },
-            "modal": {
-                "ondismiss": function() {
-                    showToast("Payment cancelled.", "info");
-                }
-            }
-        };
-
-        const rzp1 = new Razorpay(options);
-        rzp1.open();
+            };
+            
+            window.closeSimulator = function() {
+                simulatorModal.classList.add('hidden');
+                simulatorModal.classList.remove('flex');
+                showToast("Payment cancelled.", "info");
+            };
+        }
 
     } catch (err) {
         console.error("Payment Process Error:", err);

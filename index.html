@@ -994,6 +994,50 @@
     <!-- Leaflet Geocoder JS -->
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
+<!-- 💰 CUSTOM PREMIUM PAYMENT SIMULATOR MODAL -->
+<div id="customPaymentSimulator" class="fixed inset-0 z-[250000] bg-black/95 backdrop-blur-md hidden items-center justify-center p-6 transition-all duration-300">
+    <div class="bg-zinc-950 border border-[#D4AF37]/40 rounded-[2rem] w-full max-w-lg overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.15)] relative">
+        
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-zinc-900 to-black p-6 border-b border-[#D4AF37]/20 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-shield-halved text-[#D4AF37] text-2xl"></i>
+                <h3 class="text-white font-black italic tracking-widest text-lg m-0 uppercase">Safe Her Checkout</h3>
+            </div>
+            <div class="text-right">
+                <p class="text-zinc-500 text-[10px] font-black tracking-widest uppercase mb-1">Total Payable</p>
+                <h2 id="simPayAmount" class="text-[#D4AF37] font-black text-2xl m-0">₹1.00</h2>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="p-8">
+            <div class="bg-zinc-900 border border-white/5 rounded-2xl p-6 mb-8 text-center relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/5 to-transparent"></div>
+                <h4 class="text-white text-lg font-bold mb-2">Simulated Bank Gateway</h4>
+                <p class="text-zinc-400 text-sm mb-4">You are in Test Mode. No real money will be deducted. Please select the outcome of this transaction.</p>
+                <div class="flex justify-center gap-2">
+                    <span class="bg-zinc-800 text-zinc-400 px-3 py-1 rounded-full text-xs font-bold font-mono">ID: <span id="simOrderId">order_xxxx</span></span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="grid grid-cols-2 gap-4">
+                <button onclick="handleSimulatedPayment(true)" class="bg-[#D4AF37] text-black py-4 rounded-xl font-black uppercase text-sm tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)] flex items-center justify-center gap-2">
+                    <i class="fas fa-check-circle"></i> Success
+                </button>
+                <button onclick="handleSimulatedPayment(false)" class="bg-zinc-800 border border-red-500/30 text-red-400 py-4 rounded-xl font-black uppercase text-sm tracking-widest hover:bg-red-500/10 active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <i class="fas fa-times-circle"></i> Failure
+                </button>
+            </div>
+            
+            <button onclick="closeSimulator()" class="w-full mt-6 text-zinc-600 font-bold text-xs uppercase tracking-widest hover:text-white transition-colors">
+                Cancel Payment
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- 7. SECURE OTP VERIFICATION MODAL -->
 <div id="otpModal" class="fixed inset-0 z-[200000] bg-black/90 backdrop-blur-sm hidden items-center justify-center p-6">
     <div class="bg-zinc-900 border border-[#D4AF37]/30 rounded-[2.5rem] w-full max-w-md p-10 relative overflow-hidden shadow-2xl shadow-[#D4AF37]/10">
