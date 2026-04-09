@@ -949,85 +949,36 @@ async function initiateRazorpayPayment() {
         return;
     }
 
-    if (!confirm(`Hi ${user.name || 'User'}, you are about to upgrade to Premium (₹1). Continue?`)) return;
+    if (!confirm(`Hi ${user.name || 'User'}, you are about to upgrade to Premium. Continue?`)) return;
 
     try {
-        showToast("💳 Creating secure payment order...", "info");
-        const response = await fetch(`${API_URL}/create-order`, {
+        // Direct OTP generation - Bypass Razorpay completely
+        showToast("📱 Generating secure OTP...", "info");
+        
+        const response = await fetch(`${API_URL}/request-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount: 1, currency: "INR" })
+            body: JSON.stringify({
+                email: user.email,
+                phone: user.phone || ''
+            })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: 'Unknown Error' }));
-            throw new Error(errorData.message || 'Failed to create order');
+        const verifyData = await response.json();
+
+        if (response.ok && verifyData.status === 'success') {
+            currentOtpEmail = user.email;
+            currentPaymentId = verifyData.payment_id;
+
+            // Show OTP modal directly
+            openOtpModal({
+                maskedPhone: verifyData.maskedPhone,
+                paymentId: verifyData.payment_id,
+                devOtp: verifyData.dev_otp
+            });
+        } else {
+            showToast(verifyData.message || "Failed to generate OTP", "error");
         }
-
-        const order = await response.json();
-
-        const options = {
-            "key": "rzp_test_SaxSkQwrcuFvNW",
-            "amount": order.amount,
-            "currency": order.currency,
-            "name": "Safe Her Premium",
-            "description": "24/7 Security & Cloud Evidence Locker",
-            "order_id": order.id,
-            "handler": async function (rzpResponse) {
-                // ✅ Payment completed — now verify signature + get OTP
-                showToast("🔐 Payment received! Sending OTP to your phone...", "info");
-
-                try {
-                    const verifyResponse = await fetch(`${API_URL}/verify-payment`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            razorpay_order_id: rzpResponse.razorpay_order_id,
-                            razorpay_payment_id: rzpResponse.razorpay_payment_id,
-                            razorpay_signature: rzpResponse.razorpay_signature,
-                            email: user.email,
-                            phone: user.phone || ''
-                        })
-                    });
-
-                    const verifyData = await verifyResponse.json();
-
-                    if (verifyResponse.ok && verifyData.status === 'otp_required') {
-                        // Store for later use in verifySecurityCode
-                        currentOtpEmail = user.email;
-                        currentPaymentId = rzpResponse.razorpay_payment_id;
-
-                        // Show OTP modal with user's masked phone
-                        openOtpModal({
-                            maskedPhone: verifyData.maskedPhone,
-                            paymentId: rzpResponse.razorpay_payment_id,
-                            devOtp: verifyData.dev_otp // shown in dev mode only
-                        });
-
-                    } else {
-                        showToast(verifyData.message || "Verification failed", "error");
-                    }
-
-                } catch (err) {
-                    console.error("Verification error:", err);
-                    showToast("Network error. Please contact support.", "error");
-                }
-            },
-            "prefill": {
-                "name": user.name || "SafeHer User",
-                "email": user.email || "user@example.com",
-                "contact": user.phone || ""
-            },
-            "theme": { "color": "#9d4edd" },
-            "modal": {
-                "ondismiss": function() {
-                    showToast("Payment cancelled.", "info");
-                }
-            }
-        };
-
-        const rzp1 = new Razorpay(options);
-        rzp1.open();
 
     } catch (err) {
         console.error("Payment Process Error:", err);
@@ -1199,30 +1150,39 @@ function closeOtpModal() {
 
 async function resendOtp() {
     const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
-    if (!currentPaymentId || !user.email) {
-        showToast("No active payment session. Please retry payment.", "error");
+    if (!currentOtpEmail || !user.email) {
+        showToast("Session expired. Please retry process.", "error");
         return;
     }
     showToast("Resending OTP to your phone...", "info");
 
     try {
-        const res = await fetch(`${API_URL}/verify-payment`, {
+        const response = await fetch(`${API_URL}/request-otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                razorpay_order_id: 'resend',
-                razorpay_payment_id: currentPaymentId,
-                razorpay_signature: 'resend',
                 email: user.email,
-                phone: user.phone || '',
-                resend: true
+                phone: user.phone || ''
             })
         });
-        // Just restart timer — backend will regenerate if it's a real SMS flow
-        startOtpTimer(300);
-        showToast("OTP re-sent! Check your phone.", "success");
+        
+        const verifyData = await response.json();
+        
+        if (response.ok && verifyData.status === 'success') {
+            currentPaymentId = verifyData.payment_id;
+            startOtpTimer(300);
+            
+            if (verifyData.dev_otp) {
+                setTimeout(() => {
+                    showToast(`🧪 Dev Mode OTP: ${verifyData.dev_otp}`, "success");
+                }, 500);
+            }
+            showToast("OTP re-sent! Check your phone.", "success");
+        } else {
+            showToast("Could not resend. Please try again.", "error");
+        }
     } catch(e) {
-        showToast("Could not resend. Please retry payment.", "error");
+        showToast("Network Error. Please retry.", "error");
     }
 }
 
