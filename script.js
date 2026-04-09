@@ -2752,7 +2752,7 @@ async function handleGoogleLoginFallback() {
     `;
     document.body.appendChild(popup);
 
-    window.selectGoogleAccount = (name, email) => {
+    window.selectGoogleAccount = async (name, email) => {
         const body = popup.querySelector('.p-10');
         body.innerHTML = `
             <div class="text-center py-16 flex flex-col items-center">
@@ -2760,19 +2760,45 @@ async function handleGoogleLoginFallback() {
                     <div class="absolute inset-0 border-4 border-[#D4AF37]/20 rounded-full"></div>
                     <div class="absolute inset-0 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin"></div>
                 </div>
-                <p class="text-[#D4AF37] font-black uppercase text-[10px] tracking-[0.3em] animate-pulse">Verifying Identity...</p>
-                <p class="text-zinc-500 text-[11px] mt-2 italic">Establishing secure relay...</p>
+                <p class="text-[#D4AF37] font-black uppercase text-[10px] tracking-[0.3em] animate-pulse">Syncing with Server...</p>
+                <p class="text-zinc-500 text-[11px] mt-2 italic">Saving your account securely...</p>
             </div>
         `;
-        setTimeout(() => {
+
+        try {
+            // ✅ Call Backend: Find or create user in MongoDB
+            const res = await fetch(`${API_URL}/google-social-sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                popup.remove();
+                // Save the REAL DB user (with proper MongoDB _id) to localStorage
+                localStorage.setItem('herSafety_user', JSON.stringify(data.user));
+                showToast(`Welcome, ${data.user.name}! Account synced securely. ✅`, "success");
+                checkAuthGate();
+                updatePremiumUI();
+            } else {
+                popup.remove();
+                showToast(data.message || "Google sync failed. Try again.", "error");
+            }
+
+        } catch (err) {
+            console.error("Google social sync failed:", err);
+            // Graceful offline fallback — still lets user in locally
             popup.remove();
             const userData = { id: `g_${Date.now()}`, name, email, phone: 'Google Authenticated' };
             localStorage.setItem('herSafety_user', JSON.stringify(userData));
-            showToast(`Welcome, ${name}! Secure session established.`, "success");
+            showToast(`Welcome, ${name}! (Offline mode — server unreachable)`, "success");
             checkAuthGate();
             updatePremiumUI();
-        }, 2000);
+        }
     };
+
 }
 
 /**

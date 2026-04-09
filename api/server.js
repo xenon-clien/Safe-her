@@ -137,7 +137,51 @@ app.post('/api/google-login-verify', async (req, res) => {
     }
 });
 
+// 2c. Google Social Sync — fallback/dev mode (accepts name+email directly, no Google token needed)
+app.post('/api/google-social-sync', async (req, res) => {
+    try {
+        const { name, email } = req.body;
+
+        if (!name || !email) {
+            return res.status(400).json({ message: "Name and email are required" });
+        }
+
+        console.log(`🔐 Google Social Sync: ${name} (${email})`);
+
+        // Check if user already exists in DB
+        let user = await User.findOne({ email });
+
+        if (user) {
+            return res.status(200).json({
+                message: "Returning user synced",
+                user: { id: user._id, name: user.name, email: user.email, phone: user.phone }
+            });
+        }
+
+        // Create new user record
+        const newUser = new User({
+            name,
+            email,
+            password: crypto.randomBytes(16).toString('hex'),
+            phone: "Google Authenticated"
+        });
+
+        await newUser.save();
+        console.log(`✅ New Google user saved to DB: ${email}`);
+
+        res.status(201).json({
+            message: "New account created via Google",
+            user: { id: newUser._id, name: newUser.name, email: newUser.email, phone: newUser.phone }
+        });
+
+    } catch (error) {
+        console.error("❌ Google Social Sync Error:", error.message);
+        res.status(500).json({ message: "Server error during Google sync", error: error.message });
+    }
+});
+
 // 3. Add Emergency Contact
+
 app.post('/api/add-contact', async (req, res) => {
     try {
         const { userId, contactName, contactPhone } = req.body;
