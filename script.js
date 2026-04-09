@@ -936,8 +936,12 @@ function updatePremiumUI() {
     }
 }
 
+// OTP Modal state
+let otpTimerInterval = null;
+let currentOtpEmail = null;
+let currentPaymentId = null;
+
 async function initiateRazorpayPayment() {
-    // 1. Get Logged In User
     const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
     if (!user.email) {
         showToast("Please login first to upgrade to Pro", "warning");
@@ -945,14 +949,10 @@ async function initiateRazorpayPayment() {
         return;
     }
 
-    // Pehle confirm karein
     if (!confirm(`Hi ${user.name || 'User'}, you are about to upgrade to Premium (₹1). Continue?`)) return;
 
-    // GUIDANCE: Inform about Test Mode OTP
-    showToast("🧪 Test Mode: Use any 6-digit OTP (e.g., 123456) or click Success on the bank page.", "info");
-
     try {
-        console.log("💳 Initiating Payment Process...");
+        showToast("💳 Creating secure payment order...", "info");
         const response = await fetch(`${API_URL}/create-order`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -960,15 +960,12 @@ async function initiateRazorpayPayment() {
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ message: 'Unknow Error' }));
-            console.error("❌ Order Creation Failed:", errorData);
+            const errorData = await response.json().catch(() => ({ message: 'Unknown Error' }));
             throw new Error(errorData.message || 'Failed to create order');
         }
 
         const order = await response.json();
-        console.log("✅ Razorpay Order Created:", order);
 
-        // 2. Open Razorpay Checkout
         const options = {
             "key": "rzp_test_SaxSkQwrcuFvNW",
             "amount": order.amount,
@@ -976,42 +973,44 @@ async function initiateRazorpayPayment() {
             "name": "Safe Her Premium",
             "description": "24/7 Security & Cloud Evidence Locker",
             "order_id": order.id,
-            "handler": async function (response) {
-                // Success logic
-                console.log("💳 Payment Handler Triggered:", response);
+            "handler": async function (rzpResponse) {
+                // ✅ Payment completed — now verify signature + get OTP
+                showToast("🔐 Payment received! Sending OTP to your phone...", "info");
 
-                // --- VERIFY PAYMENT ON SERVER ---
                 try {
                     const verifyResponse = await fetch(`${API_URL}/verify-payment`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            razorpay_order_id: response.razorpay_order_id,
-                            razorpay_payment_id: response.razorpay_payment_id,
-                            razorpay_signature: response.razorpay_signature
+                            razorpay_order_id: rzpResponse.razorpay_order_id,
+                            razorpay_payment_id: rzpResponse.razorpay_payment_id,
+                            razorpay_signature: rzpResponse.razorpay_signature,
+                            email: user.email,
+                            phone: user.phone || ''
                         })
                     });
 
-                    if (verifyResponse.ok) {
-                        localStorage.setItem('hersafety_premium', 'true');
-                        // Record the successful transaction
-                        recordTransaction({
-                            payment_id: response.razorpay_payment_id,
-                            amount: 1,
-                            status: 'Success',
-                            date: new Date().toLocaleDateString(),
-                            time: new Date().toLocaleTimeString()
+                    const verifyData = await verifyResponse.json();
+
+                    if (verifyResponse.ok && verifyData.status === 'otp_required') {
+                        // Store for later use in verifySecurityCode
+                        currentOtpEmail = user.email;
+                        currentPaymentId = rzpResponse.razorpay_payment_id;
+
+                        // Show OTP modal with user's masked phone
+                        openOtpModal({
+                            maskedPhone: verifyData.maskedPhone,
+                            paymentId: rzpResponse.razorpay_payment_id,
+                            devOtp: verifyData.dev_otp // shown in dev mode only
                         });
-                        if (typeof updatePremiumUI === "function") updatePremiumUI();
-                        if (typeof switchSection === "function") switchSection('pro-center');
-                        showToast("👑 Pro Unlocked!", "success");
+
                     } else {
-                        console.error("❌ Verification Failed");
-                        showToast("Payment verification failed.", "error");
+                        showToast(verifyData.message || "Verification failed", "error");
                     }
+
                 } catch (err) {
-                    console.error("❌ Network Error during verification:", err);
-                    showToast("Network error during verification.", "error");
+                    console.error("Verification error:", err);
+                    showToast("Network error. Please contact support.", "error");
                 }
             },
             "prefill": {
@@ -1019,7 +1018,12 @@ async function initiateRazorpayPayment() {
                 "email": user.email || "user@example.com",
                 "contact": user.phone || ""
             },
-            "theme": { "color": "#9d4edd" }
+            "theme": { "color": "#9d4edd" },
+            "modal": {
+                "ondismiss": function() {
+                    showToast("Payment cancelled.", "info");
+                }
+            }
         };
 
         const rzp1 = new Razorpay(options);
@@ -1027,9 +1031,202 @@ async function initiateRazorpayPayment() {
 
     } catch (err) {
         console.error("Payment Process Error:", err);
-        showToast("System Error: " + err.message, "error");
+        showToast("Error: " + err.message, "error");
     }
 }
+
+// ====== OTP MODAL FUNCTIONS ======
+
+function openOtpModal({ maskedPhone, paymentId, devOtp }) {
+    const modal = document.getElementById('otpModal');
+    if (!modal) return;
+
+    // Show modal
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+    // Set phone display
+    const phoneEl = document.getElementById('otpPhoneDisplay');
+    if (phoneEl) phoneEl.textContent = maskedPhone || '+91 ***** *****';
+
+    // Set ref ID
+    const refEl = document.getElementById('otpRefId');
+    if (refEl) refEl.textContent = 'SH-' + (paymentId ? paymentId.slice(-6).toUpperCase() : '000000');
+
+    // Clear inputs
+    document.querySelectorAll('.otp-digit').forEach(inp => inp.value = '');
+    document.querySelectorAll('.otp-digit')[0]?.focus();
+
+    // Auto-advance logic
+    initOtpInputBehavior();
+
+    // Start 5-min countdown timer
+    startOtpTimer(300);
+
+    // Dev mode hint — show OTP in toast so dev can test
+    if (devOtp) {
+        setTimeout(() => {
+            showToast(`🧪 Dev Mode OTP: ${devOtp}`, "success");
+            console.log(`%c🔑 TEST OTP: ${devOtp}`, 'background:#D4AF37;color:black;padding:6px 12px;font-size:16px;font-weight:bold;border-radius:4px;');
+        }, 500);
+    }
+}
+
+function initOtpInputBehavior() {
+    const inputs = document.querySelectorAll('.otp-digit');
+
+    inputs.forEach((input, index) => {
+        // Remove old listeners by cloning
+        const newInput = input.cloneNode(true);
+        input.parentNode.replaceChild(newInput, input);
+    });
+
+    // Re-select after clone
+    document.querySelectorAll('.otp-digit').forEach((input, index, all) => {
+        input.addEventListener('input', (e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            e.target.value = val.slice(-1);
+            if (val && index < all.length - 1) {
+                all[index + 1].focus();
+            }
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && !input.value && index > 0) {
+                all[index - 1].focus();
+            }
+        });
+
+        // Paste support — fill all boxes
+        input.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const paste = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+            [...paste].forEach((char, i) => {
+                if (all[i]) all[i].value = char;
+            });
+            all[Math.min(paste.length, all.length - 1)].focus();
+        });
+    });
+}
+
+function startOtpTimer(seconds) {
+    clearInterval(otpTimerInterval);
+    let remaining = seconds;
+
+    const timerEl = document.getElementById('otpTimerDisplay');
+    const updateDisplay = () => {
+        const m = Math.floor(remaining / 60);
+        const s = remaining % 60;
+        if (timerEl) timerEl.textContent = `${m}:${String(s).padStart(2, '0')}`;
+    };
+    updateDisplay();
+
+    otpTimerInterval = setInterval(() => {
+        remaining--;
+        updateDisplay();
+        if (remaining <= 0) {
+            clearInterval(otpTimerInterval);
+            if (timerEl) timerEl.textContent = 'Expired';
+            showToast("⏰ OTP expired. Please retry payment.", "error");
+        }
+    }, 1000);
+}
+
+async function verifySecurityCode() {
+    const inputs = document.querySelectorAll('.otp-digit');
+    const otp = [...inputs].map(i => i.value).join('').trim();
+
+    if (otp.length !== 6) {
+        showToast("Please enter the complete 6-digit OTP", "error");
+        return;
+    }
+
+    const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
+    const btn = document.getElementById('otpConfirmBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Verifying...'; }
+
+    try {
+        const res = await fetch(`${API_URL}/verify-otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: currentOtpEmail || user.email,
+                otp,
+                payment_id: currentPaymentId
+            })
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.status === 'success') {
+            clearInterval(otpTimerInterval);
+            closeOtpModal();
+
+            // ✅ Grant Premium
+            localStorage.setItem('hersafety_premium', 'true');
+            recordTransaction({
+                payment_id: currentPaymentId || data.payment_id,
+                amount: 1,
+                status: 'Success',
+                date: new Date().toLocaleDateString(),
+                time: new Date().toLocaleTimeString()
+            });
+            addSecurityLog('INFO', 'Premium Activated via OTP Verification', 'success');
+            if (typeof updatePremiumUI === "function") updatePremiumUI();
+            if (typeof switchSection === "function") switchSection('pro-center');
+            showToast("👑 Premium Unlocked! Welcome to Pro.", "success");
+
+        } else {
+            showToast(data.message || "Incorrect OTP. Try again.", "error");
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-shield-halved mr-2"></i> Confirm & Unlock Premium'; }
+        }
+
+    } catch (err) {
+        console.error("OTP verify error:", err);
+        showToast("Network error. Please try again.", "error");
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-shield-halved mr-2"></i> Confirm & Unlock Premium'; }
+    }
+}
+
+function closeOtpModal() {
+    const modal = document.getElementById('otpModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+    clearInterval(otpTimerInterval);
+}
+
+async function resendOtp() {
+    const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
+    if (!currentPaymentId || !user.email) {
+        showToast("No active payment session. Please retry payment.", "error");
+        return;
+    }
+    showToast("Resending OTP to your phone...", "info");
+
+    try {
+        const res = await fetch(`${API_URL}/verify-payment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                razorpay_order_id: 'resend',
+                razorpay_payment_id: currentPaymentId,
+                razorpay_signature: 'resend',
+                email: user.email,
+                phone: user.phone || '',
+                resend: true
+            })
+        });
+        // Just restart timer — backend will regenerate if it's a real SMS flow
+        startOtpTimer(300);
+        showToast("OTP re-sent! Check your phone.", "success");
+    } catch(e) {
+        showToast("Could not resend. Please retry payment.", "error");
+    }
+}
+
+
 
 
 

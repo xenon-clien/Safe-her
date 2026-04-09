@@ -251,10 +251,13 @@ app.post('/api/create-order', async (req, res) => {
     }
 });
 
-// 6. Professional Payment Verification API
+// In-memory OTP store (for demo — use Redis in production)
+const otpStore = new Map(); // key: email, value: { otp, expires, paymentData }
+
+// 6. Payment Verification — verifies signature then generates OTP
 app.post('/api/verify-payment', (req, res) => {
     try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature, email, phone } = req.body;
         console.log(`🛡️ Verifying Payment: ${razorpay_payment_id}`);
 
         const body = razorpay_order_id + "|" + razorpay_payment_id;
@@ -264,8 +267,31 @@ app.post('/api/verify-payment', (req, res) => {
             .digest('hex');
 
         if (expectedSignature === razorpay_signature) {
-            console.log("💎 Payment Verified Successfully!");
-            res.status(200).json({ status: "success", message: "Payment verified successfully" });
+            console.log("💎 Payment Verified! Generating OTP...");
+
+            // Generate 6-digit OTP
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            const expires = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+            // Store OTP linked to email
+            const key = email || razorpay_payment_id;
+            otpStore.set(key, { otp, expires, razorpay_payment_id, razorpay_order_id });
+
+            // Mask phone for display: +91 98765 ***** → show last 4 digits
+            const maskedPhone = phone
+                ? phone.replace(/(\d{2})(\d+)(\d{4})$/, (_, a, b, c) => `${a}${'*'.repeat(b.length)}${c}`)
+                : '**********';
+
+            console.log(`📱 OTP for ${email}: ${otp} (expires in 5 min)`);
+            // In production: send OTP via SMS (Twilio/MSG91)
+            // For dev/test: OTP is returned in response so you can test
+            res.status(200).json({
+                status: "otp_required",
+                message: "OTP sent to your registered mobile number",
+                maskedPhone,
+                // REMOVE this in production! Only for dev/test:
+                dev_otp: otp
+            });
         } else {
             console.error("🚫 Invalid Signature!");
             res.status(400).json({ status: "failure", message: "Invalid payment signature" });
@@ -275,6 +301,44 @@ app.post('/api/verify-payment', (req, res) => {
         res.status(500).json({ status: "error", message: "Internal server error during verification" });
     }
 });
+
+// 6b. OTP Verification — confirm OTP then activate premium
+app.post('/api/verify-otp', (req, res) => {
+    try {
+        const { email, otp, payment_id } = req.body;
+        const key = email || payment_id;
+        const record = otpStore.get(key);
+
+        if (!record) {
+            return res.status(400).json({ status: "error", message: "OTP expired or not found. Please retry payment." });
+        }
+
+        if (Date.now() > record.expires) {
+            otpStore.delete(key);
+            return res.status(400).json({ status: "error", message: "OTP has expired. Please retry." });
+        }
+
+        if (record.otp !== otp.toString().trim()) {
+            return res.status(400).json({ status: "error", message: "Incorrect OTP. Please try again." });
+        }
+
+        // OTP matched — clean up and activate premium
+        otpStore.delete(key);
+        console.log(`✅ OTP Verified for ${key}. Premium activated!`);
+
+        res.status(200).json({
+            status: "success",
+            message: "OTP verified. Premium access granted!",
+            payment_id: record.razorpay_payment_id
+        });
+
+    } catch (error) {
+        console.error("❌ OTP Verify error:", error);
+        res.status(500).json({ status: "error", message: "Server error during OTP verification" });
+    }
+});
+
+
 
 // 6. Professional Security Logs & Evidence Sync (Mock)
 app.post('/api/sync-evidence', async (req, res) => {
