@@ -952,7 +952,6 @@ async function initiateRazorpayPayment() {
     if (!confirm(`Hi ${user.name || 'User'}, you are about to upgrade to Premium (₹1). Continue?`)) return;
 
     try {
-        showToast("💳 Creating secure payment order...", "info");
         const response = await fetch(`${API_URL}/create-order`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
