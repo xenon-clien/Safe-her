@@ -1606,3 +1606,179 @@ a {
 }
 
 
+
+/* ================== PREMIUM AUTH: SEAMLESS TRANSPARENT ================== */
+.premium-auth-bg {
+    position: relative;
+    background: transparent !important;
+    overflow: hidden;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@keyframes matrixScan {
+    0% { background-position: 0 0; }
+    100% { background-position: 100px 100px; }
+}
+
+.luxury-card {
+    background: rgba(5, 5, 15, 0.9) !important;
+    border: 1px solid rgba(212, 175, 55, 0.25) !important;
+    backdrop-filter: blur(30px);
+    box-shadow: 0 0 80px rgba(0, 0, 0, 0.8), 0 0 20px rgba(212, 175, 55, 0.1) !important;
+    width: 450px !important;
+    border-radius: 2rem !important;
+    z-index: 10;
+}
+
+.shimmer-text {
+    background: linear-gradient(90deg, #D4AF37, #FFF5D1, #D4AF37);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s linear infinite;
+}
+
+@keyframes shimmer {
+    to { background-position: 200% center; }
+}
+
+.luxury-card .line {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.3), transparent);
+    flex: 1;
+}
+
+.auth-footer-link {
+    text-align: center;
+    font-size: 11px;
+    color: #666;
+    margin-top: 1.5rem;
+}
+
+.auth-footer-link a {
+    color: #D4AF37;
+    font-weight: bold;
+    text-decoration: none;
+    transition: all 0.3s;
+}
+
+.auth-footer-link a:hover {
+    text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+}
+
+.text-gold { color: #D4AF37 !important; }
+
+/* Re-use buttons but make them pop */
+.luxury-card .auth-submit {
+    background: linear-gradient(135deg, #D4AF37, #B8860B) !important;
+    box-shadow: 0 10px 20px -5px rgba(212, 175, 55, 0.3) !important;
+    border: none !important;
+    letter-spacing: 1.5px;
+}
+
+.guardian-pulse {
+    animation: guardianGlow 2s infinite ease-in-out;
+}
+@keyframes guardianGlow {
+    0%, 100% { box-shadow: 0 0 10px rgba(157, 78, 221, 0.4); }
+    50% { box-shadow: 0 0 30px rgba(157, 78, 221, 0.8); }
+}
+
+.premium-gold-glow {
+    text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+}
+
+/* ================== AURA RADAR & PORTAL ANIMATIONS ================== */
+@keyframes radarRotation {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.animate-radarRotation {
+    animation: radarRotation 4s linear infinite;
+    background: conic-gradient(from 0deg at 50% 50%, rgba(157, 78, 221, 0.4) 0%, transparent 40%);
+}
+
+@keyframes materialize {
+    0% { clip-path: polygon(0 0, 0 0, 0 100%, 0% 100%); opacity:0; filter: blur(10px); }
+    100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); opacity:1; filter: blur(0); }
+}
+
+.portal-transition {
+    animation: materialize 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+#portalMask {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: #000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+}
+
+.hex-grid {
+    position: absolute;
+    inset: 0;
+    background-image: 
+        radial-gradient(circle at 2px 2px, rgba(157, 78, 221, 0.15) 1px, transparent 0);
+    background-size: 30px 30px;
+}
+
+.shield-pulse {
+    width: 200px;
+    height: 200px;
+    border: 1px solid rgba(157, 78, 221, 0.3);
+    border-radius: 50%;
+    animation: pulse-ring 2s infinite;
+}
+
+@keyframes pulse-ring {
+    0% { transform: scale(0.5); opacity: 0; }
+    50% { opacity: 0.5; }
+    100% { transform: scale(1.5); opacity: 0; }
+}
+
+#stealthToggleBtn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    padding: 5px;
+    border-radius: 8px;
+}
+#stealthToggleBtn:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+/* ================== UTILITY ANIMATIONS ================== */
+.animate-fadeIn {
+    animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-slideUp {
+    animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}

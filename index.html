@@ -23,6 +23,12 @@
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+    <!-- Google Maps & Places API -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA_placeholder&libraries=places"></script>
+    
+    <!-- Google Identity Services (GSI) for Real Google Login -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
 
@@ -82,15 +88,40 @@
     <!-- Navigation Bar -->
     <nav class="navbar">
         <div class="logo">
-            <i class="fas fa-shield-halved"></i> Safe Her
+            <i class="fas fa-shield-heart"></i>
+            <span>Safe Her</span>
+    <!-- AURA RADAR SYSTEM -->
+    <div id="auraRadar" class="hidden fixed inset-0 z-[100000] bg-black/90 backdrop-blur-3xl flex items-center justify-center transition-all duration-700">
+        <div class="relative w-[400px] h-[400px]">
+            <!-- Radar Circles -->
+            <div class="absolute inset-0 border-2 border-safety-purple/20 rounded-full animate-pulse"></div>
+            <div class="absolute inset-4 border border-safety-purple/10 rounded-full"></div>
+            <div class="absolute inset-16 border border-safety-purple/5 rounded-full"></div>
+            
+            <!-- Scanning Beam -->
+            <div class="absolute inset-0 bg-conic-gradient from-safety-purple/40 to-transparent rounded-full animate-radarRotation"></div>
+            
+            <!-- Center Point -->
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-safety-purple rounded-full shadow-[0_0_20px_#9d4edd]"></div>
+            
+            <!-- Scanning Data -->
+            <div class="absolute -bottom-20 left-0 right-0 text-center">
+                <h2 class="text-safety-purple font-black text-2xl uppercase tracking-tighter mb-2">Aura Scan Active</h2>
+                <div id="radarStatus" class="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em]">Analyzing Vicinity...</div>
+            </div>
+        </div>
+    </div>
         </div>
         <ul class="nav-links" id="navLinks">
             <li><a href="#home" class="active" onclick="switchSection('home')">Home</a></li>
             <li><a href="#route" onclick="switchSection('route')"><i class="fas fa-route" style="margin-right:5px;"></i>Route</a></li>
             <li><a href="#contacts" onclick="switchSection('contacts')">Contacts</a></li>
+            <li><a href="#records" onclick="switchSection('records')">Logs</a></li>
+            <li id="proCenterLink" style="display:none;"><a href="#pro-center" onclick="switchSection('pro-center')" class="text-premium-gold font-bold"><i class="fas fa-crown"></i> Pro Command</a></li>
             <li><a href="#tips" onclick="switchSection('tips')">Tips</a></li>
-            <li id="premiumNavLink" style="display:none;"><a href="#premium" onclick="switchSection('premium')" class="text-premium-gold font-bold"><i class="fas fa-crown"></i> Pro</a></li>
-            <li><a href="#auth" class="btn-login" onclick="switchSection('auth')">Login</a></li>
+            <li><a href="#feedback" onclick="switchSection('feedback')">Feedback</a></li>
+            <li id="navLogin"><a href="#loginView" class="btn-login" onclick="switchSection('loginView')">Login</a></li>
+            <li id="navLogout" style="display:none;"><a href="#" onclick="logout()" class="text-red-500 font-bold"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
             <li id="goPremiumNav"><button onclick="initiateRazorpayPayment()" class="bg-gradient-to-r from-premium-gold to-yellow-600 text-black px-4 py-2 rounded-full font-bold ml-2 hover:scale-105 transition-transform"><i class="fas fa-crown"></i> Go Premium</button></li>
         </ul>
         <div class="hamburger" onclick="toggleMobileMenu()">
@@ -102,7 +133,7 @@
     <main class="main-container">
 
         <!-- 1. HOME SECTION -->
-        <section id="home" class="section-container active-section">
+        <section id="home" class="section-container" style="display: none;">
             <div class="hero-header">
                 <h1>We are here to help you.</h1>
                 <p>Your personal safety companion — armed with AI-powered tools.</p>
@@ -159,16 +190,19 @@
                 </div>
             </div>
 
-            <!-- SOS Button -->
-            <div class="sos-container">
-                <button id="sosBtn" class="sos-btn" onclick="triggerSOS()">
-                    <span class="sos-text">SOS</span>
-                </button>
-                <div class="pulse-ring"></div>
-                <p id="sosStatus" class="sos-status"></p>
-                <!-- Digital Blackbox Status -->
-                <div id="blackboxStatus" class="blackbox-status" style="display: none;">
-                    <span class="dot"></span> 🔴 RECORDING EVIDENCE (Digital Blackbox)
+            <!-- SOS Button SECTION (Centered) -->
+            <div class="flex flex-col items-center justify-center py-12 w-full">
+                <div class="auth-container auth-card-premium relative scale-110">
+                    <button id="sosBtn" class="sos-btn" onclick="triggerSOS()">
+                        <span class="sos-text">SOS</span>
+                    </button>
+                    <div class="pulse-ring"></div>
+                    <p id="sosStatus" class="sos-status"></p>
+                    
+                    <!-- Digital Blackbox Status -->
+                    <div id="blackboxStatus" class="blackbox-status" style="display: none;">
+                        <span class="dot pulse-red"></span> 🔴 RECORDING EVIDENCE
+                    </div>
                 </div>
             </div>
 
@@ -180,43 +214,11 @@
                 </div>
                 <div class="tools-grid">
 
-                    <!-- Fake Call (PROFESSIONAL) -->
-                    <div class="premium-tool-wrapper" id="fakeCallWrapper">
-                        <button class="tool-btn" id="fakeCallBtn" onclick="initiateProfessionalFakeCall()" title="Schedule a simulated call">
-                            <i class="fas fa-phone-volume"></i>
-                            <span>Fake Call</span>
-                        </button>
-                    </div>
-
-                    <!-- Voice SOS -->
-                    <div class="premium-tool-wrapper">
-                        <button class="tool-btn" id="voiceSOSBtn" onclick="toggleVoiceSOS()" title="Say 'Help' to trigger SOS">
-                            <i class="fas fa-microphone"></i>
-                            <span>Voice SOS</span>
-                        </button>
-                    </div>
-
-                    <!-- Check-In Timer -->
-                    <div class="premium-tool-wrapper">
-                        <button class="tool-btn" onclick="openCheckInPanel()" title="Set a safety timer">
-                            <i class="fas fa-hourglass-half"></i>
-                            <span>Check-In</span>
-                        </button>
-                    </div>
-
                     <!-- Quick Share Location -->
                     <div class="premium-tool-wrapper">
                         <button class="tool-btn" onclick="quickShareLocation()" title="Share live location instantly">
                             <i class="fas fa-share-nodes"></i>
                             <span>Live Share</span>
-                        </button>
-                    </div>
-
-                    <!-- Shake to SOS -->
-                    <div class="premium-tool-wrapper">
-                        <button class="tool-btn" id="shakeBtn" onclick="toggleShakeSOS()" title="Shake phone to trigger SOS">
-                            <i class="fas fa-mobile-screen-button"></i>
-                            <span>Shake SOS</span>
                         </button>
                     </div>
 
@@ -230,9 +232,9 @@
 
                     <!-- Safe Haven Radar -->
                     <div class="premium-tool-wrapper">
-                        <button class="tool-btn" id="radarBtn" onclick="scanSafeHavens()" title="Find nearest Police and Hospitals">
+                        <button class="tool-btn" id="radarBtn" onclick="toggleAuraRadar()" title="Launch Matrix Scan">
                             <i class="fas fa-tower-broadcast"></i>
-                            <span>Haven Radar</span>
+                            <span>Aura Radar</span>
                         </button>
                     </div>
 
@@ -247,16 +249,7 @@
                 </div>
             </div>
 
-            <!-- EVIDENCE & LOGS DASHBOARD -->
-            <div id="evidenceDashboard" class="bg-black/40 p-6 rounded-[2rem] border border-white/5 mt-8 backdrop-blur-xl">
-                <h3 class="text-xl font-bold text-white mb-4 flex items-center justify-between">
-                    <span><i class="fas fa-shield-halved mr-2 text-safety-purple"></i> Security Records</span>
-                    <span class="text-[10px] text-green-400 animate-pulse">● Live Tracking</span>
-                </h3>
-                <div class="space-y-3" id="evidenceHistory">
-                    <div class="text-zinc-600 text-[10px] italic text-center py-4 uppercase tracking-widest">No recent security logs found in cloud sync.</div>
-                </div>
-            </div>
+
 
             <!-- Check-In Timer Panel (hidden by default) -->
             <div class="checkin-panel" id="checkinPanel" style="display:none;">
@@ -305,34 +298,6 @@
                 </button>
             </div>
 
-            <!-- User Feedback Section -->
-            <div class="feedback-container mt-12 bg-zinc-900/60 p-8 rounded-3xl border border-white/5">
-                <h3 class="text-2xl font-bold text-white mb-4 flex items-center">
-                    <i class="fas fa-comment-dots mr-3 text-safety-purple"></i> Your Experience Matters
-                </h3>
-                <p class="text-gray-400 mb-6 italic">Help us improve Safe Her by sharing your safety feedback or reporting app issues.</p>
-                <form id="feedbackForm" onsubmit="submitFeedback(event)" class="space-y-4">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input type="text" id="fbName" placeholder="Your Name (Optional)" class="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-safety-purple outline-none">
-                        <select id="fbCategory" class="bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-safety-purple outline-none">
-                            <option value="General">General Feedback</option>
-                            <option value="Safety">Safety Concern</option>
-                            <option value="Feature">Feature Request</option>
-                            <option value="Bug">Technical Bug</option>
-                        </select>
-                    </div>
-                    <textarea id="fbMessage" rows="3" placeholder="Tell us about your experience..." class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-safety-purple outline-none" required></textarea>
-                    <div class="flex items-center justify-between">
-                        <div class="flex space-x-2 text-yellow-500" id="fbRating">
-                            <i class="fas fa-star cursor-pointer hover:scale-110 transiton-transform" onclick="setFbRating(1)"></i>
-                            <i class="fas fa-star cursor-pointer hover:scale-110 transiton-transform" onclick="setFbRating(2)"></i>
-                            <i class="fas fa-star cursor-pointer hover:scale-110 transiton-transform" onclick="setFbRating(3)"></i>
-                            <i class="fas fa-star cursor-pointer hover:scale-110 transiton-transform" onclick="setFbRating(4)"></i>
-                            <i class="fas fa-star cursor-pointer hover:scale-110 transiton-transform" onclick="setFbRating(5)"></i>
-                        </div>
-                        <button type="submit" class="bg-gradient-to-r from-safety-purple to-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:shadow-lg hover:shadow-purple-500/20 transition-all">Submit Feedback</button>
-                    </div>
-                </form>
             </div>
         </section>
 
@@ -471,7 +436,162 @@
             </div>
         </section>
 
-        <!-- 3. SAFETY TIPS SECTION -->
+        <!-- 4. PRO COMMAND CENTER SECTION -->
+        <section id="pro-center" class="section-container" style="display: none;">
+            <div class="max-w-6xl mx-auto py-12 px-6">
+                <!-- Pro Header -->
+                <div class="text-center mb-12 animate-fadeIn">
+                    <h2 class="text-5xl font-black text-white italic uppercase tracking-tighter mb-4">Pro Command Center</h2>
+                    <div class="inline-flex items-center bg-premium-gold text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-premium-gold/20">
+                        <i class="fas fa-crown mr-2"></i> Elite Safety Access
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Left: Elite Tools Arsenal -->
+                    <div class="lg:col-span-2 space-y-8">
+                        <div class="bg-zinc-900/80 border border-premium-gold/20 rounded-[3rem] p-8 backdrop-blur-xl">
+                            <h3 class="text-xl font-bold text-white mb-8 flex items-center">
+                                <i class="fas fa-shield-halved mr-3 text-premium-gold"></i> Advanced Tactical Tools
+                            </h3>
+                            
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <!-- Fake Call -->
+                                <button onclick="initiateProfessionalFakeCall()" class="p-6 bg-white/5 rounded-[2rem] border border-white/5 hover:border-premium-gold/30 hover:bg-white/10 transition-all text-left group">
+                                    <div class="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500 mb-6 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-phone-volume text-2xl"></i>
+                                    </div>
+                                    <h4 class="text-white font-black uppercase text-xs tracking-widest mb-2">Professional Fake Call</h4>
+                                    <p class="text-zinc-500 text-[11px] leading-relaxed">Schedule a realistic incoming call to excuse yourself from any situation.</p>
+                                </button>
+
+                                <!-- Shadow Guardian -->
+                                <button onclick="toggleShadowGuardian()" id="guardianBtnPro" class="p-6 bg-white/5 rounded-[2rem] border border-white/5 hover:border-premium-gold/30 hover:bg-white/10 transition-all text-left group">
+                                    <div class="w-14 h-14 bg-safety-purple/10 rounded-2xl flex items-center justify-center text-safety-purple mb-6 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-user-secret text-2xl"></i>
+                                    </div>
+                                    <h4 class="text-white font-black uppercase text-xs tracking-widest mb-2">Shadow Guardian</h4>
+                                    <p class="text-zinc-500 text-[11px] leading-relaxed">Proactive path monitoring. Alerts contacts if you deviate or stop unexpectedly.</p>
+                                </button>
+
+                                <!-- Voice SOS -->
+                                <button onclick="toggleVoiceSOS()" id="voiceSOSBtnPro" class="p-6 bg-white/5 rounded-[2rem] border border-white/5 hover:border-premium-gold/30 hover:bg-white/10 transition-all text-left group">
+                                    <div class="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-400 mb-6 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-microphone text-2xl"></i>
+                                    </div>
+                                    <h4 class="text-white font-black uppercase text-xs tracking-widest mb-2">Voice Recognition SOS</h4>
+                                    <p class="text-zinc-500 text-[11px] leading-relaxed">Hands-free emergency activation using encrypted voice keywords.</p>
+                                </button>
+
+                                <!-- Shake SOS -->
+                                <button onclick="toggleShakeSOS()" id="shakeBtnPro" class="p-6 bg-white/5 rounded-[2rem] border border-white/5 hover:border-premium-gold/30 hover:bg-white/10 transition-all text-left group">
+                                    <div class="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center text-orange-400 mb-6 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-mobile-screen-button text-2xl"></i>
+                                    </div>
+                                    <h4 class="text-white font-black uppercase text-xs tracking-widest mb-2">Intelligent Shake SOS</h4>
+                                    <p class="text-zinc-500 text-[11px] leading-relaxed">High-sensitivity accelerometer triggers SOS on rapid movement detection.</p>
+                                </button>
+                            </div>
+                        <                        <!-- Aura Scanner Info Card -->
+                        <div class="p-6 rounded-3xl bg-black/40 border border-white/5 backdrop-blur-2xl relative overflow-hidden group hover:border-safety-purple/50 transition-all">
+                            <div class="absolute -right-4 -top-4 w-24 h-24 bg-safety-purple/10 blur-3xl rounded-full"></div>
+                            <div class="flex items-center gap-6">
+                                <div class="w-16 h-16 bg-safety-purple/20 rounded-2xl flex items-center justify-center text-safety-purple text-2xl group-hover:scale-110 transition-transform">
+                                    <i class="fas fa-satellite-dish animate-pulse"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <h4 class="text-white font-bold mb-1">Aura Matrix Scanner</h4>
+                                    <p class="text-[10px] text-zinc-500 uppercase font-black leading-tight">Live proximity monitoring. Scan nearby guardians and safe zones automatically.</p>
+                                </div>
+                            </div>
+                            <button onclick="toggleAuraRadar()" class="w-full mt-6 bg-safety-purple text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-safety-purple/80 transition-all shadow-lg shadow-safety-purple/20">
+                                Launch Aura Scan
+                            </button>
+                        </div>
+ </div>
+                    </div>
+
+                    <!-- Right: Membership & Billing -->
+                    <div class="space-y-8">
+                        <div class="bg-zinc-900/80 border border-premium-gold/20 rounded-[3rem] p-8 backdrop-blur-xl">
+                            <h3 class="text-xl font-bold text-white mb-8 flex items-center">
+                                <i class="fas fa-id-card-clip mr-3 text-premium-gold"></i> Membership
+                            </h3>
+
+                            <div class="space-y-4">
+                                <div class="p-5 bg-white/5 rounded-[1.5rem] border border-white/5">
+                                    <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">Status</p>
+                                    <h4 class="text-premium-gold font-black italic uppercase">ACTIVE PRO</h4>
+                                </div>
+                                <div class="p-5 bg-white/5 rounded-[1.5rem] border border-white/5">
+                                    <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">Next Billing</p>
+                                    <h4 class="text-white font-black">May 5, 2026</h4>
+                                </div>
+                            </div>
+
+                            <hr class="my-8 border-white/5">
+
+                            <div class="space-y-4">
+                                <button onclick="showPaymentMethods()" class="w-full flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all">
+                                    <span class="text-white text-xs font-bold">Payment Methods</span>
+                                    <i class="fas fa-chevron-right text-zinc-700"></i>
+                                </button>
+                                <button onclick="showBillingHistory()" class="w-full flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all">
+                                    <span class="text-white text-xs font-bold">Billing History</span>
+                                    <i class="fas fa-chevron-right text-zinc-700"></i>
+                                </button>
+                                <button onclick="showTransactionHistory()" class="w-full flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all">
+                                    <span class="text-white text-xs font-bold">Audit Logs</span>
+                                    <i class="fas fa-chevron-right text-zinc-700"></i>
+                                </button>
+                            </div>
+
+                            <div class="flex flex-col gap-4 mt-8">
+                                <button onclick="cancelSubscription()" class="w-full py-4 text-red-500/50 hover:text-red-500 text-[10px] font-black uppercase tracking-widest transition-all">
+                                    Cancel Pro Access
+                                </button>
+                                <button onclick="logout()" class="w-full py-4 bg-red-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 transition-all shadow-[0_10px_30px_rgba(239,68,68,0.3)]">
+                                    <i class="fas fa-power-off mr-2"></i> Immediate Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. SECURITY RECORDS SECTION -->
+        <section id="records" class="section-container" style="display:none;">
+            <div class="section-header">
+                <h2>Security Evidence Vault</h2>
+                <p>Cloud-synced logs and encrypted incident records.</p>
+            </div>
+
+            <div id="evidenceDashboard" class="bg-black/40 p-8 rounded-[3rem] border border-white/5 backdrop-blur-3xl shadow-2xl relative overflow-hidden">
+                <!-- Background Glow -->
+                <div class="absolute -top-24 -right-24 w-64 h-64 bg-safety-purple/20 blur-[100px] rounded-full"></div>
+                
+                <h3 class="text-2xl font-black text-white mb-8 flex items-center justify-between relative z-10">
+                    <span class="flex items-center"><i class="fas fa-box-archive mr-4 text-premium-gold"></i> Incident History</span>
+                    <button onclick="clearLogs()" class="text-[10px] bg-red-500/10 text-red-500 px-4 py-2 rounded-full border border-red-500/20 hover:bg-red-500 hover:text-white transition-all uppercase tracking-widest font-bold">
+                        Clear All Logs
+                    </button>
+                </h3>
+
+                <div class="space-y-4 relative z-10" id="evidenceHistory">
+                    <!-- Logs injection -->
+                </div>
+
+                <div class="mt-12 p-6 rounded-2xl bg-white/5 border border-white/5 text-center">
+                    <i class="fas fa-cloud-check text-safety-purple text-3xl mb-3"></i>
+                    <p class="text-xs text-zinc-500 uppercase tracking-widest leading-relaxed">
+                        All evidence is automatically encrypted with AES-256 <br> and synced to secure off-site servers.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. SAFETY TIPS SECTION -->
         <section id="tips" class="section-container" style="display: none;">
             <div class="section-header">
                 <h2>Safety Tips & Guidelines</h2>
@@ -617,7 +737,7 @@
                             </div>
                             <div class="bg-black/40 border border-white/5 p-6 rounded-3xl">
                                 <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">Plan Cost</p>
-                                <h4 class="text-white font-black text-xl">₹99.00 <span class="text-xs text-gray-600">/mo</span></h4>
+                                <h4 class="text-white font-black text-xl">₹1.00 <span class="text-xs text-gray-600">/mo</span></h4>
                                 <p class="text-green-500 text-[10px] mt-2 flex items-center"><i class="fas fa-check-circle mr-1"></i> Auto-renewal ON</p>
                             </div>
                             <div class="bg-black/40 border border-white/5 p-6 rounded-3xl">
@@ -629,34 +749,51 @@
                             </div>
                         </div>
 
-                        <div class="space-y-6">
-                            <div class="flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors">
+                        <div class="space-y-4">
+                            <!-- Payment Methods -->
+                            <button onclick="showPaymentMethods()" class="w-full flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors group">
                                 <div class="flex items-center">
-                                    <div class="w-12 h-12 bg-premium-gold/20 rounded-2xl flex items-center justify-center mr-4">
+                                    <div class="w-12 h-12 bg-premium-gold/20 rounded-2xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
                                         <i class="fas fa-credit-card text-premium-gold"></i>
                                     </div>
-                                    <div>
+                                    <div class="text-left">
                                         <h4 class="text-white font-bold">Payment Methods</h4>
                                         <p class="text-gray-500 text-xs">Manage your UPI and cards</p>
                                     </div>
                                 </div>
                                 <i class="fas fa-chevron-right text-gray-700"></i>
-                            </div>
-                            <div class="flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors">
+                            </button>
+
+                            <!-- Billing History -->
+                            <button onclick="showBillingHistory()" class="w-full flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors group">
                                 <div class="flex items-center">
-                                    <div class="w-12 h-12 bg-premium-gold/20 rounded-2xl flex items-center justify-center mr-4">
+                                    <div class="w-12 h-12 bg-premium-gold/20 rounded-2xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
                                         <i class="fas fa-receipt text-premium-gold"></i>
                                     </div>
-                                    <div>
+                                    <div class="text-left">
                                         <h4 class="text-white font-bold">Billing History</h4>
                                         <p class="text-gray-500 text-xs">View and download invoices</p>
                                     </div>
                                 </div>
                                 <i class="fas fa-chevron-right text-gray-700"></i>
-                            </div>
+                            </button>
+
+                            <!-- Transaction History -->
+                            <button onclick="showTransactionHistory()" class="w-full flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors group">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 bg-premium-gold/20 rounded-2xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-list-check text-premium-gold"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <h4 class="text-white font-bold">Transaction History</h4>
+                                        <p class="text-gray-500 text-xs">Technical audit of recent payments</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-700"></i>
+                            </button>
                         </div>
 
-                        <button class="w-full mt-12 py-5 text-gray-500 font-bold text-xs uppercase tracking-[0.2em] border border-white/5 hover:text-red-500 hover:border-red-500/30 transition-all rounded-3xl">
+                        <button onclick="cancelSubscription()" class="w-full mt-12 py-5 text-gray-500 font-bold text-xs uppercase tracking-[0.2em] border border-white/5 hover:text-red-500 hover:border-red-500/30 transition-all rounded-3xl">
                             Cancel Subscription
                         </button>
                     </div>
@@ -665,32 +802,50 @@
         </section>
 
         <!-- 5. AUTHENTICATION SECTION -->
-        <section id="auth" class="section-container" style="display: none;">
-            <div class="auth-box">
+        <!-- 5. LOGIN SECTION -->
+        <section id="loginView" class="section-container premium-auth-bg active-section">
+            <div class="auth-box auth-midnight-gold luxury-card">
                 <div class="auth-header">
-                    <h2><i class="fas fa-user-circle"></i> Account</h2>
-                </div>
-                <div class="auth-tabs">
-                    <button class="auth-tab" id="tabLogin" onclick="switchAuthTab('login')">Login</button>
-                    <button class="auth-tab active" id="tabSignup" onclick="switchAuthTab('signup')">Sign Up</button>
+                    <h2 class="text-gold shimmer-text">Secure Access</h2>
+                    <p>Enter your credentials to access your safety dashboard</p>
                 </div>
 
-                <!-- Login Form -->
-                <form id="loginForm" class="auth-form" style="display: none;">
+                <form id="loginForm" class="auth-form active">
                     <div class="input-group">
                         <label>Email Address</label>
                         <i class="fas fa-envelope"></i>
-                        <input type="email" placeholder="Enter your email" required>
+                        <input type="email" id="loginEmail" placeholder="Enter your email" required>
                     </div>
                     <div class="input-group">
                         <label>Password</label>
                         <i class="fas fa-lock"></i>
-                        <input type="password" placeholder="Enter password" required>
+                        <input type="password" id="loginPassword" placeholder="Enter password" required>
                     </div>
-                    <button type="submit" class="auth-submit">Proceed to Login</button>
-                </form>
+                    <button type="submit" class="auth-submit">Authorize Session</button>
+                    
+                    <div class="flex items-center my-6">
+                        <div class="line"></div>
+                        <span class="px-3 text-[10px] text-zinc-600 font-bold uppercase">OR CONTINUE WITH</span>
+                        <div class="line"></div>
+                    </div>
 
-                <!-- Signup Form -->
+                    <div id="googleBtnWrapper" class="flex flex-col items-center w-full cursor-pointer" onclick="handleGoogleLogin()">
+                        <div id="googleBtnLogin" class="w-full"></div>
+                    </div>
+
+                    <p class="auth-footer-link">New to Safe Her? <a href="#signupView" onclick="switchSection('signupView')">Create a Identity</a></p>
+                </form>
+            </div>
+        </section>
+
+        <!-- 6. SIGNUP SECTION -->
+        <section id="signupView" class="section-container premium-auth-bg" style="display: none;">
+            <div class="auth-box auth-midnight-gold luxury-card">
+                <div class="auth-header">
+                    <h2 class="text-gold shimmer-text">New Identity</h2>
+                    <p>Join our protection network and start your safety journey</p>
+                </div>
+
                 <form id="signupForm" class="auth-form active">
                     <div class="input-group">
                         <label>Full Name</label>
@@ -705,15 +860,83 @@
                     <div class="input-group">
                         <label>Phone Number</label>
                         <i class="fas fa-phone"></i>
-                        <input type="tel" id="signupPhone" placeholder="Enter your phone number" required>
+                        <input type="tel" id="signupPhone" placeholder="Enter phone number" required>
                     </div>
                     <div class="input-group">
                         <label>Password</label>
                         <i class="fas fa-lock"></i>
                         <input type="password" id="signupPassword" placeholder="Create a password" required>
                     </div>
-                    <button type="submit" class="auth-submit">Create Account</button>
+                    <button type="submit" class="auth-submit">Create My Identity</button>
+
+                    <div class="flex items-center my-6">
+                        <div class="line"></div>
+                        <span class="px-3 text-[10px] text-zinc-600 font-bold uppercase">OR CONTINUE WITH</span>
+                        <div class="line"></div>
+                    </div>
+
+                    <div id="googleBtnWrapperSignup" class="flex flex-col items-center w-full">
+                        <div id="googleBtnSignup" class="w-full"></div>
+                    </div>
+
+                    <p class="auth-footer-link">Already protected? <a href="#loginView" onclick="switchSection('loginView')">Login to Session</a></p>
                 </form>
+            </div>
+        </section>
+            </div>
+        </section>
+
+        <!-- 6. FEEDBACK SECTION -->
+        <section id="feedback" class="section-container" style="display: none;">
+            <div class="max-w-4xl mx-auto py-12 px-6">
+                <div class="bg-zinc-900/80 border border-safety-purple/20 rounded-[3rem] p-12 backdrop-blur-xl">
+                    <div class="text-center mb-12">
+                        <div class="w-20 h-20 bg-safety-purple/10 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+                            <i class="fas fa-comment-dots text-4xl text-safety-purple"></i>
+                        </div>
+                        <h2 class="text-4xl font-black text-white italic uppercase tracking-tighter mb-4">Your Experience Matters</h2>
+                        <p class="text-zinc-500 font-medium">Help us improve Safe Her by sharing your safety feedback or reporting app issues.</p>
+                    </div>
+
+                    <form id="feedbackForm" onsubmit="submitFeedback(event)" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <label class="text-[10px] text-zinc-600 font-black uppercase tracking-widest ml-4">Full Name</label>
+                                <input type="text" id="fbName" placeholder="Anonymous" class="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-white focus:border-safety-purple outline-none transition-all">
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] text-zinc-600 font-black uppercase tracking-widest ml-4">Category</label>
+                                <select id="fbCategory" class="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-white focus:border-safety-purple outline-none transition-all appearance-none cursor-pointer">
+                                    <option value="General">General Feedback</option>
+                                    <option value="Safety">Safety Concern</option>
+                                    <option value="Feature">Feature Request</option>
+                                    <option value="Bug">Technical Bug</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-[10px] text-zinc-600 font-black uppercase tracking-widest ml-4">Detailed Message</label>
+                            <textarea id="fbMessage" rows="5" placeholder="Tell us about your experience..." class="w-full bg-black/40 border border-white/5 rounded-[2rem] px-6 py-4 text-white focus:border-safety-purple outline-none transition-all" required></textarea>
+                        </div>
+
+                        <div class="flex flex-col md:flex-row items-center justify-between gap-8 pt-6">
+                            <div class="flex flex-col items-center md:items-start">
+                                <p class="text-[10px] text-zinc-600 font-black uppercase tracking-widest mb-3">Overall Rating</p>
+                                <div class="flex space-x-3 text-2xl text-zinc-800" id="fbRating">
+                                    <i class="fas fa-star cursor-pointer hover:scale-125 transition-all hover:text-yellow-500" onclick="setFbRating(1)"></i>
+                                    <i class="fas fa-star cursor-pointer hover:scale-125 transition-all hover:text-yellow-500" onclick="setFbRating(2)"></i>
+                                    <i class="fas fa-star cursor-pointer hover:scale-125 transition-all hover:text-yellow-500" onclick="setFbRating(3)"></i>
+                                    <i class="fas fa-star cursor-pointer hover:scale-125 transition-all hover:text-yellow-500" onclick="setFbRating(4)"></i>
+                                    <i class="fas fa-star cursor-pointer hover:scale-125 transition-all hover:text-yellow-500" onclick="setFbRating(5)"></i>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full md:w-auto bg-gradient-to-r from-safety-purple to-indigo-600 text-white px-12 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/30 transition-all">
+                                Send Report <i class="fas fa-paper-plane ml-2"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </section>
 
@@ -769,7 +992,49 @@
     <!-- Leaflet Geocoder JS -->
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
-    <!-- Custom Logic -->
+<!-- 7. SECURE OTP VERIFICATION MODAL -->
+<div id="otpModal" class="fixed inset-0 z-[200000] bg-black/90 backdrop-blur-sm hidden items-center justify-center p-6 animate-fadeIn">
+    <div class="bg-zinc-900 border border-[#D4AF37]/30 rounded-[2.5rem] w-full max-w-md p-10 relative overflow-hidden shadow-2xl shadow-[#D4AF37]/10">
+        <!-- Decorative gradient -->
+        <div class="absolute -top-24 -right-24 w-48 h-48 bg-[#D4AF37]/10 rounded-full blur-3xl"></div>
+        
+        <div class="text-center relative z-10">
+            <div class="w-20 h-20 bg-gradient-to-br from-[#D4AF37] to-[#8A6D3B] rounded-[1.5rem] flex items-center justify-center mx-auto mb-8 shadow-lg shadow-[#D4AF37]/20">
+                <i class="fas fa-fingerprint text-3xl text-black"></i>
+            </div>
+            
+            <h2 class="text-white text-3xl font-black italic uppercase tracking-tighter mb-4">Secure Authorization</h2>
+            <p class="text-zinc-500 text-sm font-medium leading-relaxed mb-10">
+                A 6-digit security code has been sent to your registered device. Enter it below to authorize this session.
+            </p>
+
+            <!-- OTP Input Group -->
+            <div class="flex justify-center gap-3 mb-10" id="otpInputGroup">
+                <input type="text" maxlength="1" class="w-12 h-14 bg-black/40 border-2 border-zinc-800 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+                <input type="text" maxlength="1" class="w-12 h-14 bg-black/40 border-2 border-zinc-800 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+                <input type="text" maxlength="1" class="w-12 h-14 bg-black/40 border-2 border-zinc-800 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+                <input type="text" maxlength="1" class="w-12 h-14 bg-black/40 border-2 border-zinc-800 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+                <input type="text" maxlength="1" class="w-12 h-14 bg-black/40 border-2 border-zinc-800 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+                <input type="text" maxlength="1" class="w-12 h-14 bg-black/40 border-2 border-zinc-800 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+            </div>
+
+            <div class="space-y-4">
+                <button onclick="verifySecurityCode()" class="w-full bg-[#D4AF37] text-black py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-[#D4AF37]/20">
+                    Confirm Identity
+                </button>
+                <button onclick="closeOtpModal()" class="w-full bg-zinc-800/50 text-zinc-500 py-5 rounded-2xl font-bold text-xs tracking-widest hover:text-white transition-all">
+                    Cancel Request
+                </button>
+            </div>
+            
+            <p class="text-[10px] text-zinc-700 font-bold uppercase tracking-widest mt-10">
+                Ref ID: <span id="otpRefId" class="text-zinc-600">SH-8829</span>
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Custom Logic -->
     <!-- PROFESSIONAL FAKE CALL OVERLAY -->
     <div id="fakeCallOverlay" class="fixed inset-0 z-[100000] bg-black hidden flex-col items-center justify-between py-24 animate-fadeIn">
         <div class="text-center">
@@ -803,7 +1068,7 @@
     </div>
 
     <!-- AUDIO FOR FAKE CALL RELAY -->
-    <audio id="fakeRelayAudio" src="https://www.soundjay.com/phone/phone-calling-1.mp3" loop></audio>
+    <audio id="fakeRelayAudio" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" loop></audio>
 
     <script src="script.js"></script>
     <script src="background.js"></script>
