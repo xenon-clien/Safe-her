@@ -31,7 +31,20 @@ console.log("🚀 Razorpay initialized with Key ID:", (process.env.RZP_KEY_ID ||
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+
+// CORS — allow all origins (including file:// for local dev)
+app.use(cors({
+    origin: function(origin, callback) {
+        // Allow requests with no origin (file://, mobile apps, Postman) and all HTTP/HTTPS origins
+        callback(null, true);
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: true
+}));
+app.options(/(.*)/, cors()); // Express 5 compatible preflight handler
+
+
 
 // Serve static files from the root directory so app works on http://localhost:5000
 app.use(express.static(path.join(__dirname, '..')));
