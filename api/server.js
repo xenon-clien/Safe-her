@@ -254,6 +254,39 @@ app.post('/api/create-order', async (req, res) => {
 // In-memory OTP store (for demo — use Redis in production)
 const otpStore = new Map(); // key: email, value: { otp, expires, paymentData }
 
+// 6. Direct OTP Generation for Simulator (Bypasses Razorpay Signature)
+app.post('/api/request-otp', (req, res) => {
+    try {
+        const { email, phone } = req.body;
+        if (!email) return res.status(400).json({ status: "error", message: "Email required for OTP" });
+
+        console.log(`💎 Simulator Payment Request! Generating OTP for ${email}...`);
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires = Date.now() + 5 * 60 * 1000; // 5 mins
+        const payment_id = `sim_${Date.now()}`; // Simulated payment ID
+
+        otpStore.set(email, { otp, expires, razorpay_payment_id: payment_id });
+
+        const maskedPhone = phone
+            ? phone.replace(/(\d{2})(\d+)(\d{4})$/, (_, a, b, c) => `${a}${'*'.repeat(b.length)}${c}`)
+            : '**********';
+
+        console.log(`📱 OTP for ${email}: ${otp}`);
+
+        res.status(200).json({
+            status: "success",
+            message: "OTP sent successfully",
+            maskedPhone,
+            payment_id,
+            dev_otp: otp
+        });
+    } catch (error) {
+        console.error("❌ Request OTP error:", error);
+        res.status(500).json({ status: "error", message: "Internal server error" });
+    }
+});
+
 // 6. Payment Verification — verifies signature then generates OTP
 app.post('/api/verify-payment', (req, res) => {
     try {
