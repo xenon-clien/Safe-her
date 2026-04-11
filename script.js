@@ -1773,7 +1773,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fetch(`${API_URL}/health`).then(r => r.json()).then(health => {
             const GOOGLE_CLIENT_ID = health.g_client_id && health.g_client_id !== "PENDING" 
                 ? health.g_client_id 
-                : "533722956740-v49p8v2u7qquj9u7f8v1v8v1v8v1v8v1.apps.googleusercontent.com";
+                : "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com";
 
             if (typeof google !== 'undefined') {
                 google.accounts.id.initialize({
