@@ -103,9 +103,16 @@ app.use(async (req, res, next) => {
 
 // --- Diagnostic Health Endpoint ---
 app.get('/api/health', async (req, res) => {
+    // Masked URI for safety
+    const rawUri = process.env.MONGODB_URI || "NOT SET (Using Local Fallback)";
+    const maskedUri = rawUri.includes('@') 
+        ? rawUri.split('@')[1] // Show only the cluster part
+        : rawUri;
+
     const status = {
         server: "online",
         database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+        uri_source: maskedUri,
         timestamp: new Date().toISOString(),
         env: process.env.NODE_ENV || "development"
     };
