@@ -98,6 +98,21 @@ function fetchDangerZonesDebounced() {
 }
 
 // --- REAL CRIME ANALYTICS & COMMUNITY DATA via Overpass API ---
+window.drawnZones = []; // Tracks centers and radii to prevent overlapping
+
+function getDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // in metres
+}
+
 function fetchDangerZones() {
     if (!map) return;
 
@@ -106,6 +121,7 @@ function fetchDangerZones() {
         window.dangerLayers.forEach(layer => map.removeLayer(layer));
     }
     window.dangerLayers = [];
+    window.drawnZones = []; // Reset overlap tracking
 
     const bounds = map.getBounds();
     const { _southWest: sw, _northEast: ne } = bounds;
@@ -131,15 +147,27 @@ out body 80;`;
             const name = node.tags?.name || amenity;
             if (!amenity) return;
 
-            if (safeSet.has(amenity)) {
+            // ANTI-OVERLAP: Skip if too close to an existing zone of the SAME type
+            const isSafe = safeSet.has(amenity);
+            const tooClose = window.drawnZones.some(z => {
+                const dist = getDistance(node.lat, node.lon, z.lat, z.lng);
+                // Safe zones need more space, danger zones can be tighter
+                const threshold = (isSafe && z.isSafe) ? 1200 : 600; 
+                return dist < threshold;
+            });
+
+            if (tooClose) return;
+
+            if (isSafe) {
                 const labels = {
                     police: '🟢 Police Station',
                     hospital: '🟢 Hospital',
                     fire_station: '🟢 Fire Station'
                 };
                 drawMapZone(node.lat, node.lon, 'green', labels[amenity], name,
-                    'Emergency services present. Area is relatively safe.');
+                    'Emergency services present. Area is highly secured.');
                 greenDrawn++;
+                window.drawnZones.push({ lat: node.lat, lng: node.lon, isSafe: true });
             } else if (riskSet.has(amenity)) {
                 const isDangerous = amenity === 'casino' || amenity === 'nightclub';
                 drawMapZone(node.lat, node.lon, isDangerous ? 'high' : 'medium',
@@ -149,6 +177,7 @@ out body 80;`;
                         ? 'High risk zone. Avoid at night.'
                         : 'Moderate risk area. Stay alert.');
                 redDrawn++;
+                window.drawnZones.push({ lat: node.lat, lng: node.lon, isSafe: false });
             }
         });
 
@@ -187,56 +216,61 @@ out body 80;`;
             }
         });
         const center = map.getCenter();
-        for (let i = 0; i < 4; i++) {
-            const lat = center.lat + (Math.random() - 0.5) * 0.012;
-            const lng = center.lng + (Math.random() - 0.5) * 0.012;
             drawMapZone(lat, lng, 'green', '🟢 Safe Zone', 'General Area', 'Low crime density.');
         }
     });
 }
 
-
 function drawMapZone(lat, lng, riskLevel, label, name, description) {
     const isNight = new Date().getHours() >= 20 || new Date().getHours() < 6;
-    let border, glow, radius;
+    let border, glow, radius, pulseClass;
 
     if (riskLevel === 'green') {
-        border = '#1b5e20'; glow = '#4caf50'; radius = 280;
+        border = '#10b981'; glow = '#10b981'; radius = 320; pulseClass = 'safety-pulse-emerald';
     } else if (riskLevel === 'high') {
-        border = '#7f0000'; glow = '#ff1744'; radius = 350;
+        border = '#ef4444'; glow = '#ef4444'; radius = 400; pulseClass = 'safety-pulse-crimson';
     } else {
-        border = '#e65100'; glow = '#ff9100'; radius = 250;
+        border = '#f59e0b'; glow = '#f59e0b'; radius = 280; pulseClass = 'safety-pulse-amber';
     }
 
-    // Outer diffuse glow ring
+    // Outer diffuse glow ring (Static for subtle depth)
     const outerRing = L.circle([lat, lng], {
-        radius: radius * 1.7,
+        radius: radius * 1.8,
         color: glow, weight: 1,
-        fillColor: glow, fillOpacity: 0.04,
-        dashArray: riskLevel === 'green' ? '' : '5,8'
+        fillColor: glow, fillOpacity: 0.05,
+        interactive: false
     }).addTo(map);
 
-    // Core solid circle
+    // Core pulsing circle (Animated via CSS class)
     const circle = L.circle([lat, lng], {
         radius: radius,
-        color: border, weight: 2.5,
+        color: border, weight: 3,
         fillColor: glow,
-        fillOpacity: isNight ? 0.24 : 0.15
+        fillOpacity: isNight ? 0.35 : 0.2,
+        className: pulseClass // Premium CSS Animation Applied Here
     }).addTo(map).bindPopup(
-        `<div style="font-family:inherit;padding:10px 6px;min-width:170px;">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-                <div style="width:10px;height:10px;border-radius:50%;background:${glow};box-shadow:0 0 8px ${glow};flex-shrink:0;"></div>
-                <b style="color:${glow};font-size:13px;">${label}</b>
+        `<div style="font-family:'Poppins', sans-serif; padding:12px; min-width:200px;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px;">
+                <div class="relative w-3 h-3">
+                    <div class="absolute inset-0 rounded-full bg-${riskLevel}-500 animate-ping opacity-75"></div>
+                    <div class="relative w-3 h-3 rounded-full bg-${riskLevel === 'green' ? '#10b981' : riskLevel === 'high' ? '#ef4444' : '#f59e0b'}"></div>
+                </div>
+                <b style="color:${glow}; font-size:14px; letter-spacing:0.05em; text-transform:uppercase;">${label}</b>
             </div>
-            <div style="color:#ddd;font-size:12px;font-weight:600;margin-bottom:4px;">${name}</div>
-            <small style="color:#aaa;line-height:1.5;display:block;">${description}</small>
+            <div style="color:#fff; font-size:13px; font-weight:700; margin-bottom:6px; letter-spacing:0.02em;">${name}</div>
+            <p style="color:rgba(255,255,255,0.7); font-size:11px; line-height:1.6; font-weight:400;">${description}</p>
+            <div style="margin-top:12px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:9px; color:rgba(255,255,255,0.4); text-transform:uppercase;">Live Analysis Active</span>
+                <i class="fas fa-shield-alt" style="color:${glow}; font-size:12px; opacity:0.8;"></i>
+            </div>
         </div>`,
-        { className: 'route-tooltip' }
+        { className: 'premium-popup', minWidth: 220 }
     );
 
     circle.bringToFront();
-    outerRing.bringToFront();
     window.dangerLayers.push(outerRing, circle);
+}
+erLayers.push(outerRing, circle);
 }
 
 function getCommunityReports() {

@@ -1783,19 +1783,60 @@ a {
     animation: spin 1s linear infinite;
 }
 
-/* Premium Leaflet Custom Route Tooltip */
-.leaflet-tooltip.route-tooltip {
-    background: rgba(10, 10, 15, 0.95);
-    border: 1px solid rgba(212, 175, 55, 0.5);
-    color: white;
-    border-radius: 12px;
-    padding: 8px 12px;
-    font-size: 13px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.5), 0 0 10px rgba(212,175,55,0.2);
-    backdrop-filter: blur(5px);
-    font-family: inherit;
-    line-height: 1.4;
+/* Premium Leaflet Custom Route Tooltip & Glassmorphic Popups */
+.leaflet-tooltip.route-tooltip, .leaflet-popup-content-wrapper {
+    background: rgba(10, 10, 15, 0.85) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+    border-radius: 20px !important;
+    padding: 2px !important;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 20px rgba(255,255,255,0.02) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
 }
-.leaflet-tooltip.route-tooltip::before {
-    display: none; /* Hide default triangle */
+
+.leaflet-popup-tip {
+    background: rgba(10, 10, 15, 0.85) !important;
+}
+
+/* Premium Map Safety Pulsing Animations */
+.safety-pulse-emerald {
+    animation: emerald-glow 3s infinite ease-in-out;
+}
+.safety-pulse-crimson {
+    animation: crimson-glow 2s infinite ease-in-out;
+}
+.safety-pulse-amber {
+    animation: amber-glow 4s infinite ease-in-out;
+}
+
+@keyframes emerald-glow {
+    0% { filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.6)); opacity: 0.7; }
+    50% { filter: drop-shadow(0 0 25px rgba(16, 185, 129, 0.9)); opacity: 1; }
+    100% { filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.6)); opacity: 0.7; }
+}
+
+@keyframes crimson-glow {
+    0% { filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.7)); opacity: 0.8; }
+    50% { filter: drop-shadow(0 0 35px rgba(239, 68, 68, 1)); opacity: 1; }
+    100% { filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.7)); opacity: 0.8; }
+}
+
+@keyframes amber-glow {
+    0% { filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.5)); opacity: 0.7; }
+    50% { filter: drop-shadow(0 0 20px rgba(245, 158, 11, 0.8)); opacity: 0.9; }
+    100% { filter: drop-shadow(0 0 5px rgba(245, 158, 11, 0.5)); opacity: 0.7; }
+}
+
+/* SVG Cluster Style */
+.safety-marker-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.safety-aura {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
 }
