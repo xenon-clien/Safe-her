@@ -270,8 +270,6 @@ function drawMapZone(lat, lng, riskLevel, label, name, description) {
     circle.bringToFront();
     window.dangerLayers.push(outerRing, circle);
 }
-erLayers.push(outerRing, circle);
-}
 
 function getCommunityReports() {
     const saved = localStorage.getItem('safeher_reports');
