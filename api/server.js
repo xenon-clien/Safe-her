@@ -54,12 +54,67 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
-// MongoDB Connection using Environment Variable
+// --- Robust MongoDB Connection for Vercel/Serverless ---
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hersafety';
 
-mongoose.connect(MONGODB_URI)
-    .then(() => console.log('✅ Connected to MongoDB Atlas/Local'))
-    .catch(err => console.error('❌ Failed to connect to MongoDB', err));
+let cachedDb = null;
+
+async function connectToDatabase() {
+    if (cachedDb && mongoose.connection.readyState === 1) {
+        return cachedDb;
+    }
+
+    console.log("🔗 Attempting to connect to MongoDB Atlas...");
+    try {
+        const db = await mongoose.connect(MONGODB_URI, {
+            serverSelectionTimeoutMS: 8000, // Timeout after 8s (Vercel limit is 10s)
+            connectTimeoutMS: 10000,
+        });
+        cachedDb = db;
+        console.log("✅ Successfully connected to MongoDB Atlas");
+        return db;
+    } catch (err) {
+        console.error("❌ MongoDB Connection Error:", err.message);
+        throw err;
+    }
+}
+
+// Initial connection for non-serverless environments (like local dev)
+if (process.env.NODE_ENV !== 'production') {
+    connectToDatabase().catch(e => console.error("Initial connection failed:", e.message));
+}
+
+// Middleware to ensure DB is connected before processing requests
+app.use(async (req, res, next) => {
+    // Skip DB check for static files or non-API routes if needed
+    if (!req.path.startsWith('/api')) return next();
+    
+    try {
+        await connectToDatabase();
+        next();
+    } catch (err) {
+        res.status(503).json({ 
+            message: "Database connection failed", 
+            error: err.message,
+            tip: "Check MongoDB Atlas Network Access (0.0.0.0/0) and MONGODB_URI in Vercel settings."
+        });
+    }
+});
+
+// --- Diagnostic Health Endpoint ---
+app.get('/api/health', async (req, res) => {
+    const status = {
+        server: "online",
+        database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+        timestamp: new Date().toISOString(),
+        env: process.env.NODE_ENV || "development"
+    };
+    
+    if (status.database !== "connected") {
+        return res.status(500).json(status);
+    }
+    res.status(200).json(status);
+});
 
 // =======================
 // REST APIs
@@ -77,8 +132,12 @@ app.post('/api/register', async (req, res) => {
         await newUser.save();
         res.status(201).json({ message: "User registered successfully", userId: newUser._id });
     } catch (error) {
-        console.error("Register Error:", error);
-        res.status(500).json({ message: "Error registering user: " + error.message });
+        console.error("❌ Register Error:", error.message);
+        res.status(500).json({ 
+            message: "Registration failed on server", 
+            details: error.message,
+            suggestion: "Check console logs for MongooseServerSelectionError" 
+        });
     }
 });
 
@@ -99,7 +158,11 @@ app.post('/api/login', async (req, res) => {
             user: { id: user._id, name: user.name, email: user.email, phone: user.phone }
         });
     } catch (error) {
-        res.status(500).json({ message: "Error logging in", error: error.message });
+        console.error("❌ Login Error:", error.message);
+        res.status(500).json({ 
+            message: "Login failed on server", 
+            details: error.message 
+        });
     }
 });
 
