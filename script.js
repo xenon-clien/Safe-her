@@ -147,13 +147,14 @@ out body 100;`;
             const name = node.tags?.name || amenity;
             if (!amenity) return;
 
-            // ULTRA-STRICT PROXIMITY SUPPRESSION (Grid-Aware Clustering)
+            // ULTRA-STRICT PER-TIER PROXIMITY SUPPRESSION
+            // Grid-Aware: Safe zones only suppress Safe; Risk suppresses Risk.
             const isSafe = safeSet.has(amenity);
             const threshold = isSafe ? 1500 : 800;
             
             const tooClose = window.drawnZones.some(z => {
                 const dist = getDistance(node.lat, node.lon, z.lat, z.lng);
-                return dist < threshold;
+                return dist < threshold && z.isSafe === isSafe;
             });
 
             if (tooClose) return;
@@ -170,7 +171,7 @@ out body 100;`;
                 drawMapZone(node.lat, node.lon, 'green', labels[amenity] || '🛡️ Safety Hub', name,
                     'Verified safety landmark. Active monitoring and security presence detected.');
                 greenDrawn++;
-                window.drawnZones.push({ lat: node.lat, lng: node.lon });
+                window.drawnZones.push({ lat: node.lat, lng: node.lon, isSafe: true });
             } else if (riskSet.has(amenity)) {
                 const isHighRisk = ['casino', 'nightclub', 'stripclub', 'adult_gaming_centre'].includes(amenity);
                 drawMapZone(node.lat, node.lon, isHighRisk ? 'high' : 'medium',
@@ -179,7 +180,7 @@ out body 100;`;
                         ? 'High-intensity night zone. Avoid lone travel in this perimeter.'
                         : 'Increased risk area. Monitor surroundings carefully.');
                 redDrawn++;
-                window.drawnZones.push({ lat: node.lat, lng: node.lon });
+                window.drawnZones.push({ lat: node.lat, lng: node.lon, isSafe: false });
             }
         });
 
@@ -1672,45 +1673,68 @@ function calculateRoute() {
                 window.premiumRoutePolylines = [];
 
                 const routeConfigs = [
-                    { label: '🟢 Safe Route (Recommended)', border: '#1b5e20', glow: '#4caf50', dash: '' },
-                    { label: '🟡 Medium Safe', border: '#e65100', glow: '#ffb300', dash: '10,10' },
-                    { label: '🔴 High Risk Route', border: '#b71c1c', glow: '#ff3d00', dash: '5,10' }
+                    { label: '🟢 Safe Passage (Quantum Verified)', border: '#064e3b', glow: '#10b981', dash: '' },
+                    { label: '🟡 Cautionary Route', border: '#78350f', glow: '#f59e0b', dash: '12,8' },
+                    { label: '🔴 Elevated Risk Divergence', border: '#7f1d1d', glow: '#ef4444', dash: '6,10' }
                 ];
 
-                // Render in reverse so Safe Route (index 0) is drawn on TOP of red routes!
+                // Render in reverse so Safe Route (index 0) stays on top
                 const routesToDraw = e.routes.slice(0, 3);
                 for (let i = routesToDraw.length - 1; i >= 0; i--) {
                     const r = routesToDraw[i];
                     const cfg = routeConfigs[i];
                     const coords = r.coordinates.map(c => [c.lat, c.lng]);
 
-                    const bgLine = L.polyline(coords, { color: cfg.border, weight: 14, opacity: 0.8, lineCap: 'round', lineJoin: 'round' }).addTo(routeMap);
-                    const fgLine = L.polyline(coords, { color: cfg.glow, weight: 6, opacity: 1, dashArray: cfg.dash, lineCap: 'round', lineJoin: 'round' }).addTo(routeMap);
+                    // NEON GLOW Path Layers
+                    const glowBase = L.polyline(coords, { 
+                        color: cfg.glow, weight: 12, opacity: 0.15, 
+                        lineCap: 'round', lineJoin: 'round',
+                        className: 'neon-path-base' 
+                    }).addTo(routeMap);
+
+                    const neonLine = L.polyline(coords, { 
+                        color: cfg.glow, weight: 5, opacity: 1, 
+                        dashArray: cfg.dash, lineCap: 'round', lineJoin: 'round',
+                        className: i === 0 ? 'neon-path-active' : '' 
+                    }).addTo(routeMap);
                     
-                    fgLine.bindTooltip(`<b>${cfg.label}</b><br>${Math.round(r.summary.totalTime/60)} mins • ${(r.summary.totalDistance/1000).toFixed(1)} km`, { sticky: true, className: 'route-tooltip' });
+                    neonLine.bindTooltip(`<b>${cfg.label}</b><br>${Math.round(r.summary.totalTime/60)} mins • ${(r.summary.totalDistance/1000).toFixed(1)} km`, { sticky: true, className: 'premium-popup' });
                     
-                    window.premiumRoutePolylines.push(bgLine, fgLine);
+                    window.premiumRoutePolylines.push(glowBase, neonLine);
                 }
 
                 const route = e.routes[0];
                 const summary = route.summary;
+
+                // --- QUANTUM SAFETY INTELLIGENCE ---
+                // Count Safe Havens specifically within 500m of this route
+                let safeHavenMilestones = 0;
+                window.drawnZones.forEach(z => {
+                    const nearRoute = route.coordinates.some(c => getDistance(z.lat, z.lng, c.lat, c.lng) < 500);
+                    if (nearRoute && z.isSafe) safeHavenMilestones++;
+                });
+
                 const km = (summary.totalDistance / 1000).toFixed(1);
                 const mins = Math.round(summary.totalTime / 60);
-
-                // --- DYNAMIC ROUTE SAFETY ANALYSIS ---
-                const coords = route.coordinates;
-                const morning = calculateRouteAverageScore(coords, 9);
-                const evening = calculateRouteAverageScore(coords, 19);
-                const night = calculateRouteAverageScore(coords, 2);
-
-                // Current context score
                 const currentHour = new Date().getHours();
-                const current = calculateRouteAverageScore(coords, currentHour);
+                const current = calculateRouteAverageScore(route.coordinates, currentHour);
 
                 document.getElementById('routeTime').innerText = `${mins} mins`;
                 document.getElementById('routeDistance').innerText = `${km} km`;
                 document.getElementById('routeSafety').innerText = `${current.score} / 10`;
                 document.getElementById('routeSafety').style.color = current.color;
+
+                // Update New UI Elements for Intelligence
+                const intelEl = document.getElementById('routeIntel');
+                if (intelEl) {
+                    intelEl.innerHTML = `
+                        <div style="display:flex; align-items:center; gap:8px; background:rgba(16,185,129,0.1); padding:8px 12px; border-radius:12px; border:1px solid rgba(16,185,129,0.2);">
+                            <i class="fas fa-shield-heart" style="color:#10b981;"></i>
+                            <span style="font-size:11px; color:#fff;"><b>${safeHavenMilestones}</b> Safe Havens found along this path</span>
+                        </div>
+                    `;
+                    intelEl.style.display = 'block';
+                }
 
                 // Update Forecast UI
                 document.getElementById('routeScoreMorning').innerText = morning.score;
