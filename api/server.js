@@ -84,23 +84,6 @@ if (process.env.NODE_ENV !== 'production') {
     connectToDatabase().catch(e => console.error("Initial connection failed:", e.message));
 }
 
-// Middleware to ensure DB is connected before processing requests
-app.use(async (req, res, next) => {
-    // Skip DB check for static files or non-API routes if needed
-    if (!req.path.startsWith('/api')) return next();
-    
-    try {
-        await connectToDatabase();
-        next();
-    } catch (err) {
-        res.status(503).json({ 
-            message: "Database connection failed", 
-            error: err.message,
-            tip: "Check MongoDB Atlas Network Access (0.0.0.0/0) and MONGODB_URI in Vercel settings."
-        });
-    }
-});
-
 // --- Diagnostic Health Endpoint ---
 app.get('/api/health', async (req, res) => {
     // Masked URI for safety
@@ -117,10 +100,26 @@ app.get('/api/health', async (req, res) => {
         env: process.env.NODE_ENV || "development"
     };
     
-    if (status.database !== "connected") {
-        return res.status(500).json(status);
-    }
+    // In health check, we don't status(500) so we can actually see the JSON
     res.status(200).json(status);
+});
+
+// Middleware to ensure DB is connected before processing requests
+app.use(async (req, res, next) => {
+    // Skip DB check for static files or non-API routes if needed
+    if (!req.path.startsWith('/api')) return next();
+    if (req.path === '/api/health') return next(); // Don't block health check
+    
+    try {
+        await connectToDatabase();
+        next();
+    } catch (err) {
+        res.status(503).json({ 
+            message: "Database connection failed", 
+            error: err.message,
+            tip: "Check MongoDB Atlas Network Access (0.0.0.0/0) and MONGODB_URI in Vercel settings."
+        });
+    }
 });
 
 // =======================
