@@ -1145,7 +1145,7 @@ a {
     top: 20px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 5000;
+    z-index: 999999;
     display: flex;
     flex-direction: column;
     gap: 10px;
@@ -1781,4 +1781,21 @@ a {
 
 .animate-spin {
     animation: spin 1s linear infinite;
+}
+
+/* Premium Leaflet Custom Route Tooltip */
+.leaflet-tooltip.route-tooltip {
+    background: rgba(10, 10, 15, 0.95);
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    color: white;
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-size: 13px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5), 0 0 10px rgba(212,175,55,0.2);
+    backdrop-filter: blur(5px);
+    font-family: inherit;
+    line-height: 1.4;
+}
+.leaflet-tooltip.route-tooltip::before {
+    display: none; /* Hide default triangle */
 }
