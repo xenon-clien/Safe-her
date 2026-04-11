@@ -89,6 +89,13 @@ if (process.env.NODE_ENV !== 'production') {
 
 // --- Diagnostic Health Endpoint ---
 app.get('/api/health', async (req, res) => {
+    // Proactively try to connect so we can see the error
+    try {
+        await connectToDatabase();
+    } catch (e) {
+        // Error is already logged in lastConnectionError
+    }
+
     // Masked URI for safety
     const rawUri = process.env.MONGODB_URI || "NOT SET (Using Local Fallback)";
     const maskedUri = rawUri.includes('@') 
