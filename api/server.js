@@ -107,6 +107,7 @@ app.get('/api/health', async (req, res) => {
         database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
         last_error: lastConnectionError || "none",
         uri_source: maskedUri,
+        g_client_id: process.env.G_CLIENT_ID || "PENDING",
         timestamp: new Date().toISOString(),
         env: process.env.NODE_ENV || "development"
     };

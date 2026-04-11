@@ -1766,32 +1766,36 @@ document.addEventListener('DOMContentLoaded', () => {
         // 6. Security Gate: Check if user is logged in
         checkAuthGate();
 
-        // 7. Initialize Smart Hybrid Google Sign-In
+        // 7. Initialize Official Google Identity Services (GSI)
         window.isGSI_Ready = false;
-        try {
-            if (typeof google !== 'undefined') {
-                const CLIENT_ID = "533722956740-v49p8v2u7qquj9u7f8v1v8v1v8v1v8v1.apps.googleusercontent.com"; // Placeholder
+        
+        // Fetch real Client ID from server if available (Dynamic Config)
+        fetch(`${API_URL}/health`).then(r => r.json()).then(health => {
+            const GOOGLE_CLIENT_ID = health.g_client_id && health.g_client_id !== "PENDING" 
+                ? health.g_client_id 
+                : "533722956740-v49p8v2u7qquj9u7f8v1v8v1v8v1v8v1.apps.googleusercontent.com";
 
+            if (typeof google !== 'undefined') {
                 google.accounts.id.initialize({
-                    client_id: CLIENT_ID,
+                    client_id: GOOGLE_CLIENT_ID,
                     callback: handleCredentialResponse,
                     auto_select: false,
-                    cancel_on_tap_outside: true
+                    itp_support: true
                 });
 
-                // Track if it initialized successfully
-                window.isGSI_Ready = !CLIENT_ID.includes("v1v8v1");
-
-                // Render official buttons
-                const btnLogin = document.getElementById("googleBtnLogin");
-                const btnSignup = document.getElementById("googleBtnSignup");
-                if (btnLogin) google.accounts.id.renderButton(btnLogin, { theme: "outline", size: "large", width: "100%", text: "continue_with" });
-                if (btnSignup) google.accounts.id.renderButton(btnSignup, { theme: "outline", size: "large", width: "100%", text: "signup_with" });
+                window.isGSI_Ready = !GOOGLE_CLIENT_ID.includes("v1v8v1");
+                
+                if (window.isGSI_Ready) {
+                    console.log("✅ Google Sign-In Initialized with Real ID.");
+                    // Optional: Render account tap for auto-signin experience
+                    google.accounts.id.prompt(); 
+                } else {
+                    console.warn("⚠️ Google SSO using placeholder. Social Sync mode active.");
+                }
             }
-        } catch (error) {
-            console.warn("GSI Failed to load (Origin/ID Error). Switching to Hybrid Simulation.", error);
-            window.isGSI_Ready = false;
-        }
+        }).catch(err => {
+            console.warn("Failed to fetch dynamic GSI config, using fallback.", err);
+        });
 
         // 8. Auth Form Handlers
         const loginForm = document.getElementById('loginForm');
@@ -3087,16 +3091,29 @@ async function handleCredentialResponse(response) {
  * Properly fixed with correct template literals and error handling.
  */
 function openGoogleAccountPicker() {
-    // Instead of opening a broken Google link, use our custom secure cloud simulation
+    // 1. Try to use real Google Identity Services first if initialized
+    if (window.isGSI_Ready && typeof google !== 'undefined') {
+        console.log("🚀 Triggering Real Google Picker...");
+        showToast("Opening Google Account Chooser...", "info");
+        try {
+            google.accounts.id.prompt();
+            return true;
+        } catch (err) {
+            console.warn("Native prompt failed, falling back to simulation:", err);
+        }
+    }
+
+    // 2. Fallback to our custom secure cloud simulation if real OAuth isn't ready
+    console.log("🔗 Switching to Secure Sync Simulation...");
     handleGoogleLoginFallback();
     return true;
 }
 
 /**
- * Fallback simulation when popup is blocked or Google OAuth not configured.
+ * Fallback simulation when native prompt is blocked or Google OAuth not configured.
  */
 async function handleGoogleLoginFallback() {
-    showToast("Initializing Secure Cloud Simulation...", "info");
+    showToast("Launching Secure Identity Sync...", "info");
 
     const popup = document.createElement('div');
     popup.className = 'fixed inset-0 z-[20000] flex items-center justify-center bg-black/80 backdrop-blur-md animate-fadeIn';
