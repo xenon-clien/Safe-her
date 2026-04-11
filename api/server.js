@@ -58,6 +58,7 @@ app.get('/', (req, res) => {
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hersafety';
 
 let cachedDb = null;
+let lastConnectionError = null;
 
 async function connectToDatabase() {
     if (cachedDb && mongoose.connection.readyState === 1) {
@@ -71,10 +72,12 @@ async function connectToDatabase() {
             connectTimeoutMS: 10000,
         });
         cachedDb = db;
+        lastConnectionError = null;
         console.log("✅ Successfully connected to MongoDB Atlas");
         return db;
     } catch (err) {
         console.error("❌ MongoDB Connection Error:", err.message);
+        lastConnectionError = err.message;
         throw err;
     }
 }
@@ -95,6 +98,7 @@ app.get('/api/health', async (req, res) => {
     const status = {
         server: "online",
         database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+        last_error: lastConnectionError || "none",
         uri_source: maskedUri,
         timestamp: new Date().toISOString(),
         env: process.env.NODE_ENV || "development"
