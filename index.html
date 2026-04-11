@@ -829,9 +829,13 @@
                         <div class="line"></div>
                     </div>
 
-                    <button id="googleContinueBtn" type="button" onclick="openGoogleAccountPicker()" class="w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-bold py-3 px-6 rounded-2xl border border-gray-200 hover:bg-gray-50 hover:shadow-lg transition-all active:scale-95" style="min-height:48px;">
+                    <!-- Official Google Button Container (Required for real SSO to work without browser errors) -->
+                    <div id="googleBtnLogin" class="w-full mb-4"></div>
+
+                    <!-- Fallback Sync (Hidden if Real Google is active) -->
+                    <button id="googleContinueBtn" type="button" onclick="openGoogleAccountPicker()" class="hidden w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-bold py-3 px-6 rounded-2xl border border-gray-200 hover:bg-gray-50 hover:shadow-lg transition-all active:scale-95" style="min-height:48px;">
                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width:22px;height:22px;">
-                        <span style="font-size:0.95rem;">Continue with Google</span>
+                        <span style="font-size:0.95rem;">Continue with Google (Sync)</span>
                     </button>
 
                     <p class="auth-footer-link">New to Safe Her? <a href="#signupView" onclick="switchSection('signupView')">Create a Identity</a></p>
@@ -876,9 +880,12 @@
                         <div class="line"></div>
                     </div>
 
-                    <button id="googleContinueBtnSignup" type="button" onclick="openGoogleAccountPicker()" class="w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-bold py-3 px-6 rounded-2xl border border-gray-200 hover:bg-gray-50 hover:shadow-lg transition-all active:scale-95" style="min-height:48px;">
+                    <!-- Official Google Button Container (Signup) -->
+                    <div id="googleBtnSignup" class="w-full mb-4"></div>
+
+                    <button id="googleContinueBtnSignup" type="button" onclick="openGoogleAccountPicker()" class="hidden w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-bold py-3 px-6 rounded-2xl border border-gray-200 hover:bg-gray-50 hover:shadow-lg transition-all active:scale-95" style="min-height:48px;">
                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" style="width:22px;height:22px;">
-                        <span style="font-size:0.95rem;">Continue with Google</span>
+                        <span style="font-size:0.95rem;">Continue with Google (Sync)</span>
                     </button>
 
                     <p class="auth-footer-link">Already protected? <a href="#loginView" onclick="switchSection('loginView')">Login to Session</a></p>

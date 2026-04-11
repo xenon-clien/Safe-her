@@ -1787,10 +1787,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (window.isGSI_Ready) {
                     console.log("✅ Google Sign-In Initialized with Real ID.");
-                    // Optional: Render account tap for auto-signin experience
+                    
+                    // Render official branded buttons for 100% browser compatibility
+                    const opt = { theme: "outline", size: "large", width: 400, text: "continue_with", shape: "pill" };
+                    
+                    const btnLogin = document.getElementById("googleBtnLogin");
+                    const btnSignup = document.getElementById("googleBtnSignup");
+                    const oldBtnLogin = document.getElementById("googleContinueBtn");
+                    const oldBtnSignup = document.getElementById("googleContinueBtnSignup");
+
+                    if (btnLogin) google.accounts.id.renderButton(btnLogin, opt);
+                    if (btnSignup) google.accounts.id.renderButton(btnSignup, opt);
+                    
+                    // Hide traditional sync buttons if real Google is working
+                    if (oldBtnLogin) oldBtnLogin.style.display = "none";
+                    if (oldBtnSignup) oldBtnSignup.style.display = "none";
+
+                    // Also try One-tap (optional)
                     google.accounts.id.prompt(); 
                 } else {
                     console.warn("⚠️ Google SSO using placeholder. Social Sync mode active.");
+                    // Show traditional sync buttons if real Google is not configured
+                    const oldBtnLogin = document.getElementById("googleContinueBtn");
+                    const oldBtnSignup = document.getElementById("googleContinueBtnSignup");
+                    if (oldBtnLogin) oldBtnLogin.style.display = "flex";
+                    if (oldBtnSignup) oldBtnSignup.style.display = "flex";
                 }
             }
         }).catch(err => {
