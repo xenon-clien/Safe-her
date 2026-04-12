@@ -66,7 +66,7 @@ const CRIME_HOTSPOTS = [
 function initMap(lat, lng) {
     // 1. Pehli baar map banane ke liye
     if (!map) {
-        map = L.map('map').setView([lat, lng], 15); // Zoom to 15 for better city level view
+        map = L.map('map').setView([lat, lng], 18); // Zoom to 18 for exact street/colony view
 
         // Highly detailed Google Street Maps (Great for precision street-level zooming, avoids 403 issues)
         L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -97,6 +97,7 @@ function initMap(lat, lng) {
         }
         // Properly pan map preventing blank boundaries
         map.panTo([lat, lng]);
+        map.setZoom(18);
     }
 }
 
@@ -359,7 +360,7 @@ function startTracking() {
                     showToast("Failed to track location!", "error");
                 }
             },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     } else {
         const coordsDisplay = document.getElementById("coordsDisplay");
@@ -433,7 +434,11 @@ function updateDashboardGPS(lat, lng) {
     fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
         .then(r => r.json())
         .then(data => {
-            const area = data.address.suburb || data.address.city_district || data.address.city || 'Your Area';
+            const addr = data.address;
+            const colony = addr.neighbourhood || addr.suburb || addr.residential || addr.colony || addr.city_district || "";
+            const city = addr.city || addr.town || addr.village || "";
+            const area = colony ? `${colony}, ${city}` : (city || data.display_name.split(',')[0] || 'Unknown Colony');
+            
             if (areaEl) areaEl.innerText = area;
             // Also check for street lights nearby
             fetchStreetLights(lat, lng);
