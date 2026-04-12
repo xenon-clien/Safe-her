@@ -2082,3 +2082,128 @@ a {
     .section-header h2 { font-size: 1.6rem; }
     .route-planner-card { padding: 1.2rem; }
 }
+
+/* Emergency Shortcuts Grid */
+.emergency-shortcuts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.esc-btn {
+    padding: 18px 12px;
+    border-radius: 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 0.82rem;
+    transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    border: none;
+}
+
+.esc-btn.hospital {
+    background: linear-gradient(135deg, #ef4444, #991b1b);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.esc-btn.police {
+    background: linear-gradient(135deg, #3b82f6, #1e40af);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.esc-btn:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    filter: brightness(1.1);
+}
+
+.esc-btn i { font-size: 1.4rem; }
+
+/* Facility Pills (Route Planner) */
+.planner-facilities {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.facility-pill {
+    padding: 12px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: 0.2s;
+    border: none;
+    cursor: pointer;
+}
+
+.facility-pill.hospital {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.facility-pill.police {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.facility-pill:hover {
+    transform: scale(1.03);
+    background: rgba(255,255,255,0.05);
+}
+
+.emergency-nav-btn {
+    background: #9d4edd;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    margin-top: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    width: 100%;
+}
+.emergency-nav-btn:hover { background: #7b2cbf; }
+
+/* Premium Safety Meter */
+.safety-meter-container {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 2rem;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    backdrop-filter: blur(10px);
+}
+.meter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.meter-bar-vault {
+    width: 100%;
+    height: 12px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+.meter-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 10px;
+    transition: width 1.5s cubic-bezier(0.16, 1, 0.3, 1), background 1s;
+    background: linear-gradient(90deg, #ff3366, #9d4edd, #00d2ff);
+    box-shadow: 0 0 15px currentColor;
+}
+}

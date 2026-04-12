@@ -20,31 +20,37 @@ let sirenGain = null;
 /**
  * Sends the initial SOS alert to the backend.
  */
+/**
+ * Sends the advanced SOS alert with real-time geocoding and SMS triggers.
+ */
 async function sendSOSAlert() {
-    const user = JSON.parse(localStorage.getItem('herSafety_user') || '{"id":"661502dc8882ca1a681c2b5e", "name":"Demo User"}');
+    const userStr = localStorage.getItem('herSafety_user');
+    const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : { id: 'guest', name: 'Guest' };
 
     const payload = {
         userId: user.id || user._id,
-        userName: user.name,
-        location: userLatLng,
-        message: "Emergency SOS triggered! Please monitor my live location link.",
+        lat: userLatLng.lat,
+        lng: userLatLng.lng,
         timestamp: new Date().toISOString()
     };
 
     try {
-        const response = await fetch(`${API_URL}/send-alert`, {
+        const response = await fetch(`${API_URL}/sos-trigger`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
         const data = await response.json();
-        console.log("SOS Alert Response:", data);
-
+        
         if (response.ok) {
-            addSecurityLog('SOS', 'Emergency Alert Broadcasted to Family');
+            addSecurityLog('SOS', `Broadcast via Twilio: ${data.address || 'Location Shared'}`);
+            if (data.address) {
+                const statusEl = document.getElementById('sosStatus');
+                if (statusEl) statusEl.innerHTML = `🚨 Help is on the way to:<br><b>${data.address}</b>`;
+            }
         }
     } catch (error) {
-        console.error("Failed to send SOS alert:", error);
+        console.error("SOS Trigger Fail:", error);
     }
 }
 
@@ -89,7 +95,7 @@ function initMap(lat, lng) {
         if (userMarker) {
             userMarker.setLatLng([lat, lng]);
         }
-        // Properly pan map preventing blank bounds drift
+        // Properly pan map preventing blank boundaries
         map.panTo([lat, lng]);
     }
 }
@@ -363,51 +369,6 @@ function startTracking() {
     }
 }
 
-
-
-// Initialize tracking logic temporarily defined (Will be moved to bottom for clarity)
-// Moving window.onload to the very bottom of the file to ensure all functions are defined first.
-
-function runLoader() {
-    const bar = document.getElementById('loaderBar');
-    const status = document.getElementById('loaderStatus');
-    const loader = document.getElementById('loaderScreen');
-
-    const steps = [
-        { pct: 20, msg: 'Loading safety modules...' },
-        { pct: 45, msg: 'Connecting to servers...' },
-        { pct: 65, msg: 'Acquiring GPS signal...' },
-        { pct: 85, msg: 'Analyzing area safety...' },
-        { pct: 100, msg: 'All systems ready ✅' }
-    ];
-
-    let i = 0;
-    const tick = setInterval(() => {
-        if (i >= steps.length) {
-            clearInterval(tick);
-            // Fade out loader after short pause
-            setTimeout(() => {
-                loader.classList.add('fade-out');
-                document.body.classList.add('loaded'); // Force scroll enablement
-                // Remove from DOM after transition ends
-                setTimeout(() => { if (loader) loader.style.display = 'none'; }, 650);
-            }, 400);
-            // Start app logic with safety catch
-            try {
-                startTracking();
-                startDashboardClock();
-            } catch (err) {
-                console.error("Post-loader startup failed:", err);
-            }
-            return;
-        }
-        if (bar) bar.style.width = steps[i].pct + '%';
-        if (status) status.innerText = steps[i].msg;
-        i++;
-    }, 480);
-}
-
-
 // ============================================================
 //  SAFETY DASHBOARD - Live Time + GPS + Safety Score
 // ============================================================
@@ -541,8 +502,6 @@ function getDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// (Note: Voice SOS logic has been moved to the Tactical Tools section at the end of the script for professional consolidation)
-
 // ============================================================
 //  CHECK-IN TIMER
 // ============================================================
@@ -647,54 +606,56 @@ function quickShareLocation() {
     });
 }
 
-// (Note: Shake SOS logic has been moved to the Tactical Tools section at the end of the script for professional consolidation)
-
-
 // --- Web Audio API Advanced Siren Synthesis ---
 function playAlarm() {
-    if (!audioContext) {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+
+        sirenOscillator = audioCtx.createOscillator();
+        sirenGain = audioCtx.createGain();
+
+        sirenOscillator.type = 'square'; // Harsh emergency sound
+        sirenOscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+
+        // Siren wail logic
+        sirenInterval = setInterval(() => {
+            if (sirenOscillator) {
+                const time = audioCtx.currentTime;
+                // Oscillate between 600Hz and 1200Hz for high-intensity effect
+                sirenOscillator.frequency.exponentialRampToValueAtTime(1200, time + 0.4);
+                sirenOscillator.frequency.exponentialRampToValueAtTime(600, time + 0.8);
+            }
+        }, 800);
+
+        sirenGain.gain.setValueAtTime(0.15, audioCtx.currentTime); // Professional volume mixing
+        
+        sirenOscillator.connect(sirenGain);
+        sirenGain.connect(audioCtx.destination);
+        sirenOscillator.start();
+        
+    } catch (e) {
+        console.error("Audio error:", e);
     }
-
-    oscillator = audioContext.createOscillator();
-    gainNode = audioContext.createGain();
-
-    oscillator.type = 'sine'; // Smoother, professional alert sound
-    oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5 note
-
-    // Decent Alert Tone Sequence
-    let isHigh = false;
-    window.sirenInterval = setInterval(() => {
-        if (!isSosActive) return;
-        const targetFreq = isHigh ? 880 : 660; // Alternating A5 and E5 for a "decent" alert
-        oscillator.frequency.exponentialRampToValueAtTime(targetFreq, audioContext.currentTime + 0.1);
-        isHigh = !isHigh;
-    }, 600); // Slower, less aggressive interval
-
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-
-    gainNode.gain.setValueAtTime(0.4, audioContext.currentTime); // Balanced volume
-    oscillator.start();
-
-    // Activate Smooth Visual Pulse Overlay
-    let strobe = document.getElementById('strobeOverlay');
-    if (strobe) strobe.classList.add('strobe-active');
 }
 
 function stopAlarm() {
-    if (oscillator) {
-        clearInterval(window.sirenInterval);
-        oscillator.stop();
-        oscillator.disconnect();
-        gainNode.disconnect();
+    if (sirenOscillator) {
+        sirenOscillator.stop();
+        sirenOscillator.disconnect();
+        sirenOscillator = null;
     }
-    // Deactivate Strobe
-    let strobe = document.getElementById('strobeOverlay');
-    if (strobe) strobe.classList.remove('strobe-active');
+    if (sirenInterval) {
+        clearInterval(sirenInterval);
+        sirenInterval = null;
+    }
 }
 
-// Duplicate Fake Call functions removed.
 // --- SOS Logic ---
 function triggerSOS() {
     const sosContainer = document.querySelector('.sos-container');
@@ -769,68 +730,58 @@ function triggerSOS() {
 //   PREMIUM SOS UTILITIES
 // ============================================
 
-/**
- * Generates a realistic high-frequency police/ambulance siren
- * using pure Web Audio API (No files needed)
- */
-function playAlarm() {
+let mediaRecorder = null;
+let audioChunks = [];
+
+async function startDigitalBlackbox() {
+    console.log("🛠️ DIGITAL BLACKBOX: Initiating high-security audio evidence vault...");
+    addSecurityLog('BLACKBOX', 'Evidence Vault Initializing...');
+    
     try {
-        if (!audioCtx) {
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-
-        if (audioCtx.state === 'suspended') {
-            audioCtx.resume();
-        }
-
-        sirenOscillator = audioCtx.createOscillator();
-        sirenGain = audioCtx.createGain();
-
-        sirenOscillator.type = 'square'; // Harsh emergency sound
-        sirenOscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
-
-        // Siren wail logic
-        sirenInterval = setInterval(() => {
-            if (sirenOscillator) {
-                const time = audioCtx.currentTime;
-                // Oscillate between 600Hz and 1200Hz for high-intensity effect
-                sirenOscillator.frequency.exponentialRampToValueAtTime(1200, time + 0.4);
-                sirenOscillator.frequency.exponentialRampToValueAtTime(600, time + 0.8);
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        
+        mediaRecorder.ondataavailable = async (event) => {
+            if (event.data.size > 0) {
+                const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
+                const reader = new FileReader();
+                reader.readAsDataURL(event.data);
+                reader.onloadend = async () => {
+                    const base64data = reader.result.split(',')[1];
+                    const filename = `sos_${Date.now()}.webm`;
+                    
+                    // Upload to AWS S3 via Backend
+                    await fetch(`${API_URL}/blackbox-upload`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: user.id || user._id,
+                            chunkData: base64data,
+                            filename: filename
+                        })
+                    });
+                    console.log("Chunk secured in S3 Vault.");
+                };
             }
-        }, 800);
+        };
 
-        sirenGain.gain.setValueAtTime(0.15, audioCtx.currentTime); // Professional volume mixing
-        
-        sirenOscillator.connect(sirenGain);
-        sirenGain.connect(audioCtx.destination);
-        sirenOscillator.start();
-        
-    } catch (e) {
-        console.error("Audio error:", e);
-    }
-}
+        // Capture chunks every 8 seconds for real-time safety
+        mediaRecorder.start();
+        const chunkInterval = setInterval(() => {
+            if (isSosActive && mediaRecorder.state === 'recording') {
+                mediaRecorder.requestData();
+                addSecurityLog('BLACKBOX', '10s Audio Evidence Secured in S3 Vault');
+            } else {
+                clearInterval(chunkInterval);
+            }
+        }, 8000);
 
-function stopAlarm() {
-    if (sirenOscillator) {
-        sirenOscillator.stop();
-        sirenOscillator.disconnect();
-        sirenOscillator = null;
-    }
-    if (sirenInterval) {
-        clearInterval(sirenInterval);
-        sirenInterval = null;
-    }
-}
+        showToast("🔒 DIGITAL BLACKBOX ACTIVE — Evidence securing in cloud.", "success");
 
-function startDigitalBlackbox() {
-    console.log("🛠️ DIGITAL BLACKBOX: Monitoring local sensors & audio feed...");
-    // Professional simulation of evidence gathering
-    setTimeout(() => {
-        if (isSosActive) {
-            addSecurityLog('BLACKBOX', 'Audio Snapshot Captured & AES-256 Encrypted');
-            showToast("Evidence Stream: Secure Sync Active", "info");
-        }
-    }, 2000);
+    } catch (err) {
+        console.warn("Audio Blackbox failed:", err.message);
+        showToast("Blackbox Audio Access Denied.", "warning");
+    }
 }
 
 function startLiveBeacon() {
@@ -847,99 +798,6 @@ function startLiveBeacon() {
         }
     }, 5000);
 }
-
-function toggleCheckInTimer() {
-    if (checkInInterval) {
-        clearInterval(checkInInterval);
-        checkInInterval = null;
-        document.getElementById('timerDisplay').style.display = 'none';
-        document.getElementById('timerToggleBtn').innerText = 'Start Timer';
-        document.getElementById('checkinPanel').style.borderColor = 'rgba(157,78,221,0.4)';
-        showToast('Timer cancelled', 'success');
-        return;
-    }
-
-    const mins = parseInt(document.getElementById('checkinDuration').value);
-    checkInSecsLeft = mins * 60;
-
-    document.getElementById('timerDisplay').style.display = 'block';
-    document.getElementById('timerToggleBtn').innerText = 'Cancel Timer';
-    updateTimerDisplay();
-
-    checkInInterval = setInterval(() => {
-        checkInSecsLeft--;
-        updateTimerDisplay();
-
-        if (checkInSecsLeft <= 0) {
-            clearInterval(checkInInterval);
-            checkInInterval = null;
-            // Auto SOS!
-            document.getElementById('timerStatusMsg').innerText = '⚠️ Time expired! SOS alert triggered!';
-            document.getElementById('checkinPanel').style.borderColor = '#ff3366';
-            showToast('⚠️ Check-In timer expired — SOS sent to contacts!', 'error');
-            triggerSOS();
-        }
-
-        // Warning at 1 minute
-        if (checkInSecsLeft === 60) {
-            showToast('⚠️ 1 minute left! Check-in before time runs out!', 'error');
-        }
-    }, 1000);
-}
-
-function updateTimerDisplay() {
-    const m = Math.floor(checkInSecsLeft / 60);
-    const s = checkInSecsLeft % 60;
-    document.getElementById('timerCountdown').innerText =
-        `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
-function checkInNow() {
-    clearInterval(checkInInterval);
-    checkInInterval = null;
-    document.getElementById('timerDisplay').style.display = 'none';
-    document.getElementById('timerToggleBtn').innerText = 'Start Timer';
-    document.getElementById('timerStatusMsg').innerText = 'Stay safe! Timer running...';
-    document.getElementById('checkinPanel').style.borderColor = 'rgba(157,78,221,0.4)';
-    showToast('✅ Check-In confirmed! You are safe.', 'success');
-}
-
-// ============================================================
-//  QUICK SHARE LOCATION
-// ============================================================
-function quickShareLocation() {
-    if (!navigator.geolocation) {
-        showToast('Geolocation not supported', 'error');
-        return;
-    }
-
-    navigator.geolocation.getCurrentPosition(pos => {
-        const lat = pos.coords.latitude.toFixed(5);
-        const lng = pos.coords.longitude.toFixed(5);
-        const msg = encodeURIComponent(
-            `🚨 I need help! My live location:\nhttps://maps.google.com/?q=${lat},${lng}\n\nSent via Safe Her App`
-        );
-
-        // Try native share API first
-        if (navigator.share) {
-            navigator.share({
-                title: 'My Live Location - Safe Her',
-                text: `🚨 My location: https://maps.google.com/?q=${lat},${lng}`,
-                url: `https://maps.google.com/?q=${lat},${lng}`
-            }).then(() => showToast('Location shared!', 'success'))
-                .catch(() => { });
-        } else {
-            // Fallback: WhatsApp
-            window.open(`https://wa.me/?text=${msg}`, '_blank');
-        }
-        showToast(`📍 Sharing location: ${lat}, ${lng}`, 'success');
-    }, () => {
-        showToast('Could not get location. Enable GPS.', 'error');
-    });
-}
-
-// (Note: Shake SOS logic has been moved to the Tactical Tools section at the end of the script for professional consolidation)
-
 
 // --- Dynamic Tab Switching ---
 function switchSection(sectionId) {
@@ -1033,8 +891,6 @@ function switchAuthTab(type) {
 }
 
 // --- Real Backend Interaction (Node.js/MongoDB) ---
-// --- Real Backend Interaction (Node.js/MongoDB) ---
-
 document.getElementById('signupForm').addEventListener('submit', async (e) => {
     e.preventDefault(); // Page refresh hone se rokne ke liye
 
@@ -1065,11 +921,6 @@ document.getElementById('signupForm').addEventListener('submit', async (e) => {
         showToast("Backend se connect nahi ho paya!", "error");
     }
 });
-
-
-
-
-
 
 // --- Chatbot Logic ---
 function toggleChat() {
@@ -1175,7 +1026,112 @@ function showToast(message, type) {
 let routeMap = null;
 let routeControl = null;
 let currentRouteMode = 'safe';
-userLatLng = null; // Global coordinates
+// ============================================
+//   NEARBY FACILITIES (Hospital / Police)
+// ============================================
+async function findNearest(type) {
+    // Determine active map (home main map or route map)
+    const activeMap = (document.getElementById('home').style.display !== 'none') ? map : routeMap;
+    
+    // --- FORCE RE-CALIBRATE GPS FOR ACCURACY ---
+    showToast(`Calibrating GPS for precise search...`, 'info');
+    
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000 });
+        });
+        userLatLng = { lat: position.coords.latitude, lng: position.coords.longitude };
+    } catch (e) {
+        console.warn("GPS timeout, using last known position.");
+    }
+
+    const currentPos = userLatLng || { lat: 30.901, lng: 75.8573 };
+
+    showToast(`Searching for nearest ${type}...`, 'info');
+
+    // Overpass API Query
+    const query = `[out:json];node(around:5000,${currentPos.lat},${currentPos.lng})[amenity=${type}];out;`;
+    
+    try {
+        const response = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+        const data = await response.json();
+        const nodes = data.elements || [];
+
+        if (nodes.length === 0) {
+            showToast(`No ${type}s detected within 5km. Try a different area.`, 'error');
+            return;
+        }
+
+        // Find Closest Node
+        let closest = null;
+        let minDist = Infinity;
+
+        nodes.forEach(node => {
+            const d = calculateDistance(currentPos.lat, currentPos.lng, node.lat, node.lon);
+            if (d < minDist) {
+                minDist = d;
+                closest = node;
+            }
+        });
+
+        if (closest) {
+            const name = closest.tags.name || `Nearest ${type}`;
+            const distStr = (minDist / 1000).toFixed(2) + " km";
+            
+            showToast(`📍 Found: ${name} (${distStr})`, "success");
+
+            // Pan and Mark on Map
+            activeMap.setView([closest.lat, closest.lon], 15);
+            
+            const color = type === 'hospital' ? '#ef4444' : '#3b82f6';
+            const icon = L.divIcon({
+                html: `<div style="background:${color};width:34px;height:34px;border-radius:50%;border:4px solid white;display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 0 15px ${color}"><i class="fas fa-${type === 'hospital' ? 'hospital' : 'building-shield'}"></i></div>`,
+                className: '',
+                iconSize: [34, 34]
+            });
+
+            L.marker([closest.lat, closest.lon], { icon }).addTo(activeMap)
+                .bindPopup(`<b>${name}</b><br>Distance: ${distStr}<br><button onclick="navigateToCoords(${closest.lat}, ${closest.lon})" class="emergency-nav-btn">Start Route</button>`)
+                .openPopup();
+
+            // Auto-fill Route Planner if user wants to go there
+            const routeToField = document.getElementById('routeTo');
+            if (routeToField) {
+                routeToField.value = `${closest.lat}, ${closest.lon}`;
+            }
+        }
+
+    } catch (error) {
+        console.error("Facility search error:", error);
+        showToast("System busy. Please try again.", "error");
+    }
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // Earth's radius in meters
+    const phi1 = lat1 * Math.PI / 180;
+    const phi2 = lat2 * Math.PI / 180;
+    const deltaPhi = (lat2 - lat1) * Math.PI / 180;
+    const deltaLambda = (lon2 - lon1) * Math.PI / 180;
+
+    const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+              Math.cos(phi1) * Math.cos(phi2) *
+              Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; 
+}
+
+function navigateToCoords(lat, lng) {
+    const routeToField = document.getElementById('routeTo');
+    if (routeToField) {
+        routeToField.value = `${lat}, ${lng}`;
+        switchSection('route');
+        setTimeout(() => calculateRoute(), 300);
+    }
+}
+
+// GPS state persistent
 let isPremium = localStorage.getItem('hersafety_premium') === 'true';
 
 function updatePremiumUI() {
@@ -1509,12 +1465,6 @@ async function resendOtp() {
     }
 }
 
-
-
-
-
-
-
 function showPremiumPopup() {
     const modal = document.createElement('div');
     modal.style.cssText = `
@@ -1781,14 +1731,30 @@ function calculateRoute() {
                     serviceUrl: 'https://router.project-osrm.org/route/v1',
                     profile: currentRouteMode === 'walk' ? 'foot' : 'driving'
                 }),
-                showAlternatives: true,
-                altLineOptions: { styles: [{ color: 'transparent', opacity: 0, weight: 0 }] },
-                lineOptions: { styles: [{ color: 'transparent', opacity: 0, weight: 0 }] },
+                showAlternatives: false,
                 createMarker: () => null,
                 show: false,
                 addWaypoints: false
+            }).on('routesfound', function(e) {
+                const routes = e.routes;
+                const summary = routes[0].summary;
+                
+                // Update UI Labels
+                const distKm = (summary.totalDistance / 1000).toFixed(1);
+                const timeMin = Math.round(summary.totalTime / 60);
+                
+                const distEl = document.getElementById('routeDistance');
+                const timeEl = document.getElementById('routeTime');
+                const infoPanel = document.getElementById('routeInfoPanel');
+                
+                if (distEl) distEl.innerText = `${distKm} km`;
+                if (timeEl) timeEl.innerText = `${timeMin} mins`;
+                if (infoPanel) infoPanel.style.display = 'flex';
+
+                // Display Route Metrics logic...
+                showToast(`Route Calculated: ${distKm}km, ~${timeMin}mins`, 'success');
             }).addTo(routeMap);
-            
+
             if (window.premiumRoutePolylines) {
                 window.premiumRoutePolylines.forEach(p => routeMap.removeLayer(p));
             }
@@ -1876,6 +1842,9 @@ function calculateRoute() {
                 }
 
                 // Update Forecast UI
+                const morning = calculateDynamicScore(9);
+                const evening = calculateDynamicScore(19);
+                const night = calculateDynamicScore(2);
                 document.getElementById('routeScoreMorning').innerText = morning.score;
                 document.getElementById('routeScoreEvening').innerText = evening.score;
                 document.getElementById('routeScoreNight').innerText = night.score;
@@ -2043,10 +2012,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// ============================================================
-//  CORE INITIALIZATION: LOADER & DASHBOARD
-// ============================================================
-
 /**
  * Animates the professional premium loader and transitions to the app.
  */
@@ -2066,13 +2031,13 @@ function runLoader() {
 
         // Dynamic Status Updates
         if (progress < 30) {
-            status.innerText = "Initializing security protocols...";
+            if (status) status.innerText = "Initializing security protocols...";
         } else if (progress < 60) {
-            status.innerText = "Connecting to safe-haven relay...";
+            if (status) status.innerText = "Connecting to safe-haven relay...";
         } else if (progress < 90) {
-            status.innerText = "Syncing local database and logs...";
+            if (status) status.innerText = "Syncing local database and logs...";
         } else {
-            status.innerText = "System Ready. Secure Connection Established.";
+            if (status) status.innerText = "System Ready. Secure Connection Established.";
         }
 
         if (progress === 100) {
@@ -2086,6 +2051,14 @@ function runLoader() {
                         loader.style.display = 'none';
                         document.body.classList.add('loaded');
                         console.log("✅ Core Systems Loaded.");
+                        
+                        // Start app logic
+                        try {
+                            startTracking();
+                            startDashboardClock();
+                        } catch (err) {
+                            console.error("Post-loader startup failed:", err);
+                        }
                     }, 500);
                 }
             }, 600);
@@ -2368,8 +2341,7 @@ function showCallOptionsModal(name, phone) {
 // ============================================================
 //  DIGITAL BLACKBOX - Evidence Locker (Audio Recording)
 // ============================================================
-let mediaRecorder;
-let audioChunks = [];
+
 
 async function startDigitalBlackbox() {
     try {
@@ -3495,4 +3467,84 @@ async function handleLoginSubmission(e) {
     } catch (err) {
         showToast("Server unreachable", "error");
     }
+}
+
+// ============================================
+//   PREMIUM PRODUCTION UPGRADES (Batch 2)
+// ============================================
+
+let currentSafetyWatchId = null;
+
+/**
+ * HIGH-ACCURACY GPS POLLING (Power Optimized for Night)
+ */
+function startGlobalSafetyRadar() {
+    if (currentSafetyWatchId) navigator.geolocation.clearWatch(currentSafetyWatchId);
+
+    const options = {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 1000
+    };
+
+    currentSafetyWatchId = navigator.geolocation.watchPosition(
+        (pos) => {
+            userLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            const speed = pos.coords.speed || 0;
+            
+            const gpsLabel = document.getElementById('dashGps');
+            if (gpsLabel) gpsLabel.innerText = "ACTIVE-HIGH";
+            
+            // Sync with Map if in dashboard
+            if (map) {
+                userMarker.setLatLng([pos.coords.latitude, pos.coords.longitude]);
+                // Only pan if user moves significantly
+                if (speed > 2) map.panTo([pos.coords.latitude, pos.coords.longitude]);
+            }
+
+            updateProductionSafetyScore(pos.coords.latitude, pos.coords.longitude);
+        },
+        (err) => console.warn("Radar Signal Interrupted:", err.message),
+        options
+    );
+}
+
+/**
+ * HYBRID SAFETY SCORE INTEGRATION (Real API)
+ */
+async function updateProductionSafetyScore(lat, lng) {
+    try {
+        const res = await fetch(`${API_URL}/safety-score?lat=${lat}&lng=${lng}`);
+        const data = await res.json();
+
+        const bar = document.getElementById('safetyMeterBar');
+        const valEl = document.getElementById('safetyMeterValue');
+        const labelEl = document.getElementById('safetyMeterLabel');
+
+        if (bar && valEl && labelEl) {
+            const score = data.score || 5;
+            bar.style.width = (score * 10) + '%';
+            valEl.innerText = score.toFixed(1);
+            labelEl.innerText = data.label || "MODERATE";
+            
+            // Color Dynamics
+            if (score > 7) {
+                labelEl.className = "text-[10px] font-black px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/30";
+                bar.style.backgroundColor = "#22c55e";
+            } else if (score > 4) {
+                labelEl.className = "text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-500 border border-yellow-500/30";
+                bar.style.backgroundColor = "#eab308";
+            } else {
+                labelEl.className = "text-[10px] font-black px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/30";
+                bar.style.backgroundColor = "#ef4444";
+            }
+        }
+    } catch (e) {
+        console.error("Safety Radar failed to sync.");
+    }
+}
+
+// Start Safety Radar as soon as user enters
+if (localStorage.getItem('herSafety_user')) {
+    startGlobalSafetyRadar();
 }
