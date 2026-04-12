@@ -33,9 +33,6 @@ console.log("⚙️ Dotenv loaded");
 // Initialize Express App
 const app = express();
 
-// --- SERVE FRONTEND (STATIC FILES) ---
-app.use(express.static(path.join(__dirname, '..')));
-
 // Middleware
 app.use(express.json());
 app.use(cors());
@@ -224,6 +221,7 @@ app.get('/api/safety-score', (req, res) => {
 app.post('/api/chat', async (req, res) => {
     try {
         const { message, userId } = req.body;
+        console.log(`🤖 Chat request from ${userId}: ${message}`);
         
         // In production, you would use: 
         // const { GoogleGenerativeAI } = require("@google/generative-ai");
@@ -265,6 +263,10 @@ const smsWorkerLogic = async job => {
 };
 
 if (redisConn) new Worker('sos_alerts', smsWorkerLogic, { connection: redisConn });
+
+// --- SERVE FRONTEND (STATIC FILES) ---
+// Placing this at the end ensures API routes take precedence
+app.use(express.static(path.join(__dirname, '..')));
 
 // Start Server
 const PORT = process.env.PORT || 5000;

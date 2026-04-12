@@ -1008,7 +1008,8 @@ async function sendMessage() {
     } catch (err) {
         const typingEl = document.getElementById(typingId);
         if (typingEl) typingEl.remove();
-        appendMessage("Google API link busy. Please try later.", 'bot');
+        console.error("Chat Error:", err);
+        appendMessage(`Google API link busy. (Status: ${err.message})`, 'bot');
     }
 }
 
