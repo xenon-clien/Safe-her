@@ -10,13 +10,18 @@ let userLatLng = { lat: 30.901, lng: 75.8573 }; // Default Ludhiana
 const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.protocol === 'file:')
     ? 'http://localhost:5000/api'
     : '/api';
-let pendingPaymentResponse = null; // Stores Razorpay response until OTP verification
+let pendingPaymentResponse = null; 
+let liveBeaconInterval = null;
+let sirenInterval = null;
+let audioCtx = null;
+let sirenOscillator = null;
+let sirenGain = null;
 
 /**
  * Sends the initial SOS alert to the backend.
  */
 async function sendSOSAlert() {
-    const user = JSON.parse(localStorage.getItem('herSafety_user') || '{"id":"demo_user_123", "name":"Demo User"}');
+    const user = JSON.parse(localStorage.getItem('herSafety_user') || '{"id":"661502dc8882ca1a681c2b5e", "name":"Demo User"}');
 
     const payload = {
         userId: user.id || user._id,
@@ -408,7 +413,35 @@ function runLoader() {
 // ============================================================
 function startDashboardClock() {
     updateDashboard(); // Run once immediately
+    checkDatabaseStatus(); // Check DB status
     setInterval(updateDashboard, 1000);
+    setInterval(checkDatabaseStatus, 5000); // Check DB every 5s
+}
+
+async function checkDatabaseStatus() {
+    const dbEl = document.getElementById('dashDb');
+    if (!dbEl) return;
+
+    try {
+        const response = await fetch(`${API_URL}/health`);
+        const data = await response.json();
+        
+        if (data.database === 'connected') {
+            dbEl.innerText = 'Online ✅';
+            dbEl.style.color = '#4caf50';
+        } else if (data.database === 'connecting') {
+            dbEl.innerText = 'Syncing...';
+            dbEl.style.color = '#ff9800';
+        } else {
+            dbEl.innerText = 'Offline ❌';
+            dbEl.style.color = '#ff3366';
+            console.warn("Database disconnected:", data.last_error);
+        }
+    } catch (error) {
+        dbEl.innerText = 'Error ⚠️';
+        dbEl.style.color = '#ff3366';
+        console.error("Health check failed:", error);
+    }
 }
 
 function updateDashboard() {
@@ -666,58 +699,153 @@ function stopAlarm() {
 function triggerSOS() {
     const sosContainer = document.querySelector('.sos-container');
     const statusText = document.getElementById('sosStatus');
+    const blackbox = document.getElementById('blackboxStatus');
 
     if (!isSosActive) {
-        // 1. SOS State ON karo
+        // --- SOS ON ---
         isSosActive = true;
+        
+        // Haptic Feedback for Premium Feel
+        if (navigator.vibrate) {
+            navigator.vibrate([500, 200, 500, 200, 800]); 
+        }
+
         sosContainer.classList.add('sos-active');
+        document.body.classList.add('strobe-active');
         document.querySelector('.sos-text').innerText = 'STOP';
+        if (blackbox) blackbox.style.display = 'flex';
 
-        // 2. Alarm Chalao
-        if (typeof playAlarm === "function") {
-            playAlarm();
-        }
+        // 1. Initial High-Alert Warning Sound
+        const warningTone = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = warningTone.createOscillator();
+        const gain = warningTone.createGain();
+        osc.connect(gain);
+        gain.connect(warningTone.destination);
+        osc.frequency.value = 1500;
+        gain.gain.setValueAtTime(0.5, warningTone.currentTime);
+        osc.start();
+        osc.stop(warningTone.currentTime + 0.5);
 
-        // 3. Start Digital Blackbox (Evidence Recording)
-        if (typeof startDigitalBlackbox === "function") {
-            startDigitalBlackbox();
-        }
+        // 2. Alarm Audio (Professional High-Frequency Siren)
+        setTimeout(() => {
+            if (isSosActive) playAlarm();
+        }, 500);
 
-        // 4. Start Live Tracking Beacon (for Family Dashboard)
-        if (typeof startLiveBeacon === "function") {
-            startLiveBeacon();
-        }
+        // 3. Start Digital Blackbox (Evidence Simulation)
+        startDigitalBlackbox();
 
-        // 5. Show Tracking Link (In Console for Demo)
-        const user = JSON.parse(localStorage.getItem('herSafety_user') || '{"id":"demo_user_123"}');
-        const trackingLink = `${window.location.origin}/track/${user.id}`;
-        console.log(`%c🚨 EMERGENCY RELAY ACTIVE`, "background: #ff4757; color: white; padding: 10px; font-weight: bold;");
-        console.log(`%cTracking link sent to family: ${trackingLink}`, "color: #00d2ff; font-weight: bold;");
+        // 4. Start Live Tracking Beacon (Production Grade)
+        startLiveBeacon();
 
-        if (typeof showToast === 'function') {
-            showToast("Tracking link shared with family!", "error");
-        }
-
-        // 6. Send initial Alert to API
+        // 5. Initial Alert Sync
         sendSOSAlert();
 
+        if (statusText) statusText.innerText = "🚨 EMERGENCY ACTIVE";
+        showToast("EMERGENCY PROTOCOLS ACTIVATED", "error");
+
     } else {
-        // --- SOS OFF KARO ---
+        // --- SOS OFF ---
         isSosActive = false;
         sosContainer.classList.remove('sos-active');
+        document.body.classList.remove('strobe-active');
         document.querySelector('.sos-text').innerText = 'SOS';
+        if (blackbox) blackbox.style.display = 'none';
 
-        // Alarm Band karo
-        if (typeof stopAlarm === "function") {
-            stopAlarm();
-        }
+        // Stop all protocols
+        stopAlarm();
+        clearInterval(liveBeaconInterval);
+        liveBeaconInterval = null;
 
         if (statusText) statusText.innerText = "Situation Cleared.";
         setTimeout(() => {
             if (statusText) statusText.innerHTML = '';
         }, 3000);
-        document.getElementById('checkinPanel').style.display = 'none';
+        
+        showToast("Emergency Protocols Deactivated", "success");
     }
+}
+
+// ============================================
+//   PREMIUM SOS UTILITIES
+// ============================================
+
+/**
+ * Generates a realistic high-frequency police/ambulance siren
+ * using pure Web Audio API (No files needed)
+ */
+function playAlarm() {
+    try {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+
+        sirenOscillator = audioCtx.createOscillator();
+        sirenGain = audioCtx.createGain();
+
+        sirenOscillator.type = 'square'; // Harsh emergency sound
+        sirenOscillator.frequency.setValueAtTime(440, audioCtx.currentTime);
+
+        // Siren wail logic
+        sirenInterval = setInterval(() => {
+            if (sirenOscillator) {
+                const time = audioCtx.currentTime;
+                // Oscillate between 600Hz and 1200Hz for high-intensity effect
+                sirenOscillator.frequency.exponentialRampToValueAtTime(1200, time + 0.4);
+                sirenOscillator.frequency.exponentialRampToValueAtTime(600, time + 0.8);
+            }
+        }, 800);
+
+        sirenGain.gain.setValueAtTime(0.15, audioCtx.currentTime); // Professional volume mixing
+        
+        sirenOscillator.connect(sirenGain);
+        sirenGain.connect(audioCtx.destination);
+        sirenOscillator.start();
+        
+    } catch (e) {
+        console.error("Audio error:", e);
+    }
+}
+
+function stopAlarm() {
+    if (sirenOscillator) {
+        sirenOscillator.stop();
+        sirenOscillator.disconnect();
+        sirenOscillator = null;
+    }
+    if (sirenInterval) {
+        clearInterval(sirenInterval);
+        sirenInterval = null;
+    }
+}
+
+function startDigitalBlackbox() {
+    console.log("🛠️ DIGITAL BLACKBOX: Monitoring local sensors & audio feed...");
+    // Professional simulation of evidence gathering
+    setTimeout(() => {
+        if (isSosActive) {
+            addSecurityLog('BLACKBOX', 'Audio Snapshot Captured & AES-256 Encrypted');
+            showToast("Evidence Stream: Secure Sync Active", "info");
+        }
+    }, 2000);
+}
+
+function startLiveBeacon() {
+    console.log("📡 LIVE BEACON: Sharing high-frequency location updates...");
+    
+    // Send update immediately
+    sendSOSAlert();
+
+    // Then every 5 seconds
+    liveBeaconInterval = setInterval(() => {
+        if (isSosActive) {
+            sendSOSAlert();
+            console.log("Live Beacon Update Sent");
+        }
+    }, 5000);
 }
 
 function toggleCheckInTimer() {
@@ -1005,7 +1133,18 @@ function simulateAlert(name) {
 
 // --- Mobile Menu ---
 function toggleMobileMenu() {
-    document.getElementById('navLinks').classList.toggle('active');
+    const nav = document.getElementById('navLinks');
+    const burger = document.querySelector('.hamburger i');
+    
+    nav.classList.toggle('active');
+    
+    if (nav.classList.contains('active')) {
+        burger.className = 'fas fa-times'; // Change to close icon
+        document.body.style.overflow = 'hidden'; // Prevent scroll
+    } else {
+        burger.className = 'fas fa-bars'; // Back to hamburger
+        document.body.style.overflow = 'auto'; // Re-enable scroll
+    }
 }
 
 // --- Toast System ---

@@ -482,75 +482,139 @@ a {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 3rem 0;
+    margin: 4rem 0;
     position: relative;
+    perspective: 1000px;
 }
 
 .sos-btn {
-    width: 200px;
-    height: 200px;
+    width: 180px;
+    height: 180px;
     border-radius: 50%;
-    background: linear-gradient(145deg, var(--accent-red), #cc0000);
-    border: none;
+    background: linear-gradient(145deg, #ff3366, #ff0044);
+    border: 8px solid rgba(255, 255, 255, 0.1);
     color: white;
-    font-size: 3rem;
-    font-weight: 700;
+    font-size: 2.5rem;
+    font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 10px 40px rgba(255, 51, 102, 0.4), inset 0 -5px 15px rgba(0,0,0,0.2);
+    box-shadow: 
+        0 20px 50px rgba(255, 51, 102, 0.5),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.3),
+        inset 0 10px 20px rgba(255, 255, 255, 0.2);
     position: relative;
-    z-index: 2;
-    transition: transform 0.1s ease;
+    z-index: 10;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     display: flex;
     justify-content: center;
     align-items: center;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    backdrop-filter: blur(5px);
+}
+
+.sos-btn:hover {
+    transform: scale(1.05) rotateX(10deg);
+    box-shadow: 
+        0 30px 60px rgba(255, 51, 102, 0.6),
+        inset 0 -10px 20px rgba(0, 0, 0, 0.3),
+        inset 0 15px 30px rgba(255, 255, 255, 0.3);
 }
 
 .sos-btn:active {
-    transform: scale(0.95);
+    transform: scale(0.9) rotateX(0deg);
 }
 
-/* Pulse Animation Ring */
-.sos-container::before, .sos-container::after {
-    content: '';
+/* Multi-Layer Premium Glow */
+.sos-glow-inner {
+    position: absolute;
+    inset: -15px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 51, 102, 0.4) 0%, transparent 70%);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.sos-active .sos-btn {
+    animation: urgentBlink 0.5s infinite alternate;
+    background: #ff0000;
+}
+
+@keyframes urgentBlink {
+    from { transform: scale(1); box-shadow: 0 0 20px #ff0000; }
+    to { transform: scale(1.1); box-shadow: 0 0 60px #ff3366, 0 0 100px rgba(255, 51, 102, 0.4); }
+}
+
+/* Strobe Overlay */
+#strobeOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99998;
+    pointer-events: none;
+    display: none;
+}
+
+.strobe-active #strobeOverlay {
+    display: block;
+    animation: emergencyStrobe 0.2s infinite;
+}
+
+@keyframes emergencyStrobe {
+    0%, 100% { background: transparent; }
+    50% { background: rgba(255, 0, 0, 0.15); }
+}
+
+/* High-Intensity Ripple */
+.sos-ripple {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 200px;
-    height: 200px;
+    width: 180px;
+    height: 180px;
     border-radius: 50%;
-    border: 2px solid var(--accent-red);
-    z-index: 1;
+    border: 3px solid #ff3366;
     opacity: 0;
+    pointer-events: none;
+    box-shadow: 0 0 20px #ff3366;
 }
 
-.sos-active .sos-btn {
-    animation: urgentPulse 1.5s infinite ease-in-out;
-}
-.sos-active .sos-container::before {
-    animation: ripple 2s infinite linear;
-}
-.sos-active .sos-container::after {
-    animation: ripple 2s infinite linear 1s;
-}
+.sos-active .sos-ripple:nth-child(1) { animation: rippleEffect 1.5s infinite linear; }
+.sos-active .sos-ripple:nth-child(2) { animation: rippleEffect 1.5s infinite linear 0.5s; }
+.sos-active .sos-ripple:nth-child(3) { animation: rippleEffect 1.5s infinite linear 1s; }
 
-@keyframes urgentPulse {
-    0% { box-shadow: 0 0 10px var(--accent-red); transform: scale(1); }
-    50% { box-shadow: 0 0 30px var(--accent-red); transform: scale(1.02); }
-    100% { box-shadow: 0 0 10px var(--accent-red); transform: scale(1); }
-}
-
-@keyframes ripple {
-    0% { width: 200px; height: 200px; opacity: 1; }
-    100% { width: 600px; height: 600px; opacity: 0; }
+@keyframes rippleEffect {
+    0% { transform: translate(-50%, -50%) scale(1); opacity: 1; border-width: 4px; }
+    100% { transform: translate(-50%, -50%) scale(5); opacity: 0; border-width: 1px; }
 }
 
 .sos-status {
-    margin-top: 2rem;
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: var(--accent-red);
-    min-height: 28px;
+    margin-top: 3rem;
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: #ff3366;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 0 15px rgba(255, 51, 102, 0.7);
+    min-height: 40px;
+    font-style: italic;
+    animation: textFlash 0.5s infinite alternate;
+}
+
+@keyframes textFlash {
+    from { opacity: 0.6; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+/* ================== PREMIUM GLASSDOM FOR SOS ================== */
+.sos-glass-ring {
+    position: absolute;
+    inset: -30px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: radial-gradient(circle at center, rgba(255, 51, 102, 0.05) 0%, transparent 70%);
+    backdrop-filter: blur(4px);
+    z-index: 1;
+    pointer-events: none;
 }
 
 /* Location Container */
@@ -1926,7 +1990,95 @@ a {
 }
 
 .safety-aura {
-    position: absolute;
-    border-radius: 50%;
     pointer-events: none;
+}
+
+/* ================== MOBILE RESPONSIVENESS ================== */
+@media (max-width: 1024px) {
+    .main-container { padding: 1rem; }
+}
+
+@media (max-width: 768px) {
+    .navbar {
+        padding: 0.8rem 5%;
+    }
+    .nav-links {
+        position: fixed;
+        right: -100%;
+        top: 0;
+        flex-direction: column;
+        background: rgba(8, 8, 25, 0.98);
+        backdrop-filter: blur(40px);
+        width: 100%;
+        height: 100vh;
+        justify-content: center;
+        text-align: center;
+        transition: all 0.5s cubic-bezier(0.85, 0, 0.15, 1);
+        z-index: 999;
+        padding: 4rem 2rem;
+        gap: 1.5rem;
+    }
+    .nav-links.active {
+        right: 0;
+    }
+    .hamburger {
+        display: block;
+        z-index: 1001;
+        font-size: 1.8rem;
+        color: white;
+    }
+    
+    /* Layout Adjustments */
+    .hero-header h1 { font-size: 2rem; }
+    .hero-header p { font-size: 0.9rem; }
+
+    .safety-dashboard {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+    .dash-stat { padding: 15px 10px; }
+    .dash-val { font-size: 0.9rem; }
+
+    .tools-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+    
+    .sos-container {
+        transform: scale(0.85);
+        margin: 2rem 0;
+    }
+
+    #map, #routeMap {
+        height: 400px !important;
+    }
+
+    /* Auth stacking */
+    .auth-card {
+        padding: 30px 20px;
+        width: 100%;
+        border-radius: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .safety-dashboard {
+        grid-template-columns: 1fr;
+    }
+    .tools-grid {
+        grid-template-columns: 1fr;
+    }
+    .safety-forecast-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .sos-container {
+        transform: scale(0.75);
+    }
+    .section-header h2 { font-size: 1.6rem; }
+    .route-planner-card { padding: 1.2rem; }
 }

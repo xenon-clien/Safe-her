@@ -1,10 +1,15 @@
+const path = require('path');
+// --- Configuration Loader ---
+const rootPath = path.join(__dirname, '..');
+require('dotenv').config({ path: path.join(rootPath, '.env') }); 
+// Also load local if it exists (for overrides)
 require('dotenv').config();
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
-const path = require('path');
 const { OAuth2Client } = require('google-auth-library');
 
 // Initialize Google OAuth Client
@@ -35,18 +40,15 @@ app.use(express.json());
 // CORS — allow all origins (including file:// for local dev)
 app.use(cors({
     origin: function(origin, callback) {
-        // Allow requests with no origin (file://, mobile apps, Postman) and all HTTP/HTTPS origins
         callback(null, true);
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     credentials: true
 }));
-app.options(/(.*)/, cors()); // Express 5 compatible preflight handler
+app.options(/(.*)/, cors());
 
-
-
-// Serve static files from the root directory so app works on http://localhost:5000
+// Serve static files from the root directory
 app.use(express.static(path.join(__dirname, '..')));
 
 // Root route to serve index.html
@@ -54,73 +56,22 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'index.html'));
 });
 
-// --- Robust MongoDB Connection for Vercel/Serverless ---
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hersafety';
-
-let cachedDb = null;
-let lastConnectionError = null;
-
-async function connectToDatabase() {
-    if (cachedDb && mongoose.connection.readyState === 1) {
-        return cachedDb;
-    }
-
-    console.log("🔗 Attempting to connect to MongoDB Atlas...");
-    try {
-        const db = await mongoose.connect(MONGODB_URI, {
-            serverSelectionTimeoutMS: 8000, // Timeout after 8s (Vercel limit is 10s)
-            connectTimeoutMS: 10000,
-        });
-        cachedDb = db;
-        lastConnectionError = null;
-        console.log("✅ Successfully connected to MongoDB Atlas");
-        return db;
-    } catch (err) {
-        console.error("❌ MongoDB Connection Error:", err.message);
-        lastConnectionError = err.message;
-        throw err;
-    }
-}
-
-// Initial connection for non-serverless environments (like local dev)
-if (process.env.NODE_ENV !== 'production') {
-    connectToDatabase().catch(e => console.error("Initial connection failed:", e.message));
-}
-
-// --- Diagnostic Health Endpoint ---
+// Diagnostic Health Endpoint
 app.get('/api/health', async (req, res) => {
-    // Proactively try to connect so we can see the error
-    try {
-        await connectToDatabase();
-    } catch (e) {
-        // Error is already logged in lastConnectionError
-    }
-
-    // Masked URI for safety
-    const rawUri = process.env.MONGODB_URI || "NOT SET (Using Local Fallback)";
-    const maskedUri = rawUri.includes('@') 
-        ? rawUri.split('@')[1] // Show only the cluster part
-        : rawUri;
-
     const status = {
         server: "online",
-        database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+        database: mongoose.connection.readyState === 1 ? "connected" : (isConnecting ? "connecting" : "disconnected"),
         last_error: lastConnectionError || "none",
-        uri_source: maskedUri,
-        g_client_id: process.env.G_CLIENT_ID || "PENDING",
         timestamp: new Date().toISOString(),
         env: process.env.NODE_ENV || "development"
     };
-    
-    // In health check, we don't status(500) so we can actually see the JSON
     res.status(200).json(status);
 });
 
-// Middleware to ensure DB is connected before processing requests
+// Database Connection Guard Middleware
 app.use(async (req, res, next) => {
-    // Skip DB check for static files or non-API routes if needed
     if (!req.path.startsWith('/api')) return next();
-    if (req.path === '/api/health') return next(); // Don't block health check
+    if (req.path === '/api/health') return next();
     
     try {
         await connectToDatabase();
@@ -129,10 +80,87 @@ app.use(async (req, res, next) => {
         res.status(503).json({ 
             message: "Database connection failed", 
             error: err.message,
-            tip: "Check MongoDB Atlas Network Access (0.0.0.0/0) and MONGODB_URI in Vercel settings."
+            suggestion: "Fallback to local MongoDB or check Atlas network whitelist (0.0.0.0/0)"
         });
     }
 });
+
+
+// --- Robust MongoDB Connection for Vercel/Serverless & Local Dev ---
+const ATLAS_URI = process.env.MONGODB_URI;
+const LOCAL_URI = 'mongodb://127.0.0.1:27017/hersafety';
+const MONGODB_URI = ATLAS_URI || LOCAL_URI;
+
+let cachedDb = null;
+let lastConnectionError = null;
+let isConnecting = false;
+
+async function connectToDatabase() {
+    if (mongoose.connection.readyState === 1) {
+        return mongoose.connection;
+    }
+
+    if (isConnecting) {
+        // Wait for current connection attempt
+        return new Promise((resolve, reject) => {
+            const check = setInterval(() => {
+                if (mongoose.connection.readyState === 1) {
+                    clearInterval(check);
+                    resolve(mongoose.connection);
+                } else if (!isConnecting && mongoose.connection.readyState !== 1) {
+                    clearInterval(check);
+                    reject(new Error("Database connection failed after waiting."));
+                }
+            }, 100);
+        });
+    }
+
+    isConnecting = true;
+    console.log(`🔗 Attempting to connect to ${ATLAS_URI ? "MongoDB Atlas" : "Local MongoDB"}...`);
+    
+    try {
+        const db = await mongoose.connect(MONGODB_URI, {
+            serverSelectionTimeoutMS: 5000, 
+            connectTimeoutMS: 10000,
+            family: 4 // Force IPv4 to avoid DNS/SRV issues
+        });
+        
+        cachedDb = db;
+        lastConnectionError = null;
+        console.log("✅ Successfully connected to MongoDB:", (ATLAS_URI ? "Atlas Cluster" : "Local Engine"));
+        isConnecting = false;
+        return db;
+    } catch (err) {
+        isConnecting = false;
+        console.error("❌ MongoDB Connection Error:", err.message);
+        lastConnectionError = err.message;
+
+        // Fallback to Local if Atlas failed and we are not in production
+        if (ATLAS_URI && process.env.NODE_ENV !== 'production') {
+            console.warn("⚠️ Atlas connection failed. Attempting local fallback...");
+            try {
+                const localDb = await mongoose.connect(LOCAL_URI, {
+                    serverSelectionTimeoutMS: 2000
+                });
+                console.log("✅ Connected to Local MongoDB (Fallback)");
+                lastConnectionError = "Atlas failed, using Local Fallback: " + err.message;
+                return localDb;
+            } catch (localErr) {
+                console.error("❌ Local Fallback also failed:", localErr.message);
+            }
+        }
+        
+        throw err;
+    }
+}
+
+// Initial connection for local dev
+if (process.env.NODE_ENV !== 'production') {
+    connectToDatabase().catch(e => {
+        console.error("🚀 Server started but DB is offline. Will retry on first request.");
+    });
+}
+
 
 // =======================
 // REST APIs
