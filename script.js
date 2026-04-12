@@ -435,7 +435,38 @@ function updateDashboardGPS(lat, lng) {
         .then(data => {
             const area = data.address.suburb || data.address.city_district || data.address.city || 'Your Area';
             if (areaEl) areaEl.innerText = area;
-        }).catch(() => { if (areaEl) areaEl.innerText = 'GPS Active'; });
+            // Also check for street lights nearby
+            fetchStreetLights(lat, lng);
+        }).catch(() => { 
+            if (areaEl) areaEl.innerText = 'GPS Active';
+            fetchStreetLights(lat, lng); 
+        });
+}
+
+/**
+ * Checks for Street Lamps in 100m radius using Overpass API
+ */
+async function fetchStreetLights(lat, lng) {
+    const lightEl = document.getElementById('dashLights');
+    if (!lightEl) return;
+
+    const query = `[out:json][timeout:10];node(around:100,${lat},${lng})["highway"="street_lamp"];out count;`;
+    
+    try {
+        const response = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+        const data = await response.json();
+        const count = data.elements && data.elements[0] ? data.elements[0].tags.total : (data.elements ? data.elements.length : 0);
+
+        if (count > 0) {
+            lightEl.innerText = "Lit Area ✅";
+            lightEl.style.color = "#4caf50";
+        } else {
+            lightEl.innerText = "Low Lighting ⚠️";
+            lightEl.style.color = "#ff9800";
+        }
+    } catch (e) {
+        lightEl.innerText = "Scan Offline";
+    }
 }
 
 // Real Safety Score Logic
@@ -694,6 +725,22 @@ function triggerSOS() {
 
         if (statusText) statusText.innerText = "🚨 EMERGENCY ACTIVE";
         showToast("EMERGENCY PROTOCOLS ACTIVATED", "error");
+
+        // WhatsApp Fallback: Open WhatsApp with SOS message to primary group/contacts
+        setTimeout(() => {
+            const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
+            const lat = userLatLng.lat;
+            const lng = userLatLng.lng;
+            const msg = encodeURIComponent(`🚨 SOS EMERGENCY! I am in danger. My live location: https://maps.google.com/?q=${lat},${lng} (Sent via Safe Her App)`);
+            
+            // Try to send to first saved contact if available
+            let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
+            let target = contacts.length > 0 ? contacts[0].phone : "";
+            
+            if (confirm("Send SOS alert to WhatsApp contacts?")) {
+                window.open(`https://wa.me/${target}?text=${msg}`, '_blank');
+            }
+        }, 2000);
 
     } else {
         // --- SOS OFF ---
