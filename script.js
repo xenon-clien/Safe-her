@@ -978,7 +978,7 @@ function toggleChat() {
     }
 }
 
-function sendMessage() {
+async function sendMessage() {
     const input = document.getElementById('chatInput');
     const msg = input.value.trim();
     if (!msg) return;
@@ -987,18 +987,29 @@ function sendMessage() {
     appendMessage(msg, 'user');
     input.value = '';
 
-    // Simulate bot response
-    setTimeout(() => {
-        const responses = [
-            "I'm here for you. Make sure you're in a safe place.",
-            "If you feel threatened, please press the SOS button immediately.",
-            "I've noted that down. Do you want me to alert your contacts?",
-            "Remember to stay in well-lit areas.",
-            "Would you like me to share your location with your family?"
-        ];
-        const reply = responses[Math.floor(Math.random() * responses.length)];
-        appendMessage(reply, 'bot');
-    }, 1000);
+    // Typing indicator
+    const typingId = 'typing-' + Date.now();
+    appendMessage("AI is thinking...", 'bot', typingId);
+
+    try {
+        const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
+        const res = await fetch(`${API_URL}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg, userId: user.id || user._id })
+        });
+        const data = await res.json();
+        
+        // Remove typing
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+
+        appendMessage(data.response || "I'm having trouble connecting to my central brain.", 'bot');
+    } catch (err) {
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+        appendMessage("Google API link busy. Please try later.", 'bot');
+    }
 }
 
 function handleChatEnter(e) {
@@ -1007,12 +1018,14 @@ function handleChatEnter(e) {
     }
 }
 
-function appendMessage(text, sender) {
+function appendMessage(text, sender, id = null) {
     const body = document.getElementById('chatBody');
-    const div = document.createElement('div');
-    div.className = `message ${sender}`;
-    div.innerText = text;
-    body.appendChild(div);
+    if (!body) return;
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${sender}`;
+    if (id) msgDiv.id = id;
+    msgDiv.innerText = text;
+    body.appendChild(msgDiv);
     body.scrollTop = body.scrollHeight;
 }
 
