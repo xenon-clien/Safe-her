@@ -264,6 +264,11 @@ const smsWorkerLogic = async job => {
 
 if (redisConn) new Worker('sos_alerts', smsWorkerLogic, { connection: redisConn });
 
+// API 404 Handler (Prevents returning HTML for missing API routes)
+app.all('/api/*', (req, res) => {
+    res.status(404).json({ message: `API Route [${req.method} ${req.url}] not found on this server.` });
+});
+
 // --- SERVE FRONTEND (STATIC FILES) ---
 // Placing this at the end ensures API routes take precedence
 app.use(express.static(path.join(__dirname, '..')));
