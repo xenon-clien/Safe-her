@@ -98,7 +98,8 @@ app.get('/api/health', (req, res) => {
     res.json({
         server: "online",
         database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        g_client_id: process.env.G_CLIENT_ID || "PENDING"
     });
 });
 
