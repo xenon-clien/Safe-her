@@ -111,7 +111,7 @@ function fetchDangerZonesDebounced() {
 // --- REAL CRIME ANALYTICS & COMMUNITY DATA via Overpass API ---
 window.drawnZones = []; // Tracks centers to prevent overlapping
 
-function getDistance(lat1, lon1, lat2, lon2) {
+function getDistanceMeters(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
     const phi1 = lat1 * Math.PI/180;
     const phi2 = lat2 * Math.PI/180;
@@ -164,7 +164,7 @@ out body 100;`;
             const threshold = isSafe ? 1500 : 800;
             
             const tooClose = window.drawnZones.some(z => {
-                const dist = getDistance(node.lat, node.lon, z.lat, z.lng);
+                const dist = getDistanceMeters(node.lat, node.lon, z.lat, z.lng);
                 return dist < threshold && z.isSafe === isSafe;
             });
 
@@ -359,7 +359,7 @@ function startTracking() {
                     showToast("Failed to track location!", "error");
                 }
             },
-            { enableHighAccuracy: true }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
         );
     } else {
         const coordsDisplay = document.getElementById("coordsDisplay");
@@ -473,13 +473,13 @@ function calculateDynamicScore(hour) {
 
     if (userLatLng) {
         allHotspots.forEach(spot => {
-            const dist = getDistance(userLatLng.lat, userLatLng.lng, spot.lat, spot.lng);
+            const dist = getDistanceMeters(userLatLng.lat, userLatLng.lng, spot.lat, spot.lng);
             if (dist < minDistance) minDistance = dist;
         });
 
-        if (minDistance < 0.5) baseScore -= 5.0;
-        else if (minDistance < 1.0) baseScore -= 2.5;
-        else if (minDistance < 2.0) baseScore -= 1.0;
+        if (minDistance < 500) baseScore -= 5.0;
+        else if (minDistance < 1000) baseScore -= 2.5;
+        else if (minDistance < 2000) baseScore -= 1.0;
     }
 
     const finalScore = Math.max(1.0, Math.min(10, baseScore)).toFixed(1);
@@ -491,16 +491,7 @@ function calculateDynamicScore(hour) {
 }
 
 // Distance helper (Haversine formula simplified)
-function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-}
+
 
 // ============================================================
 //  CHECK-IN TIMER
@@ -601,9 +592,9 @@ function quickShareLocation() {
             window.open(`https://wa.me/?text=${msg}`, '_blank');
         }
         showToast(`📍 Sharing location: ${lat}, ${lng}`, 'success');
-    }, () => {
-        showToast('Could not get location. Enable GPS.', 'error');
-    });
+    }, (err) => {
+        showToast("Tracking failed! Enable GPS & high accuracy.", "error");
+    }, { enableHighAccuracy: true, timeout: 15000 });
 }
 
 // --- Web Audio API Advanced Siren Synthesis ---
@@ -1038,7 +1029,7 @@ async function findNearest(type) {
     
     try {
         const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 5000 });
+            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000 });
         });
         userLatLng = { lat: position.coords.latitude, lng: position.coords.longitude };
     } catch (e) {
@@ -1103,7 +1094,7 @@ async function findNearest(type) {
 
     } catch (error) {
         console.error("Facility search error:", error);
-        showToast("System busy. Please try again.", "error");
+        showToast("Satellite Servers Busy. Please try again in 30s.", "error");
     }
 }
 
@@ -1815,7 +1806,7 @@ function calculateRoute() {
                 // Count Safe Havens specifically within 500m of this route
                 let safeHavenMilestones = 0;
                 window.drawnZones.forEach(z => {
-                    const nearRoute = route.coordinates.some(c => getDistance(z.lat, z.lng, c.lat, c.lng) < 500);
+                    const nearRoute = route.coordinates.some(c => getDistanceMeters(z.lat, z.lng, c.lat, c.lng) < 500);
                     if (nearRoute && z.isSafe) safeHavenMilestones++;
                 });
 
@@ -2547,7 +2538,7 @@ function startLiveBeacon() {
 
         navigator.geolocation.getCurrentPosition(pos => {
             const { latitude, longitude } = pos.coords;
-            const user = JSON.parse(localStorage.getItem('hersafety_user'));
+            const user = JSON.parse(localStorage.getItem('herSafety_user'));
 
             fetch(`${API_URL}/send-alert`, {
                 method: 'POST',
