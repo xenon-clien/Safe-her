@@ -7,7 +7,17 @@ let userMarker;
 let isSosActive = false;
 let audioContext, oscillator, gainNode;
 let userLatLng = { lat: 30.901, lng: 75.8573 }; // Default Ludhiana
-const API_URL = '/api';
+const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') 
+    ? '/api' 
+    : (location.protocol === 'file:' ? 'http://localhost:5000/api' : '/api');
+
+// Auto-check connection on load
+window.addEventListener('load', () => {
+    fetch(`${API_URL}/health`)
+        .then(r => r.json())
+        .then(d => console.log("✅ Core System Linked:", d.server))
+        .catch(e => console.error("❌ System Link Failed. Make sure server is running on port 5000."));
+});
 let pendingPaymentResponse = null; 
 let liveBeaconInterval = null;
 let sirenInterval = null;
