@@ -91,10 +91,14 @@ const s3 = new AWS.S3({
 
 // --- ROUTES ---
 
+let lastDbError = null;
+
 app.get('/api/health', (req, res) => {
+    const isConnected = mongoose.connection.readyState === 1;
     res.json({
         server: "online",
-        database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+        database: isConnected ? "connected" : "disconnected",
+        db_error: isConnected ? null : lastDbError,
         timestamp: new Date().toISOString(),
         g_client_id: process.env.G_CLIENT_ID || "PENDING",
         gemini_key_status: process.env.GEMINI_API_KEY ? "CONFIGURED ✅" : "MISSING ❌"
@@ -288,6 +292,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hersafety
         console.log("✅ Database Connected Successfully");
     })
     .catch(e => {
+        lastDbError = e.message;
         console.error("❌ DB Connection Error:", e.message);
         console.log("⚠️ Server will continue to run in OFFLINE mode.");
     });
