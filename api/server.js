@@ -217,20 +217,31 @@ app.get('/api/safety-score', (req, res) => {
     res.json({ score, label, timestamp: new Date() });
 });
 
-// AI Chat Assistant (Google Gemini Integration Placeholder)
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// AI Chat Assistant (Real Google Gemini Integration)
 app.post('/api/chat', async (req, res) => {
     try {
         const { message, userId } = req.body;
         console.log(`🤖 Chat request from ${userId}: ${message}`);
-        
-        // In production, you would use: 
-        // const { GoogleGenerativeAI } = require("@google/generative-ai");
-        // const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        // const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-        // const result = await model.generateContent(message);
-        // const response = result.response.text();
 
-        // SIMULATED SMART RESPONSE
+        const apiKey = process.env.GEMINI_API_KEY;
+        
+        if (apiKey && apiKey !== "PENDING") {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            
+            const prompt = `You are the Safe-Her AI assistant, a professional and empathetic security companion for women. 
+            User message: "${message}". 
+            Context: The user is currently using the Safe-Her app. Provide a short, helpful, and safety-focused response (max 2-3 sentences). 
+            If they are in danger, advise using the SOS button.`;
+
+            const result = await model.generateContent(prompt);
+            const response = result.response.text();
+            return res.json({ response });
+        }
+
+        // SIMULATED SMART RESPONSE (Fallback if No API Key)
         let response = "I'm your Safe-Her AI assistant. ";
         const msg = message.toLowerCase();
         
@@ -238,15 +249,14 @@ app.post('/api/chat', async (req, res) => {
             response += "I sense you might be feeling unsafe. Please consider using the SOS button or moving to a well-lit area. Should I track your location more closely?";
         } else if (msg.includes("where") || msg.includes("location")) {
             response += "I can help you find safe routes. Use the Route Planner section to navigate safely.";
-        } else if (msg.includes("hi") || msg.includes("hello")) {
-            response += "Hello! I'm here to ensure your safety. How can I assist you today?";
         } else {
-            response += "Stay alert and keep your phone charged. I'm monitoring the safety score of your current area.";
+            response += "Stay alert and keep your phone charged. I'm here to ensure your safety with real-time monitoring.";
         }
 
         res.json({ response });
     } catch (e) {
-        res.status(500).json({ message: "AI Assistant is resting." });
+        console.error("Gemini Error:", e);
+        res.status(500).json({ message: "AI Assistant is resting. Please try again in a moment." });
     }
 });
 
