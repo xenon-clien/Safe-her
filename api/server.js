@@ -96,7 +96,8 @@ app.get('/api/health', (req, res) => {
         server: "online",
         database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
         timestamp: new Date().toISOString(),
-        g_client_id: process.env.G_CLIENT_ID || "PENDING"
+        g_client_id: process.env.G_CLIENT_ID || "PENDING",
+        gemini_key_status: process.env.GEMINI_API_KEY ? "CONFIGURED ✅" : "MISSING ❌"
     });
 });
 
