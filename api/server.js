@@ -133,6 +133,36 @@ app.post('/api/sos-trigger', async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+// Google Login Verification
+app.post('/api/google-login-verify', async (req, res) => {
+    try {
+        const { token } = req.body;
+        const ticket = await googleClient.verifyIdToken({
+            idToken: token,
+            audience: process.env.G_CLIENT_ID || "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com"
+        });
+        const payload = ticket.getPayload();
+        const { email, name, sub } = payload;
+
+        let user = await User.findOne({ email });
+        if (!user) {
+            // Create a new user if not exists
+            user = new User({
+                name,
+                email,
+                password: crypto.randomBytes(16).toString('hex'), // Random password for social login
+                phone: "PENDING"
+            });
+            await user.save();
+        }
+
+        res.json({ user: { id: user._id, name: user.name, email: user.email, phone: user.phone } });
+    } catch (e) {
+        console.error("Google verify error:", e);
+        res.status(401).json({ message: "Google Auth Failed" });
+    }
+});
+
 // --- NEW REACHABLE ENDPOINTS ---
 
 // Emergency Contacts
