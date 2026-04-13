@@ -142,10 +142,35 @@
 
         <!-- 1. HOME SECTION -->
         <section id="home" class="section-container" style="display: none;">
+
+            <!-- SOS Button SECTION (Centered & At Top) -->
+            <div class="flex flex-col items-center justify-center py-10 w-full animate-fadeInUp">
+                <div class="sos-container relative scale-110">
+                    <div class="sos-glass-ring"></div>
+                    <div class="sos-glow-inner"></div>
+                    <div class="sos-ripple"></div>
+                    <div class="sos-ripple"></div>
+                    <div class="sos-ripple"></div>
+                    <div class="sos-ripple"></div>
+
+                    <button id="sosBtn" class="sos-btn premium-sos" onclick="triggerSOS()">
+                        <div class="sos-inner-glow"></div>
+                        <span class="sos-text">SOS</span>
+                    </button>
+
+                    <p id="sosStatus" class="sos-status-premium"></p>
+                    
+                    <div id="blackboxStatus" class="blackbox-status-premium" style="display: none;">
+                        <span class="dot-premium pulse-red"></span> LIVE PROTECTION ACTIVE
+                    </div>
+                </div>
+            </div>
+
             <div class="hero-header">
                 <h1>We are here to help you.</h1>
                 <p>Your personal safety companion — armed with AI-powered tools.</p>
             </div>
+
 
             <!-- Safety Dashboard Stats -->
             <div class="safety-dashboard">
@@ -228,28 +253,24 @@
                 </div>
             </div>
 
-            <!-- SOS Button SECTION (Centered) -->
-            <div class="flex flex-col items-center justify-center py-12 w-full">
-                <div class="sos-container relative scale-110">
-                    <div class="sos-glass-ring"></div>
-                    <!-- Glow & Rings Phase -->
-                    <div class="sos-glow-inner"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
-
-                    <button id="sosBtn" class="sos-btn" onclick="triggerSOS()">
-                        <span class="sos-text">SOS</span>
-                        <div class="sos-btn-glow"></div>
-                    </button>
-
-                    <!-- Status Display -->
-                    <p id="sosStatus" class="sos-status"></p>
-
-                    <div id="blackboxStatus" class="blackbox-status" style="display: none;">
-                        <span class="dot pulse-red"></span> 🔴 SECURE EVIDENCE SYNC
+            <!-- Map -->
+            <div class="location-container mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-white"><i class="fab fa-google text-blue-500 mr-2"></i> Advanced Google Map</h2>
+                    <span id="gpsStatusBadge" class="text-[9px] bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/20 font-black uppercase tracking-widest shadow-[0_0_15px_rgba(59,130,246,0.3)]">High Precision Link</span>
+                </div>
+                
+                <div class="relative w-full rounded-[2.5rem] overflow-hidden border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] bg-zinc-950">
+                    <div id="map" class="h-[400px] w-full z-10"></div>
+                    <!-- Manual Search Overlay -->
+                    <div class="absolute top-4 left-4 right-4 z-[1000] flex gap-2">
+                        <input type="text" id="manualLocationInput" placeholder="Search area (e.g. Ludhiana)..." 
+                               class="flex-1 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-3 text-white text-xs outline-none focus:border-safety-purple transition-all shadow-xl">
+                        <button onclick="handleManualSearch()" class="bg-safety-purple text-white px-6 py-3 rounded-2xl text-xs font-bold shadow-lg hover:scale-105 active:scale-95 transition-all">GO</button>
                     </div>
+                </div>
+                <div class="mt-4 text-[10px] text-zinc-600 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                    <i class="fas fa-satellite text-blue-500/50"></i> Real-time Satellite Sync Active: Level 20 Precision
                 </div>
             </div>
 
@@ -343,26 +364,8 @@
                 </div>
             </div>
 
-            <!-- Map -->
-            <div class="location-container">
-                <h2><i class="fas fa-map-marker-alt"></i> Live Location</h2>
-                <div class="coords" id="coordsDisplay">Fetching coordinates...</div>
 
-                <div class="map-wrapper" style="position: relative;">
-                    <div id="map" class="main-map"></div>
-                    <!-- Map Overlay Controls -->
-                    <div class="map-controls-overlay">
-                        <button class="map-overlay-btn report-btn" onclick="reportDangerAtCenter()"
-                            title="Report danger at map center">
-                            <i class="fas fa-triangle-exclamation"></i> Report Danger
-                        </button>
-                    </div>
-                </div>
-
-                <button class="track-btn" onclick="startTracking()">
-                    <i class="fas fa-location-crosshairs"></i> Refresh Location
-                </button>
-            </div>
+            <!-- End of section -->
 
             </div>
         </section>
@@ -1361,3 +1364,4 @@
 
 </html>
 
+<!-- AGENT_VERIFICATION_TAG_XYZ_1 -->

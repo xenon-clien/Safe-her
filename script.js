@@ -72,11 +72,11 @@ const CRIME_HOTSPOTS = [
 ];
 
 function initMap(lat, lng) {
-    // 1. Pehli baar map banane ke liye
     if (!map) {
-        map = L.map('map').setView([lat, lng], 18); // Zoom to 18 for exact street/colony view
+        // Initialize Map with Google Maps Tiles inside Leaflet
+        map = L.map('map').setView([lat, lng], 18);
 
-        // Highly detailed Google Street Maps (Great for precision street-level zooming, avoids 403 issues)
+        // --- GOOGLE MAPS TILE LAYER ---
         L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
             maxZoom: 20,
             subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
@@ -86,26 +86,18 @@ function initMap(lat, lng) {
         userMarker = L.marker([lat, lng]).addTo(map)
             .bindPopup("<b>You are here</b>").openPopup();
 
-        // Fix leaflet blank space/grey tile issue on resize/zoom load 
+        // Safety Refresh
         setTimeout(() => {
             map.invalidateSize();
-            fetchDangerZones(); // Lal, peele aur hare ghere mangwane ke liye
+            fetchDangerZones(); 
         }, 500);
 
-        // GLOBAL TRACKING: Map move karne par automatically naye areas analyze karo
-        // Performance Fix: Debounced to avoid lag while panning
         map.on('moveend', () => {
-            fetchDangerZonesDebounced();
+            fetchDangerZones();
         });
-    }
-    // 2. Taki location update hone par properly pan kare
-    else {
-        if (userMarker) {
-            userMarker.setLatLng([lat, lng]);
-        }
-        // Properly pan map preventing blank boundaries
-        map.panTo([lat, lng]);
-        map.setZoom(18);
+    } else {
+        if (userMarker) userMarker.setLatLng([lat, lng]);
+        map.setView([lat, lng], 18);
     }
 }
 
@@ -360,12 +352,13 @@ function startTracking() {
             },
             (error) => {
                 console.error("Error getting location:", error);
-                const coordsDisplay = document.getElementById("coordsDisplay");
-                if (coordsDisplay) {
-                    coordsDisplay.innerText = "Location access denied or failed.";
+                const areaDisplay = document.getElementById("dashArea");
+                if (areaDisplay) {
+                    areaDisplay.innerHTML = `<span style="color:#ff3366; cursor:pointer;" onclick="showManualSearch()">GPS Failed (Tap to set)</span>`;
                 }
+                
                 if (typeof showToast === 'function') {
-                    showToast("Failed to track location!", "error");
+                    showToast("GPS Signal Weak. You can set area manually.", "warning");
                 }
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
@@ -2119,6 +2112,7 @@ function runLoader() {
                         
                         // Start app logic
                         try {
+                            if (typeof updatePremiumUI === 'function') updatePremiumUI();
                             startTracking();
                             startDashboardClock();
                         } catch (err) {

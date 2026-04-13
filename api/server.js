@@ -14,8 +14,8 @@ const { OAuth2Client } = require('google-auth-library');
 console.log("📦 Google Auth loaded");
 const twilio = require('twilio');
 console.log("📦 Twilio loaded");
-const AWS = require('aws-sdk');
-console.log("📦 AWS loaded");
+// const AWS = require('aws-sdk');
+// console.log("📦 AWS loaded");
 const axios = require('axios');
 console.log("📦 Axios loaded");
 const { Queue, Worker } = require('bullmq');
@@ -82,12 +82,14 @@ const googleClient = new OAuth2Client(process.env.G_CLIENT_ID);
 // Initialize Twilio
 const twilioClient = process.env.TWILIO_SID ? twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN) : null;
 
-// Initialize AWS S3
+// Initialize AWS S3 (Commented out until needed)
+/*
 const s3 = new AWS.S3({
     accessKeyId: process.env.AWS_ACCESS_KEY,
     secretAccessKey: process.env.AWS_SECRET_KEY,
     region: process.env.AWS_REGION
 });
+*/
 
 // --- ROUTES ---
 
@@ -249,7 +251,7 @@ app.post('/api/chat', async (req, res) => {
 
     try {
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const prompt = `You are Safe-Her AI, an empathetic women's safety companion. 
         User says: "${message}". 
         Give a SHORT (2-3 sentences), helpful, safety-focused reply. If they seem in danger, advise using the SOS button.`;
@@ -260,11 +262,11 @@ app.post('/api/chat', async (req, res) => {
         // Return exact error so user can see what's wrong
         const errMsg = e.message || "Unknown error";
         if (errMsg.includes("API_KEY_INVALID") || errMsg.includes("invalid")) {
-            return res.json({ response: "⚠️ Gemini Error: API Key invalid hai. Vercel mein sahi key check karein." });
-        } else if (errMsg.includes("quota") || errMsg.includes("QUOTA")) {
-            return res.json({ response: "⚠️ Gemini Error: API quota khatam ho gaya. Kal try karein ya naya project banayein." });
+            return res.json({ response: "⚠️ Gemini Error: API Key invalid hai. Sahi key check karein." });
+        } else if (errMsg.includes("quota") || errMsg.includes("QUOTA") || errMsg.includes("429")) {
+            return res.json({ response: "⚠️ Gemini Error: API quota khatam ho gaya hai. Aap FREE limit par hain, please kuch der baad try karein." });
         } else if (errMsg.includes("not found") || errMsg.includes("404")) {
-            return res.json({ response: "⚠️ Gemini Error: Model 'gemini-1.5-flash' available nahi hai is region mein." });
+            return res.json({ response: "⚠️ Gemini Error: Model 'gemini-2.0-flash' available nahi hai ya deprecated hai." });
         } else {
             return res.json({ response: `⚠️ Gemini Error: ${errMsg.substring(0, 100)}` });
         }
@@ -303,14 +305,53 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hersafety
         console.log("⚠️ Server will continue to run in OFFLINE mode.");
     });
 
-app.listen(PORT, '0.0.0.0', () => {
+// --- PREMIUM & PAYMENT INFRASTRUCTURE ---
+app.post('/api/create-order', async (req, res) => {
+    try {
+        const { amount, currency } = req.body;
+        // Mocking Razorpay Order for Simulator
+        const orderId = "order_" + crypto.randomBytes(8).toString('hex');
+        res.json({ id: orderId, amount: (amount || 1) * 100, currency: currency || "INR" });
+    } catch (e) {
+        res.status(500).json({ message: "Order creation failed" });
+    }
+});
+
+app.post('/api/request-otp', async (req, res) => {
+    const { email, phone } = req.body;
+    // Generate RANDOM 6-digit OTP
+    const dynamic_otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const payment_id = "pay_" + crypto.randomBytes(8).toString('hex');
+    
+    // In a real app, you'd store this in Redis or DB. For now, we'll send it back in the response.
+    // The simulator will 'read' this OTP to show the user.
+    res.json({ 
+        status: 'success', 
+        payment_id, 
+        dev_otp: dynamic_otp, 
+        maskedPhone: phone ? phone.replace(/(\d{2})\d{5}(\d{3})/, "$1*****$2") : "+91 ***** *****" 
+    });
+});
+
+app.post('/api/verify-otp', async (req, res) => {
+    const { otp, email, expectedOtp } = req.body;
+    // Comparison logic
+    if (otp === expectedOtp) {
+        res.json({ status: "success", message: "Verification Successful" });
+    } else {
+        res.status(400).json({ status: "error", message: "Invalid Security Code" });
+    }
+});
+
+app.listen(PORT, () => {
     console.log(`
 🚀 ==========================================
 🚀 SERVER ONLINE: HerSafety v1.0.0
-🚀 URL: http://localhost:${PORT}
+🚀 URL: http://localhost:5000
 🚀 FRONTEND: Serving static files from root
 🚀 ==========================================
     `);
 });
 
 module.exports = app;
+ 
