@@ -142,11 +142,13 @@ app.post('/api/sos-trigger', async (req, res) => {
 app.post('/api/google-login-verify', async (req, res) => {
     try {
         const { token } = req.body;
+        console.log("🔐 Verifying Google Token for audience:", process.env.G_CLIENT_ID);
         const ticket = await googleClient.verifyIdToken({
             idToken: token,
             audience: process.env.G_CLIENT_ID || "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com"
         });
         const payload = ticket.getPayload();
+        console.log("✅ Token Verified for:", payload.email);
         const { email, name, sub } = payload;
 
         let user = await User.findOne({ email });
@@ -164,7 +166,32 @@ app.post('/api/google-login-verify', async (req, res) => {
         res.json({ user: { id: user._id, name: user.name, email: user.email, phone: user.phone } });
     } catch (e) {
         console.error("Google verify error:", e);
-        res.status(401).json({ message: "Google Auth Failed" });
+        res.status(401).json({ message: "Google Auth Failed: " + e.message });
+    }
+});
+
+// Fallback Google Social Sync (When native GSI fails)
+app.post('/api/google-social-sync', async (req, res) => {
+    try {
+        const { name, email } = req.body;
+        if (!email) return res.status(400).json({ message: "Email is required" });
+
+        let user = await User.findOne({ email });
+        if (!user) {
+            user = new User({
+                name,
+                email,
+                password: crypto.randomBytes(16).toString('hex'),
+                phone: "Google Synced"
+            });
+            await user.save();
+        }
+
+        console.log("🔄 Social Sync successful for:", email);
+        res.json({ message: "Sync Successful", user: { id: user._id, name: user.name, email: user.email, phone: user.phone } });
+    } catch (e) {
+        console.error("Social Sync error:", e);
+        res.status(500).json({ message: "Internal Sync Error" });
     }
 });
 

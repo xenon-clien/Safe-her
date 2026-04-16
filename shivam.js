@@ -14,7 +14,7 @@ age=87;
  age=930;
 console.log(age);
 isfollow=true;
-let=x;
+let x;
 const student ={
     fullName: "shivam kumar",
     age:340,

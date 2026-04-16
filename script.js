@@ -7,9 +7,9 @@ let userMarker;
 let isSosActive = false;
 let audioContext, oscillator, gainNode;
 let userLatLng = { lat: 30.901, lng: 75.8573 }; // Default Ludhiana
-const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1') 
+const API_URL = (location.port === '5000') 
     ? '/api' 
-    : (location.protocol === 'file:' ? 'http://localhost:5000/api' : '/api');
+    : `http://${location.hostname}:5000/api`;
 
 // Auto-check connection on load
 window.addEventListener('load', () => {
@@ -72,32 +72,55 @@ const CRIME_HOTSPOTS = [
 ];
 
 function initMap(lat, lng) {
-    if (!map) {
-        // Initialize Map with Google Maps Tiles inside Leaflet
-        map = L.map('map').setView([lat, lng], 18);
+    const container = document.getElementById('map');
+    if (!container) return;
 
-        // --- GOOGLE MAPS TILE LAYER ---
-        L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-            maxZoom: 20,
-            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-            attribution: '© Google Maps'
-        }).addTo(map);
+    // Retry if container is hidden (Leaflet requirement)
+    if (container.offsetWidth === 0) {
+        setTimeout(() => initMap(lat, lng), 400);
+        return;
+    }
 
-        userMarker = L.marker([lat, lng]).addTo(map)
-            .bindPopup("<b>You are here</b>").openPopup();
+    try {
+        if (!map) {
+            map = L.map('map', {
+                zoomControl: false,
+                scrollWheelZoom: true,
+                dragging: true,
+                tap: true,
+                touchZoom: true,
+                bounceAtZoomLimits: true
+            }).setView([lat, lng], 18);
 
-        // Safety Refresh
-        setTimeout(() => {
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            // --- ADVANCED GOOGLE HYBRID LAYER (Satellite + Roads) ---
+            L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: '© Google Maps'
+            }).addTo(map);
+
+            userMarker = L.marker([lat, lng]).addTo(map)
+                .bindPopup("<b>Verified Safety Map</b>").openPopup();
+
+            setTimeout(() => {
+                map.invalidateSize();
+                if (typeof fetchDangerZones === 'function') fetchDangerZones(); 
+            }, 600);
+
+            map.on('moveend', () => {
+                if (typeof fetchDangerZones === 'function') fetchDangerZones();
+            });
+        } else {
+            console.log("🔄 Map already exists. Re-centering...");
+            if (userMarker) userMarker.setLatLng([lat, lng]);
+            map.setView([lat, lng], map.getZoom());
             map.invalidateSize();
-            fetchDangerZones(); 
-        }, 500);
-
-        map.on('moveend', () => {
-            fetchDangerZones();
-        });
-    } else {
-        if (userMarker) userMarker.setLatLng([lat, lng]);
-        map.setView([lat, lng], 18);
+        }
+    } catch (e) {
+        console.warn("Map Init Error:", e.message);
+        if (map) map.invalidateSize();
     }
 }
 
@@ -138,6 +161,21 @@ function fetchDangerZones() {
     const bounds = map.getBounds();
     const { _southWest: sw, _northEast: ne } = bounds;
     const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
+
+    // --- FETCH DANGER ZONES FROM OUR BACKEND ---
+    fetch(`${API_URL}/danger-zones`)
+    .then(r => r.json())
+    .then(zones => {
+        zones.forEach(zone => {
+            const lat = zone.location?.coordinates[1] || zone.lat;
+            const lng = zone.location?.coordinates[0] || zone.lng;
+            if (lat && lng) {
+                drawMapZone(lat, lng, zone.risk === 'High' ? 'high' : 'medium', 
+                    zone.risk + ' Risk Zone', zone.name || 'System Zone', zone.type || zone.description || 'Danger Zone');
+            }
+        });
+    })
+    .catch(e => console.error("Backend zones fetch failed:", e));
 
     // Overpass: Multi-region Worldwide landmarks for high-fidelity safety mapping
     const query = `[out:json][timeout:15];
@@ -320,54 +358,68 @@ function reportDangerAtCenter() {
 }
 
 // Location track karne ka sahi tareeka
-function startTracking() {
-    // UI feedback for satellite search
+async function startTracking() {
     const gpsEl = document.getElementById('dashGps');
-    if (gpsEl) gpsEl.innerText = "Connecting...";
+    const areaDisplay = document.getElementById('dashArea');
+    if (gpsEl) gpsEl.innerText = "Syncing...";
 
-    if (typeof showToast === 'function') {
-        showToast("🛰️ Searching for digital satellite signal...", "success");
+    console.log("🚀 Initializing Hybrid AI Location Engine...");
+
+    // 1. INSTANT: LOAD LAST KNOWN LOCATION (FASTEST)
+    const lastKnown = JSON.parse(localStorage.getItem('safeher_last_loc'));
+    if (lastKnown) {
+        console.log("📍 Last Known Location Found:", lastKnown);
+        initMap(lastKnown.lat, lastKnown.lng);
+        updateDashboardGPS(lastKnown.lat, lastKnown.lng);
+        if (gpsEl) gpsEl.innerHTML = '<span class="text-yellow-400">CACHED-SYN</span>';
     }
 
+    // 2. PARALLEL: GPS + IP-GEOLOCATION FALLBACK
+    let hasFoundLocation = false;
+
+    // Parallel IP Geolocation Fetch
+    const ipFetchPromise = fetch('https://ipapi.co/json/')
+        .then(res => res.json())
+        .then(data => {
+            if (!hasFoundLocation && data.latitude && data.longitude) {
+                console.log("🌐 IP-Based Geolocation Success:", data.latitude, data.longitude);
+                initMap(data.latitude, data.longitude);
+                updateDashboardGPS(data.latitude, data.longitude);
+                if (gpsEl) gpsEl.innerHTML = '<span class="text-blue-400">IP-PROXY</span>';
+                if (typeof showToast === 'function') showToast("📍 Map loaded via Hybrid IP-Link", "info");
+            }
+        }).catch(() => { });
+
+    // Parallel GPS Fetch
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                const latitude = position.coords.latitude;
-                const longitude = position.coords.longitude;
-
-                // UI display update karo!
-                const coordsDisplay = document.getElementById("coordsDisplay");
-                if (coordsDisplay) {
-                    coordsDisplay.innerText = `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`;
-                }
-
-                console.log("Location found:", latitude, longitude);
+                hasFoundLocation = true;
+                const { latitude, longitude } = position.coords;
+                console.log("🛰️ GPS Precision Sync Success:", latitude, longitude);
+                
+                // Store for next visit
+                localStorage.setItem('safeher_last_loc', JSON.stringify({ lat: latitude, lng: longitude }));
+                
                 initMap(latitude, longitude);
-                updateDashboardGPS(latitude, longitude);  // Update dashboard stats
-
-                // Force immediate size invalidation just in case flexbox resized the map container
-                if (map) {
-                    setTimeout(() => { map.invalidateSize(); }, 200);
-                }
+                updateDashboardGPS(latitude, longitude);
+                
+                if (gpsEl) gpsEl.innerHTML = '<span class="text-green-400">HIGH-PRECISION</span>';
             },
             (error) => {
-                console.error("Error getting location:", error);
-                const areaDisplay = document.getElementById("dashArea");
-                if (areaDisplay) {
-                    areaDisplay.innerHTML = `<span style="color:#ff3366; cursor:pointer;" onclick="showManualSearch()">GPS Failed (Tap to set)</span>`;
-                }
-                
-                if (typeof showToast === 'function') {
-                    showToast("GPS Signal Weak. You can set area manually.", "warning");
-                }
+                console.warn("⚠️ High-Precision GPS Failed:", error.message);
+                // If IP Fetch also fails or hasn't finished, use static fallback
+                setTimeout(() => {
+                    if (!hasFoundLocation && !lastKnown) {
+                        console.log("🚧 Global Fallback: Ludhiana Active");
+                        initMap(30.901, 75.8573);
+                        updateDashboardGPS(30.901, 75.8573);
+                        if (gpsEl) gpsEl.innerText = "OFFLINE-FIX";
+                    }
+                }, 2000);
             },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
         );
-    } else {
-        const coordsDisplay = document.getElementById("coordsDisplay");
-        if (coordsDisplay) {
-            coordsDisplay.innerText = "Geolocation is not supported by your browser.";
-        }
     }
 }
 
@@ -476,25 +528,60 @@ async function fetchStreetLights(lat, lng) {
 }
 
 // Real Safety Score Logic
-function refreshSafetyScore() {
+async function refreshSafetyScore() {
     const scoreEl = document.getElementById('dashScore');
     if (!scoreEl) return;
 
-    // Calculate Current Score
-    let currentScore = calculateDynamicScore(new Date().getHours());
+    try {
+        const lat = userLatLng.lat;
+        const lng = userLatLng.lng;
+        const response = await fetch(`${API_URL}/safety-score?lat=${lat}&lng=${lng}`);
+        const data = await response.json();
+        
+        const score = data.score || calculateDynamicScore(new Date().getHours()).score;
+        const label = data.label || "SECURE";
 
-    // Update Main Score UI
-    scoreEl.innerText = `${currentScore.score} / 10`;
-    scoreEl.style.color = currentScore.color;
+        scoreEl.innerText = `${score} / 10`;
+        
+        // Update Meter UI if exists
+        const bar = document.getElementById('safetyMeterBar');
+        const valEl = document.getElementById('safetyMeterValue');
+        const labelEl = document.getElementById('safetyMeterLabel');
+
+        if (bar && valEl && labelEl) {
+            bar.style.width = (score * 10) + '%';
+            valEl.innerText = score;
+            labelEl.innerText = label;
+            
+            if (score > 7) {
+                labelEl.className = "text-[10px] font-black px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/30";
+                bar.style.backgroundColor = "#22c55e";
+                scoreEl.style.color = "#4caf50";
+            } else if (score > 4) {
+                labelEl.className = "text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-500 border border-yellow-500/30";
+                bar.style.backgroundColor = "#eab308";
+                scoreEl.style.color = "#ffeb3b";
+            } else {
+                labelEl.className = "text-[10px] font-black px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 border border-red-500/30";
+                bar.style.backgroundColor = "#ef4444";
+                scoreEl.style.color = "#ff3366";
+            }
+        }
+    } catch (e) {
+        // Fallback to local
+        let currentScore = calculateDynamicScore(new Date().getHours());
+        scoreEl.innerText = `${currentScore.score} / 10`;
+        scoreEl.style.color = currentScore.color;
+    }
 
     // Update Forecast Scores (Morning=9, Evening=19, Night=2)
     const morning = calculateDynamicScore(9);
     const evening = calculateDynamicScore(19);
     const night = calculateDynamicScore(2);
 
-    document.getElementById('scoreMorning').innerText = morning.score;
-    document.getElementById('scoreEvening').innerText = evening.score;
-    document.getElementById('scoreNight').innerText = night.score;
+    if (document.getElementById('scoreMorning')) document.getElementById('scoreMorning').innerText = morning.score;
+    if (document.getElementById('scoreEvening')) document.getElementById('scoreEvening').innerText = evening.score;
+    if (document.getElementById('scoreNight')) document.getElementById('scoreNight').innerText = night.score;
 }
 
 function calculateDynamicScore(hour) {
@@ -839,8 +926,16 @@ function startLiveBeacon() {
         if (isSosActive) {
             sendSOSAlert();
             console.log("Live Beacon Update Sent");
-        }
     }, 5000);
+}
+
+function forceMapRefresh() {
+    if (map) {
+        map.invalidateSize();
+        showToast("Map container recalibrated.", "info");
+    } else {
+        initMap(30.901, 75.8573);
+    }
 }
 
 // --- Dynamic Tab Switching ---
@@ -1551,12 +1646,19 @@ function initRoutePlannerMap() {
         const startLat = userLatLng ? userLatLng.lat : 28.6139;
         const startLng = userLatLng ? userLatLng.lng : 77.2090;
 
-        routeMap = L.map('routeMap').setView([startLat, startLng], 13);
-        L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        routeMap = L.map('routeMap', {
+            zoomControl: false,
+            scrollWheelZoom: true
+        }).setView([startLat, startLng], 13);
+
+        // --- ADVANCED GOOGLE HYBRID LAYER ---
+        L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 20,
             subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
             attribution: '© Google Maps'
         }).addTo(routeMap);
+
+        L.control.zoom({ position: 'bottomright' }).addTo(routeMap);
 
         L.marker([startLat, startLng])
             .addTo(routeMap)
@@ -2013,11 +2115,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 : "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com";
 
             if (typeof google !== 'undefined') {
+                console.log("🛠️ GSI DEBUG: Initializing with ID:", GOOGLE_CLIENT_ID);
+                console.log("🛠️ GSI DEBUG: Current Origin:", window.location.origin);
+
                 google.accounts.id.initialize({
                     client_id: GOOGLE_CLIENT_ID,
                     callback: handleCredentialResponse,
                     auto_select: false,
-                    itp_support: true
+                    itp_support: true,
+                    ux_mode: 'popup' // Ensure popup mode for better compatibility
                 });
 
                 window.isGSI_Ready = !GOOGLE_CLIENT_ID.includes("v1v8v1");
@@ -2128,76 +2234,7 @@ function runLoader() {
 /**
  * Updates the Home Dashboard with real-time stats (Time, Area, Score).
  */
-function updateDashboard() {
-    // 1. Update Clock
-    const timeEl = document.getElementById('dashTime');
-    if (timeEl) {
-        const now = new Date();
-        timeEl.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-
-    // 2. Update GPS Status
-    const gpsEl = document.getElementById('dashGps');
-    if (gpsEl) {
-        gpsEl.innerText = "Active (High precision)";
-    }
-
-    // 3. Update Area Detection (Mock based on current position)
-    const areaEl = document.getElementById('dashArea');
-    if (areaEl) {
-        areaEl.innerText = "Safe Zone - Monitoring";
-    }
-
-    // 4. Refresh Safety Score
-    refreshSafetyScore();
-}
-
-/**
- * Calculates and refreshes the Safety Score UI.
- */
-function refreshSafetyScore() {
-    const hour = new Date().getHours();
-    const result = calculateDynamicScore(hour);
-
-    const scoreVal = document.getElementById('dashScore');
-    if (scoreVal) {
-        scoreVal.innerText = result.score;
-        scoreVal.style.color = result.color;
-    }
-}
-
-/**
- * Core Algorithm for Safety Score Calculation
- * @param {number} hour Current hour (0-23)
- */
-function calculateDynamicScore(hour) {
-    let score = 9.2; // Base high safety
-    let color = '#4caf50'; // Vibrant Green
-
-    // A. Time-based penalty (Night Factor)
-    if (hour >= 21 || hour <= 4) {
-        score -= 2.5; // High Night Risk
-    } else if (hour >= 18 || hour < 21) {
-        score -= 1.2; // Evening Risk
-    }
-
-    // B. Hotspot Proximity Penalty (Mock Simulation)
-    // In production, this checks distance to CRIME_HOTSPOTS
-    const randomShift = (Math.random() * 0.4) - 0.2; // Slight fluctuations
-    score += randomShift;
-
-    // Determine Color Code
-    if (score < 5) {
-        color = '#ff3366'; // Critical Danger (Red)
-    } else if (score < 8) {
-        color = '#ffcc00'; // Moderate Risk (Yellow/Gold)
-    }
-
-    return {
-        score: score.toFixed(1),
-        color: color
-    };
-}
+// Duplicates removed
 
 async function addCustomContact(e) {
     if (e) e.preventDefault();
@@ -2252,25 +2289,62 @@ async function addCustomContact(e) {
     }
 }
 
-window.deleteContact = function (id) {
+window.deleteContact = async function (id) {
+    const userStr = localStorage.getItem('herSafety_user');
+    const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
+
+    try {
+        if (user) {
+            const res = await fetch(`${API_URL}/delete-contact`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.id || user._id, contactId: id })
+            });
+            if (!res.ok) console.warn("Cloud deletion failed, proceeding with local.");
+        }
+    } catch (e) {
+        console.warn("Cloud deletion offline:", e);
+    }
+
     let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
     contacts = contacts.filter(c => c.id !== id);
     localStorage.setItem('herSafety_contacts', JSON.stringify(contacts));
     if (typeof showToast === 'function') {
         showToast("Contact Deleted", "success");
     }
-    renderCustomContacts();
+    renderCustomContacts(true); // Skip sync since we just deleted it
 };
 
-function renderCustomContacts() {
+async function fetchAndStoreContacts() {
+    const userStr = localStorage.getItem('herSafety_user');
+    const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
+    if (!user) return;
+
+    try {
+        const res = await fetch(`${API_URL}/get-contacts/${user.id || user._id}`);
+        const data = await res.json();
+        if (res.ok) {
+            const contacts = data.contacts.map(c => ({ id: c._id, name: c.contactName, phone: c.contactPhone }));
+            localStorage.setItem('herSafety_contacts', JSON.stringify(contacts));
+            localStorage.setItem('herSafety_initialized_contacts', 'true');
+            renderCustomContacts(true); // Call with flag to avoid re-fetching
+        }
+    } catch (err) {
+        console.warn("Could not sync contacts from cloud:", err);
+    }
+}
+
+function renderCustomContacts(skipSync = false) {
     const grid = document.getElementById('contactsGrid');
     if (!grid) return;
+
+    if (!skipSync) fetchAndStoreContacts();
 
     document.querySelectorAll('.dynamic-contact').forEach(el => el.remove());
 
     let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
 
-    // Default mock data for first-time visitors
+    // Default mock data for first-time visitors if nothing in local or cloud
     if (contacts.length === 0 && !localStorage.getItem('herSafety_initialized_contacts')) {
         contacts = [
             { id: 1, name: 'Dad', phone: '+1 234 567 8900' },
@@ -2291,7 +2365,7 @@ function renderCustomContacts() {
             </div>
             <div style="display:flex; align-items:center;">
                 <button class="call-btn-link" onclick="startOutgoingCall('${contact.name}', '${contact.phone}')">Call</button>
-                <button class="delete-btn" onclick="deleteContact(${contact.id})" title="Delete">
+                <button class="delete-btn" onclick="deleteContact('${contact.id}')" title="Delete">
                     <i class="fas fa-trash"></i>
                 </button>
             </div>
@@ -2606,18 +2680,20 @@ function startLiveBeacon() {
 
         navigator.geolocation.getCurrentPosition(pos => {
             const { latitude, longitude } = pos.coords;
-            const user = JSON.parse(localStorage.getItem('herSafety_user'));
+            const userStr = localStorage.getItem('herSafety_user');
+            const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : {};
 
-            fetch(`${API_URL}/send-alert`, {
+            fetch(`${API_URL}/sos-trigger`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId: user.id,
-                    location: { latitude, longitude },
-                    message: "LIVE SOS BEACON UPDATING..."
+                    userId: user.id || user._id,
+                    lat: latitude,
+                    lng: longitude,
+                    liveBeacon: true,
+                    timestamp: new Date().toISOString()
                 })
             }).then(() => console.log("📡 SOS Beacon Synced"));
-
         });
     }, 5000);
 }
@@ -3327,10 +3403,11 @@ async function handleCredentialResponse(response) {
     showToast("Syncing with Google...", "info");
 
     try {
+        console.log("🚀 GSI DEBUG: Sending token to verify at", `${API_URL}/google-login-verify`);
         const res = await fetch(`${API_URL}/google-login-verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token: response.credential })
+            body: JSON.stringify({ token: response.credential, origin: window.location.origin })
         });
 
         const data = await res.json();
@@ -3517,6 +3594,7 @@ async function handleLoginSubmission(e) {
             showToast(`Welcome back, ${data.user.name}!`, "success");
             checkAuthGate();
             updatePremiumUI();
+            fetchAndStoreContacts(); // Sync contacts on login
             
             // Explicitly force navigation to home dashboard upon manual login
             switchSection('home');
@@ -3607,3 +3685,23 @@ async function updateProductionSafetyScore(lat, lng) {
 if (localStorage.getItem('herSafety_user')) {
     startGlobalSafetyRadar();
 }
+
+// ============================================================
+//  EMERGENCY FORCED MAP LOAD (The Bulletproof Fix)
+// ============================================================
+window.addEventListener('load', () => {
+    console.log("🚦 Window Load: Checking Map Status...");
+    setTimeout(() => {
+        if (typeof L === 'undefined') {
+            console.error("❌ Leaflet failure. Retrying CDN...");
+            const s = document.createElement('script');
+            s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+            s.onload = () => { console.log("✅ Leaflet CDN Recovered."); initMap(30.901, 75.8573); };
+            document.head.appendChild(s);
+        } else {
+            console.log("✅ Leaflet Ready. Forcing Map Start...");
+            // Force map to initialize with Ludhiana if it hasn't already
+            if (!map) initMap(30.901, 75.8573);
+        }
+    }, 1000);
+});

@@ -2,8 +2,10 @@ const mongoose = require('mongoose');
 const User = require('./models/User');
 const EmergencyContact = require('./models/EmergencyContact');
 const Alert = require('./models/Alert');
+const path = require('path');
 
-mongoose.connect('mongodb://127.0.0.1:27017/hersafety')
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hersafety')
     .then(async () => {
         console.log('✅ Connected to MongoDB for Seeding');
         

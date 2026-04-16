@@ -1,1 +1,3 @@
-node api/server.js > out.txt 2>&1
+@echo off
+npm run dev
+pause
