@@ -1112,12 +1112,36 @@ async function sendMessage() {
         const typingEl = document.getElementById(typingId);
         if (typingEl) typingEl.remove();
 
-        appendMessage(data.response || "I'm having trouble connecting to my central brain.", 'bot');
+        const botReply = data.response || "I'm having trouble connecting to my central brain.";
+        appendMessage(botReply, 'bot');
+        
+        // Voice Assistant: Speak the reply
+        speakSafeHer(botReply);
     } catch (err) {
         const typingEl = document.getElementById(typingId);
         if (typingEl) typingEl.remove();
         console.error("Chat Error:", err);
-        appendMessage(`Google API link busy. (Status: ${err.message})`, 'bot');
+        const errorMsg = "I'm experiencing a bit of a signal delay, but I'm still here.";
+        appendMessage(errorMsg, 'bot');
+        speakSafeHer(errorMsg);
+    }
+}
+
+function speakSafeHer(text) {
+    if ('speechSynthesis' in window) {
+        // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1; // Slightly higher pitch for a female/empathetic tone
+        
+        // Try to find a female voice
+        const voices = window.speechSynthesis.getVoices();
+        const femaleVoice = voices.find(v => v.name.includes("Female") || v.name.includes("Google UK English Female") || v.name.includes("Microsoft Zira"));
+        if (femaleVoice) utterance.voice = femaleVoice;
+        
+        window.speechSynthesis.speak(utterance);
     }
 }
 
