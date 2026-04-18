@@ -396,52 +396,72 @@ function reportDangerAtCenter() {
     }
 }
 
-async function startTracking() {
-    const gpsEl = document.getElementById('dashGps');
-    if (gpsEl) gpsEl.innerText = "Syncing...";
+let trackingInterval = null;
 
-    const lastKnown = JSON.parse(localStorage.getItem('safeher_last_loc'));
-    if (lastKnown) {
-        initMap(lastKnown.lat, lastKnown.lng);
-        updateDashboardGPS(lastKnown.lat, lastKnown.lng);
-        if (gpsEl) gpsEl.innerHTML = '<span class="text-yellow-400">CACHED-SYN</span>';
+async function startTracking() {
+    if (trackingInterval) {
+        clearInterval(trackingInterval);
+        trackingInterval = null;
+        showToast("Tracking Stopped", "info");
+        return;
     }
 
-    let hasFoundLocation = false;
+    const gpsEl = document.getElementById('dashGps');
+    showToast("🛰️ LIVE TRACKING STARTED", "success");
+    
+    // Initial Sync
+    performTrackingSync();
+
+    // Loop every 60 seconds (as requested for live tracking)
+    trackingInterval = setInterval(() => {
+        performTrackingSync();
+    }, 60000);
+}
+
+async function performTrackingSync() {
+    const gpsEl = document.getElementById('dashGps');
+    if (gpsEl) gpsEl.innerText = "Syncing...";
 
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             (position) => {
-                hasFoundLocation = true;
                 const { latitude, longitude } = position.coords;
-                console.log("ðŸ›°ï¸ GPS Precision Sync Success:", latitude, longitude);
+                userLatLng = { lat: latitude, lng: longitude };
                 
-                // Store for next visit
-                localStorage.setItem('safeher_last_loc', JSON.stringify({ lat: latitude, lng: longitude }));
-                
+                // Update UI
                 initMap(latitude, longitude);
                 updateDashboardGPS(latitude, longitude);
+                if (gpsEl) gpsEl.innerHTML = '<span class="text-green-400">LIVE-SYNC</span>';
                 
-                if (gpsEl) gpsEl.innerHTML = '<span class="text-green-400">HIGH-PRECISION</span>';
-                
-                // Update AI Intelligence Insight
-                updateAIIntelligence(latitude, longitude);
+                // Share with Backend (Auto-Share for safety)
+                sendTrackingUpdate();
+                console.log("🛰️ Live tracking update successful.");
             },
-            (error) => {
-                console.warn("âš ï¸ High-Precision GPS Failed:", error.message);
-                // If IP Fetch also fails or hasn't finished, use static fallback
-                setTimeout(() => {
-                    if (!hasFoundLocation && !lastKnown) {
-                        console.log("ðŸš§ Global Fallback: Ludhiana Active");
-                        initMap(30.901, 75.8573);
-                        updateDashboardGPS(30.901, 75.8573);
-                        if (gpsEl) gpsEl.innerText = "OFFLINE-FIX";
-                    }
-                }, 2000);
+            (err) => {
+                console.warn("Tracking fail:", err.message);
+                if (gpsEl) gpsEl.innerText = "GPS-LOST";
             },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+            { enableHighAccuracy: true, timeout: 5000 }
         );
     }
+}
+
+async function sendTrackingUpdate() {
+    const userStr = localStorage.getItem('herSafety_user');
+    const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : { id: 'guest' };
+    
+    try {
+        await fetch(`${API_URL}/sos-trigger`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId: user.id || user._id,
+                lat: userLatLng.lat,
+                lng: userLatLng.lng,
+                isTracking: true // Distinguish from full SOS
+            })
+        });
+    } catch(e) { console.error("Tracking update failed:", e); }
 }
 
 // ============================================================
@@ -944,17 +964,22 @@ async function startDigitalBlackbox() {
 }
 
 function startLiveBeacon() {
-    console.log("ðŸ“¡ LIVE BEACON: Sharing high-frequency location updates...");
+    console.log("📡 LIVE BEACON: Active Path Tracking...");
     
-    // Send update immediately
-    sendSOSAlert();
+    if (liveBeaconInterval) clearInterval(liveBeaconInterval);
 
-    // Then every 5 seconds
     liveBeaconInterval = setInterval(() => {
-        if (isSosActive) {
-            sendSOSAlert();
-            console.log("Live Beacon Update Sent");
+        if (!isSosActive) {
+            clearInterval(liveBeaconInterval);
+            return;
         }
+
+        navigator.geolocation.getCurrentPosition(pos => {
+            userLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            sendSOSAlert();
+            console.log("📡 High-Priority SOS Sync Success");
+        }, err => console.warn(err), { enableHighAccuracy: true });
+
     }, 5000);
 }
 
@@ -2659,37 +2684,7 @@ function activateShakeListener() {
     showToast("Shake SOS active. Shake phone 3x to trigger.", "info");
 }
 
-let beaconInterval = null;
-
-function startLiveBeacon() {
-    if (beaconInterval) clearInterval(beaconInterval);
-
-    // Sync location every 5 seconds during SOS
-    beaconInterval = setInterval(() => {
-        if (!isSosActive) {
-            clearInterval(beaconInterval);
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(pos => {
-            const { latitude, longitude } = pos.coords;
-            const userStr = localStorage.getItem('herSafety_user');
-            const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : {};
-
-            fetch(`${API_URL}/sos-trigger`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.id || user._id,
-                    lat: latitude,
-                    lng: longitude,
-                    liveBeacon: true,
-                    timestamp: new Date().toISOString()
-                })
-            }).then(() => console.log("📡 SOS Beacon Synced"));
-        });
-    }, 5000);
-}
+// Consolidated tracking logic above
 
 function handleShake(event) {
     const acc = event.accelerationIncludingGravity;
