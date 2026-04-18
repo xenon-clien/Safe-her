@@ -280,30 +280,40 @@ app.get('/api/safety-score', (req, res) => {
     res.json({ score, label, timestamp: new Date() });
 });
 
-// AI Chat Assistant (Free & Unlimited Localized AI)
+// AI Chat Assistant (Super-Solid Universal Safety Oracle)
 app.post('/api/chat', async (req, res) => {
     const { message, userId } = req.body;
     console.log(`🤖 Chat request from ${userId}: ${message}`);
 
+    const systemPrompt = `You are the 'Safe-Her Universal Oracle', a super-intelligent and deeply empathetic safety companion.
+    
+    1. MISSION: Solve every problem the user has regarding safety, navigation, or emergency situations with 100% reliability.
+    2. LANGUAGE: Respond in the EXACT language/style of the user (Hindi, Hinglish, etc.).
+    3. MAP EXPERT: You know every tiny chowk and street globally. Always use "MAP_FOCUS: [Place Name]" if they ask for a location.
+    4. PROBLEM SOLVER: If they face any challenge, give a solid, actionable solution.
+    5. BREVITY: Keep it powerful but SHORT (2-4 sentences).`;
+
+    // High-Reliability Fetch with Retry
+    const getAIResponse = async (retryCount = 0) => {
+        try {
+            const pollinationsUrl = `https://text.pollinations.ai/${encodeURIComponent(message)}?system=${encodeURIComponent(systemPrompt)}&model=openai`;
+            const response = await axios.get(pollinationsUrl, { timeout: 15000 }); // 15s timeout
+            return response.data;
+        } catch (e) {
+            if (retryCount < 2) {
+                console.log(`🔄 Retrying AI fetch... (Attempt ${retryCount + 1})`);
+                return getAIResponse(retryCount + 1);
+            }
+            throw e;
+        }
+    };
+
     try {
-        // We use Pollinations.ai - it's free, unlimited, and provides high-quality chat responses
-        const systemPrompt = `You are Safe-Her AI, a professional women's safety companion and Global Location Expert.
-        
-        1. LANGUAGE: Always respond in the SAME LANGUAGE as the user (Hindi, Hinglish, English, etc.).
-        2. KNOWLEDGE: You know every street, chowk, landmark, and intersection in the world (OpenStreetMap data expert).
-        3. MAP CONTROL: If a user asks for a location, chowk, or area, provide a safety tip for that area AND include the command "MAP_FOCUS: [Place Name]" at the end of your message.
-        4. BREVITY: Keep replies to 2-3 sentences.
-        5. EMERGENCY: If the user is in danger, prioritize the SOS button.`;
-
-        const pollinationsUrl = `https://text.pollinations.ai/${encodeURIComponent(message)}?system=${encodeURIComponent(systemPrompt)}&model=openai`;
-        
-        const response = await axios.get(pollinationsUrl);
-        const aiReply = response.data || "I'm here for you. Stay safe.";
-
-        return res.json({ response: aiReply });
+        const aiReply = await getAIResponse();
+        return res.json({ response: aiReply || "I am processing your request. Please stay safe." });
     } catch (e) {
-        console.error("AI Fetch error:", e.message);
-        return res.json({ response: "I'm experiencing a bit of a signal delay, but I'm still here. How can I help you stay safe?" });
+        console.error("Super-AI Fetch error:", e.message);
+        return res.json({ response: "I'm strengthening our secure link. My intelligence is always with you. Keep the SOS ready." });
     }
 });
 
