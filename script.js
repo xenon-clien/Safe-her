@@ -1191,9 +1191,18 @@ async function findNearest(type) {
     if (cacheEntry && (Date.now() - cacheEntry.timestamp) < 2 * 60 * 1000) {
         console.log(`🔄 Using cached ${type} result`);
         const { result } = cacheEntry;
-        // Pan map and show marker using cached data
-        const activeMap = (document.getElementById('home').style.display !== 'none') ? map : routeMap;
+        
+        // Robust activeMap detection
+        const routeSection = document.getElementById('route');
+        const activeMap = (routeSection && routeSection.style.display !== 'none' && routeMap) ? routeMap : map;
+        
+        if (!activeMap) {
+            console.error("No active map found for nearest facility display.");
+            return;
+        }
+
         activeMap.setView([result.lat, result.lon], 15);
+
         const color = type === 'hospital' ? '#ef4444' : '#3b82f6';
         const icon = L.divIcon({
             html: `<div style="background:${color};width:34px;height:34px;border-radius:50%;border:4px solid white;display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 0 15px ${color}"><i class="fas fa-${type === 'hospital' ? 'hospital' : 'building-shield'}"></i></div>`,
@@ -1206,8 +1215,15 @@ async function findNearest(type) {
         return;
     }
 
-    // Determine active map (home main map or route map)
-    const activeMap = (document.getElementById('home').style.display !== 'none') ? map : routeMap;
+    // Robust activeMap detection
+    const routeSection = document.getElementById('route');
+    const activeMap = (routeSection && routeSection.style.display !== 'none' && routeMap) ? routeMap : map;
+    
+    if (!activeMap) {
+        showToast("Map is initializing. Please wait.", "error");
+        return;
+    }
+
 
 
     
