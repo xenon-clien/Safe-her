@@ -1132,6 +1132,7 @@ async function sendMessage() {
             body: JSON.stringify({ message: msg, userId: user.id || user._id })
         });
         const data = await res.json();
+        const botReply = data.response || "I'm processing your request...";
         
         // Remove typing
         const typingEl = document.getElementById(typingId);
@@ -1180,7 +1181,7 @@ async function sendMessage() {
         const typingEl = document.getElementById(typingId);
         if (typingEl) typingEl.remove();
         console.error("Chat Error:", err);
-        const errorMsg = "I'm experiencing a bit of a signal delay, but I'm still here.";
+        const errorMsg = "Maaf kijiye, connection mein thodi deri ho rahi hai. Par main yahin hoon, aap bilkul chinta na karein.";
         appendMessage(errorMsg, 'bot');
         speakSafeHer(errorMsg);
     }
