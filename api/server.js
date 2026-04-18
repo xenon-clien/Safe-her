@@ -287,10 +287,13 @@ app.post('/api/chat', async (req, res) => {
 
     try {
         // We use Pollinations.ai - it's free, unlimited, and provides high-quality chat responses
-        const systemPrompt = `You are Safe-Her AI, a professional and empathetic women's safety companion.
-        IMPORTANT: Always respond in the SAME LANGUAGE as the user (Hindi, Hinglish, English, etc.).
-        Keep replies SHORT (2-3 sentences max).
-        If the user is in immediate danger, tell them to HIT THE SOS BUTTON now.`;
+        const systemPrompt = `You are Safe-Her AI, a professional women's safety companion and Global Location Expert.
+        
+        1. LANGUAGE: Always respond in the SAME LANGUAGE as the user (Hindi, Hinglish, English, etc.).
+        2. KNOWLEDGE: You know every street, chowk, landmark, and intersection in the world (OpenStreetMap data expert).
+        3. MAP CONTROL: If a user asks for a location, chowk, or area, provide a safety tip for that area AND include the command "MAP_FOCUS: [Place Name]" at the end of your message.
+        4. BREVITY: Keep replies to 2-3 sentences.
+        5. EMERGENCY: If the user is in danger, prioritize the SOS button.`;
 
         const pollinationsUrl = `https://text.pollinations.ai/${encodeURIComponent(message)}?system=${encodeURIComponent(systemPrompt)}&model=openai`;
         

@@ -1113,10 +1113,25 @@ async function sendMessage() {
         if (typingEl) typingEl.remove();
 
         const botReply = data.response || "I'm having trouble connecting to my central brain.";
-        appendMessage(botReply, 'bot');
         
-        // Voice Assistant: Speak the reply
-        speakSafeHer(botReply);
+        // --- MAP INTEGRATION: Check for Location Tokens ---
+        let cleanReply = botReply;
+        if (botReply.includes("MAP_FOCUS:")) {
+            const parts = botReply.split("MAP_FOCUS:");
+            cleanReply = parts[0].trim();
+            const locationQuery = parts[1].trim();
+            
+            showToast(`📍 AI Focusing Map: ${locationQuery}`, "info");
+            // Trigger a manual search on the map
+            const searchInput = document.getElementById('manualLocationInput');
+            if (searchInput) {
+                searchInput.value = locationQuery;
+                handleManualSearch(); // This function should exist globally
+            }
+        }
+
+        appendMessage(cleanReply, 'bot');
+        speakSafeHer(cleanReply);
     } catch (err) {
         const typingEl = document.getElementById(typingId);
         if (typingEl) typingEl.remove();
@@ -1147,6 +1162,16 @@ function toggleVoice() {
     }
 }
 
+// Global voices cache
+let availableVoices = [];
+function loadVoices() {
+    availableVoices = window.speechSynthesis.getVoices();
+}
+if ('speechSynthesis' in window) {
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+}
+
 function speakSafeHer(text) {
     if (!isVoiceEnabled) return;
     
@@ -1161,17 +1186,13 @@ function speakSafeHer(text) {
         const isHindi = /[\u0900-\u097F]/.test(text);
         utterance.lang = isHindi ? 'hi-IN' : 'en-US';
 
-        const voices = window.speechSynthesis.getVoices();
         let selectedVoice = null;
-
         if (isHindi) {
-            // Priority for Hindi voices
-            selectedVoice = voices.find(v => v.lang.includes('hi') || v.name.includes('Hindi') || v.name.includes('Kalpana') || v.name.includes('Hemant'));
+            selectedVoice = availableVoices.find(v => v.lang.includes('hi') || v.name.includes('Hindi') || v.name.includes('Kalpana') || v.name.includes('Hemant'));
         }
 
         if (!selectedVoice) {
-            // Find a suitable female voice
-            selectedVoice = voices.find(v => 
+            selectedVoice = availableVoices.find(v => 
                 v.lang.includes('en') && 
                 (v.name.includes("Female") || v.name.includes("Zira") || v.name.includes("Google UK English Female") || v.name.includes("Samantha"))
             );
