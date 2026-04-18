@@ -84,6 +84,7 @@ function initMap(lat, lng) {
 
     try {
         if (!map) {
+            userLatLng = { lat, lng }; // UPDATE GLOBAL COORDS
             map = L.map('map', {
                 zoomControl: false,
                 scrollWheelZoom: true,
@@ -95,32 +96,30 @@ function initMap(lat, lng) {
 
             L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-            // --- LAYER DEFINITIONS ---
             window.mapLayers = {
-                google: L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+                google: L.tileLayer('https://{s}.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}', {
                     maxZoom: 20,
                     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                    attribution: 'Â© Google Maps',
+                    attribution: '© Google Maps',
                     detectRetina: true
                 }),
                 baidu: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                     maxZoom: 20,
-                    attribution: 'Â© OpenStreetMap Â© CartoDB',
+                    attribution: '© OpenStreetMap © CartoDB',
                     detectRetina: true
                 }),
                 voyager: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
                     maxZoom: 20,
-                    attribution: 'Â© OpenStreetMap Â© CartoDB',
+                    attribution: '© OpenStreetMap © CartoDB',
                     detectRetina: true
                 }),
                 ghost: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                     maxZoom: 20,
-                    attribution: 'Â© OpenStreetMap Â© CartoDB',
+                    attribution: '© OpenStreetMap © CartoDB',
                     detectRetina: true
                 })
             };
 
-            // Add Default Layer
             window.mapLayers.google.addTo(map);
 
             userMarker = L.marker([lat, lng]).addTo(map)
@@ -137,10 +136,15 @@ function initMap(lat, lng) {
             });
             updateMapHUD();
         } else {
-            console.log("ðŸ”„ Map already exists. Re-centering...");
+            userLatLng = { lat, lng }; // UPDATE GLOBAL COORDS
+            console.log("🔄 Map already exists. Re-centering...");
             if (userMarker) userMarker.setLatLng([lat, lng]);
             map.setView([lat, lng], map.getZoom());
             map.invalidateSize();
+            
+            // Sync Route Planner instantly
+            const fromField = document.getElementById('routeFrom');
+            if (fromField) fromField.value = `${lat.toFixed(5)}, ${lng.toFixed(5)} (My Location)`;
         }
     } catch (e) {
         console.warn("Map Init Error:", e.message);
