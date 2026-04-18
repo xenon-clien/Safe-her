@@ -1190,68 +1190,37 @@ const nearestCache = {}; // { type: { timestamp: Date, result: node } }
 //   NEARBY FACILITIES (Hospital / Police)
 // ============================================
 async function findNearest(type) {
-    // Use cached result if recent (within 2 minutes)
-    const cacheEntry = nearestCache[type];
-    if (cacheEntry && (Date.now() - cacheEntry.timestamp) < 2 * 60 * 1000) {
-        console.log(`🔄 Using cached ${type} result`);
-        const { result } = cacheEntry;
-        
-        // Robust activeMap detection
-        const routeSection = document.getElementById('route');
-        const activeMap = (routeSection && routeSection.style.display !== 'none' && routeMap) ? routeMap : map;
-        
-        if (!activeMap) {
-            console.error("No active map found for nearest facility display.");
-            return;
-        }
-
-        activeMap.setView([result.lat, result.lon], 15);
-
-        const color = type === 'hospital' ? '#ef4444' : '#3b82f6';
-        const icon = L.divIcon({
-            html: `<div style="background:${color};width:34px;height:34px;border-radius:50%;border:4px solid white;display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 0 15px ${color}"><i class="fas fa-${type === 'hospital' ? 'hospital' : 'building-shield'}"></i></div>`,
-            className: '',
-            iconSize: [34, 34]
-        });
-        L.marker([result.lat, result.lon], { icon }).addTo(activeMap)
-            .bindPopup(`<b>${result.tags.name || 'Nearest ${type}'}</b><br>Distance: ${result._dist.toFixed(2)} km`)
-            .openPopup();
-        return;
-    }
-
-    // Robust activeMap detection
+    // Determine active map
     const routeSection = document.getElementById('route');
     const activeMap = (routeSection && routeSection.style.display !== 'none' && routeMap) ? routeMap : map;
     
     if (!activeMap) {
-        showToast("Map is initializing. Please wait.", "error");
+        showToast("Map is initializing...", "error");
         return;
     }
 
-
-
-    
-    // --- FORCE RE-CALIBRATE GPS FOR ACCURACY ---
-    showToast(`Calibrating GPS for precise search...`, 'info');
+    // --- FORCE RE-CALIBRATE GPS ---
+    showToast(`Scanning Satellite for precise location...`, 'info');
     
     try {
         const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000 });
+            navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 8000 });
         });
         userLatLng = { lat: position.coords.latitude, lng: position.coords.longitude };
     } catch (e) {
-        console.warn("GPS timeout, using last known position.");
+        console.warn("GPS timeout, using center point.");
     }
 
     const currentPos = userLatLng || { lat: 30.901, lng: 75.8573 };
+    const centerName = (currentPos.lat === 30.901) ? "Default (Ludhiana)" : "Your Location";
 
     try {
-        showToast(`Searching for nearest ${type}...`, 'info');
+        showToast(`📍 Searching near ${centerName}...`, 'info');
         
-        // --- STEP 1: TRY NOMINATIM (Localized Search) ---
-        const delta = 0.5; // Approx 50km radius
+        // --- STEP 1: NOMINATIM (High Precision 10km box) ---
+        const delta = 0.1; 
         const viewbox = `${currentPos.lng - delta},${currentPos.lat + delta},${currentPos.lng + delta},${currentPos.lat - delta}`;
-        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${type}&lat=${currentPos.lat}&lon=${currentPos.lng}&viewbox=${viewbox}&bounded=1&limit=5`;
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${type}&lat=${currentPos.lat}&lon=${currentPos.lng}&viewbox=${viewbox}&bounded=1&limit=8`;
         
         let nodes = [];
         try {
