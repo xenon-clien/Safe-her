@@ -1267,7 +1267,13 @@ function toggleMic() {
 
         recognition.onerror = (event) => {
             console.error("Speech Error:", event.error);
-            showToast("Mic Error: " + event.error, "error");
+            if (event.error === 'not-allowed') {
+                showToast("🎤 Mic Blocked: Please click the LOCK icon in your browser address bar and ALLOW Microphone access.", "error");
+            } else if (event.error === 'network') {
+                showToast("🌐 Network Error: Voice recognition needs an active internet connection.", "error");
+            } else {
+                showToast("Mic Error: " + event.error, "error");
+            }
             stopMic();
         };
 
