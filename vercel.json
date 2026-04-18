@@ -1,31 +1,9 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "api/server.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "index.html",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "script.js",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "style.css",
-      "use": "@vercel/static"
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api/server.js"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/$1"
     }
   ],
   "headers": [
@@ -34,7 +12,7 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "s-maxage=0, no-cache, no-store, must-revalidate"
+          "value": "s-maxage=0"
         }
       ]
     }
