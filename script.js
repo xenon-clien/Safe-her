@@ -1206,8 +1206,90 @@ function speakSafeHer(text) {
         
         if (selectedVoice) utterance.voice = selectedVoice;
         
+        // --- Visual Feedback for Alexa Waveform ---
+        utterance.onstart = () => {
+            const wave = document.getElementById('alexaWaveform');
+            if (wave) {
+                wave.style.display = 'flex';
+                const label = wave.querySelector('span');
+                if (label) label.innerText = "Oracle Speaking...";
+            }
+        };
+        utterance.onend = () => {
+            const wave = document.getElementById('alexaWaveform');
+            if (wave) wave.style.display = 'none';
+        };
+
         window.speechSynthesis.speak(utterance);
     }
+}
+
+// --- ALEXA VOICE INPUT (STT) ---
+let recognition;
+let isListening = false;
+
+function toggleMic() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        showToast("Voice input not supported in this browser.", "error");
+        return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!recognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-IN'; 
+
+        recognition.onstart = () => {
+            isListening = true;
+            const mic = document.getElementById('micBtn');
+            if (mic) mic.classList.add('active');
+            const wave = document.getElementById('alexaWaveform');
+            if (wave) {
+                wave.style.display = 'flex';
+                const label = wave.querySelector('span');
+                if (label) label.innerText = "Listening...";
+            }
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            const input = document.getElementById('chatInput');
+            if (input) {
+                input.value = transcript;
+                sendMessage();
+            }
+        };
+
+        recognition.onerror = (event) => {
+            console.error("Speech Error:", event.error);
+            stopMic();
+        };
+
+        recognition.onend = () => {
+            stopMic();
+        };
+    }
+
+    if (isListening) {
+        recognition.stop();
+    } else {
+        try {
+            recognition.start();
+        } catch(e) {
+            console.warn("Mic already active.");
+        }
+    }
+}
+
+function stopMic() {
+    isListening = false;
+    const mic = document.getElementById('micBtn');
+    if (mic) mic.classList.remove('active');
+    const wave = document.getElementById('alexaWaveform');
+    if (wave) wave.style.display = 'none';
 }
 
 function handleChatEnter(e) {

@@ -1141,32 +1141,49 @@
 
     </main>
 
-    <!-- FLOATING FAKE CHAT ASSISTANT -->
+    <!-- FLOATING ADVANCED AI ASSISTANT (ALEXA STYLE) -->
     <div class="chat-wrapper">
         <div class="chat-container" id="chatBox">
-            <div class="chat-header">
-                <div>
-                    <i class="fas fa-robot"></i>
-                    <span>Safety Assistant</span>
+            <div class="chat-header alexa-header">
+                <div class="flex items-center gap-3">
+                    <div class="alexa-orb"></div>
+                    <div>
+                        <span class="block text-xs font-black uppercase tracking-widest text-white">Safe-Her Oracle</span>
+                        <span class="block text-[9px] text-green-400 font-bold uppercase">Ready to Assist</span>
+                    </div>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center;">
-                    <button id="voiceToggle" onclick="toggleVoice()" title="Toggle Voice Assistant" style="background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer;">
+                    <button id="voiceToggle" onclick="toggleVoice()" title="Toggle Voice Assistant" class="alexa-header-btn">
                         <i class="fas fa-volume-up"></i>
                     </button>
                     <button class="close-chat" onclick="toggleChat()"><i class="fas fa-times"></i></button>
                 </div>
             </div>
+
             <div class="chat-body" id="chatBody">
                 <div class="message bot">
-                    Hello! I'm your digital safety assistant. How can I help you today?
+                    Hello! I'm your Universal Safety Oracle. Talk to me or type any location/danger.
                 </div>
             </div>
-            <div class="chat-footer">
-                <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="handleChatEnter(event)">
-                <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+
+            <!-- ALEXA WAVEFORM (Hidden by default) -->
+            <div id="alexaWaveform" class="alexa-wave-container" style="display: none;">
+                <div class="wave"></div><div class="wave"></div><div class="wave"></div><div class="wave"></div>
+                <span class="text-[9px] font-bold text-blue-400 ml-4 uppercase">Listening...</span>
+            </div>
+
+            <div class="chat-footer alexa-footer">
+                <button id="micBtn" onclick="toggleMic()" class="mic-btn-premium">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <input type="text" id="chatInput" placeholder="Ask Oracle anything..." onkeypress="handleChatEnter(event)">
+                <button onclick="sendMessage()" class="send-btn-v2">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
             </div>
         </div>
-        <button class="chat-fab" onclick="toggleChat()">
+        <button class="chat-fab alexa-fab" onclick="toggleChat()">
+            <div class="fab-orb"></div>
             <i class="fas fa-comment-dots"></i>
         </button>
     </div>

@@ -2209,3 +2209,129 @@ a {
     box-shadow: 0 0 15px currentColor;
 }
 }
+
+/* ALEXA-STYLE ADVANCED CHATBOX */
+.alexa-header {
+    background: linear-gradient(to right, #000, #111) !important;
+    border-bottom: 2px solid #00d2ff55 !important;
+    padding: 15px 20px !important;
+}
+
+.alexa-orb {
+    width: 25px;
+    height: 25px;
+    background: radial-gradient(circle, #00d2ff, #3a7bd5);
+    border-radius: 50%;
+    box-shadow: 0 0 15px #00d2ff, 0 0 30px #00d2ff55;
+    animation: orbPulse 2s infinite ease-in-out;
+}
+
+@keyframes orbPulse {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 25px #00d2ff; }
+}
+
+.alexa-header-btn {
+    background: rgba(255,255,255,0.05) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: white !important;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+.alexa-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px !important;
+    background: #000 !important;
+}
+
+.mic-btn-premium {
+    background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+    color: white;
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    border: none;
+    box-shadow: 0 5px 15px rgba(0, 210, 255, 0.4);
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mic-btn-premium.active {
+    animation: micPulse 1.5s infinite;
+    background: #ff3366 !important;
+    box-shadow: 0 0 20px #ff3366 !important;
+}
+
+@keyframes micPulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 51, 102, 0.7); }
+    70% { transform: scale(1.1); box-shadow: 0 0 0 15px rgba(255, 51, 102, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 51, 102, 0); }
+}
+
+.send-btn-v2 {
+    background: rgba(255,255,255,0.05) !important;
+    color: #00d2ff !important;
+    border: 1px solid #00d2ff33 !important;
+    padding: 10px 15px;
+    border-radius: 12px;
+    cursor: pointer;
+}
+
+.alexa-wave-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    background: rgba(0, 210, 255, 0.05) !important;
+    border-top: 1px solid rgba(0, 210, 255, 0.1) !important;
+}
+
+.wave {
+    width: 3px;
+    height: 15px;
+    background: #00d2ff;
+    margin: 0 2px;
+    border-radius: 10px;
+    animation: waveAnim 1s infinite ease-in-out;
+}
+
+.wave:nth-child(2) { animation-delay: 0.1s; }
+.wave:nth-child(3) { animation-delay: 0.2s; }
+.wave:nth-child(4) { animation-delay: 0.3s; }
+
+@keyframes waveAnim {
+    0%, 100% { height: 10px; }
+    50% { height: 25px; }
+}
+
+.alexa-fab {
+    background: #000 !important;
+    border: 2px solid #00d2ff !important;
+    box-shadow: 0 0 30px rgba(0, 210, 255, 0.3) !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.fab-orb {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle, #00d2ff44, transparent);
+    animation: orbGlow 3s infinite;
+}
+
+@keyframes orbGlow {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 0.7; }
+}
+
