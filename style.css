@@ -600,9 +600,10 @@ a {
     box-shadow: 0 0 20px #ff3366;
 }
 
-.sos-active .sos-ripple:nth-child(1) { animation: rippleEffect 1.5s infinite linear; }
-.sos-active .sos-ripple:nth-child(2) { animation: rippleEffect 1.5s infinite linear 0.5s; }
-.sos-active .sos-ripple:nth-child(3) { animation: rippleEffect 1.5s infinite linear 1s; }
+.sos-ripple:nth-child(1) { animation: rippleEffect 2s infinite linear; }
+.sos-ripple:nth-child(2) { animation: rippleEffect 2s infinite linear 0.6s; }
+.sos-ripple:nth-child(3) { animation: rippleEffect 2s infinite linear 1.2s; }
+.sos-ripple:nth-child(4) { animation: rippleEffect 2s infinite linear 1.8s; }
 
 @keyframes rippleEffect {
     0% { transform: translate(-50%, -50%) scale(1); opacity: 1; border-width: 4px; }
