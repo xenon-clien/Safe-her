@@ -1240,18 +1240,20 @@ function toggleMic() {
         recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = false;
-        recognition.lang = 'en-IN'; 
+        
+        // Use a multi-lingual aware language (Hinglish/Hindi/English mix)
+        recognition.lang = 'hi-IN'; // Priority is Hindi/Indian English
 
         recognition.onstart = () => {
             isListening = true;
-            const mic = document.getElementById('micBtn');
-            if (mic) mic.classList.add('active');
+            document.getElementById('micBtn').classList.add('active');
             const wave = document.getElementById('alexaWaveform');
             if (wave) {
                 wave.style.display = 'flex';
                 const label = wave.querySelector('span');
-                if (label) label.innerText = "Listening...";
+                if (label) label.innerText = "Listening: Speak Now...";
             }
+            showToast("Listening... Aap boliye", "info");
         };
 
         recognition.onresult = (event) => {
@@ -1259,12 +1261,13 @@ function toggleMic() {
             const input = document.getElementById('chatInput');
             if (input) {
                 input.value = transcript;
-                sendMessage();
+                sendMessage(); // Auto-send when user stops talking
             }
         };
 
         recognition.onerror = (event) => {
             console.error("Speech Error:", event.error);
+            showToast("Mic Error: " + event.error, "error");
             stopMic();
         };
 
@@ -1279,7 +1282,9 @@ function toggleMic() {
         try {
             recognition.start();
         } catch(e) {
-            console.warn("Mic already active.");
+            console.warn("Retrying Mic...");
+            recognition.stop();
+            setTimeout(() => recognition.start(), 200);
         }
     }
 }
