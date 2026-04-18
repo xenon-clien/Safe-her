@@ -10,6 +10,11 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Leaflet Routing Machine CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <!-- Anti-Cache for Real-time Dev -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
     <!-- Leaflet Geocoder CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
 
@@ -28,7 +33,7 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <!-- App Styling -->
-    <link rel="stylesheet" href="style.css?v=12">
+    <link rel="stylesheet" href="style.css?v=15">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -147,75 +152,36 @@
                 <h1>We are here to help you.</h1>
                 <p>Your personal safety companion — armed with AI-powered tools.</p>
             </div>
-            <!-- SOS Button SECTION (Now the PRIMARY Focal Point) -->
-            <div class="flex flex-col items-center justify-center py-12 w-full">
-                <div class="sos-container relative scale-110">
-                    <div class="sos-glass-ring"></div>
-                    <!-- Glow & Rings Phase -->
-                    <div class="sos-glow-inner"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
 
-                    <button id="sosBtn" class="sos-btn" onclick="triggerSOS()">
-                        <span class="sos-text">SOS</span>
-                        <div class="sos-btn-glow"></div>
-                    </button>
 
-                    <!-- Status Display -->
-                    <p id="sosStatus" class="sos-status"></p>
-
-                    <div id="blackboxStatus" class="blackboxStatus" style="display: none;">
-                        <span class="dot pulse-red"></span> 🔴 SECURE EVIDENCE SYNC
-                    </div>
-                </div>
-            </div>
-
-            <!-- PREMIUM SAFETY METER -->
-            <div class="safety-meter-container">
-                <div class="meter-header">
-                    <span class="text-xs uppercase tracking-[0.2em] text-white/40">Radar Safety Score</span>
-                    <span id="safetyMeterLabel" class="text-[10px] font-black px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/30">ANALYZING...</span>
-                </div>
-                <div class="meter-bar-vault">
-                    <div id="safetyMeterBar" class="meter-fill" style="width: 0%;"></div>
-                </div>
-                <div class="flex justify-between mt-2">
-                    <span class="text-[9px] text-zinc-600 font-bold">DANGER</span>
-                    <span id="safetyMeterValue" class="text-xl font-black italic">--</span>
-                    <span class="text-[9px] text-zinc-600 font-bold">SECURE</span>
-                </div>
-            </div>
-
-            <!-- Daily Safety Forecast UI -->
-            <div class="safety-forecast-row">
-                <div class="forecast-card">
-                    <i class="fas fa-sun text-yellow-400"></i>
-                    <span class="forecast-time">Morning</span>
-                    <span class="forecast-score" id="scoreMorning">--</span>
-                </div>
-                <div class="forecast-card">
-                    <i class="fas fa-cloud-sun text-orange-400"></i>
-                    <span class="forecast-time">Evening</span>
-                    <span class="forecast-score" id="scoreEvening">--</span>
-                </div>
-                <div class="forecast-card">
-                    <i class="fas fa-moon text-blue-400"></i>
-                    <span class="forecast-time">Night</span>
-                    <span class="forecast-score" id="scoreNight">--</span>
-                </div>
-            </div>
 
             <!-- Map -->
             <div class="location-container mb-8">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-white"><i class="fab fa-google text-blue-500 mr-2"></i> Advanced Google Map</h2>
-                    <span id="gpsStatusBadge" class="text-[9px] bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/20 font-black uppercase tracking-widest shadow-[0_0_15px_rgba(59,130,246,0.3)]">High Precision Link</span>
+                    <h2 class="text-xl font-bold text-white"><i class="fas fa-map-location-dot text-blue-500 mr-2"></i> Safety Map Radar</h2>
+                    <div class="flex items-center gap-2">
+                        <button onclick="forceMapRefresh()" class="text-[9px] bg-white/5 hover:bg-white/10 text-white/60 px-2 py-1 rounded-md border border-white/5 transition-all">REFRESH MAP</button>
+                        <span id="gpsStatusBadge" class="text-[9px] bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/20 font-black uppercase tracking-widest">Live Sync</span>
+                    </div>
                 </div>
                 
                 <div class="relative w-full rounded-[2.5rem] overflow-hidden border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] bg-zinc-950">
                     <div id="map" class="h-[400px] w-full z-10"></div>
+                    
+                    <!-- SOS Button OVERLAY -->
+                    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-[2000] flex flex-col items-center">
+                        <div class="sos-container relative scale-90">
+                            <div class="sos-glass-ring"></div>
+                            <div class="sos-glow-inner"></div>
+                            
+                            <button id="sosBtn" class="sos-btn premium-sos shadow-2xl shadow-red-500/50" onclick="triggerSOS()">
+                                <div class="sos-inner-glow"></div>
+                                <span class="sos-text">SOS</span>
+                            </button>
+                            
+                            <p id="sosStatus" class="sos-status-premium mt-2 font-bold text-white shadow-md bg-black/60 px-3 py-1 rounded-full backdrop-blur-md text-[10px] hidden"></p>
+                        </div>
+                    </div>
                     <!-- Manual Search Overlay -->
                     <div class="absolute top-4 left-4 right-4 z-[1000] flex gap-2">
                         <input type="text" id="manualLocationInput" placeholder="Search area (e.g. Ludhiana)..." 
@@ -318,51 +284,8 @@
                 </div>
             </div>
 
-            <!-- Safety Dashboard Stats -->
-            <div class="safety-dashboard">
-                <div class="dash-stat">
-                    <i class="fas fa-location-arrow"></i>
-                    <div>
-                        <span class="dash-val" id="dashArea">Detecting...</span>
-                        <span class="dash-lbl">Your Area</span>
-                    </div>
-                </div>
-                <div class="dash-stat">
-                    <i class="fas fa-shield-halved" style="color:#4caf50;"></i>
-                    <div>
-                        <span class="dash-val" id="dashScore" style="color:#4caf50;">--</span>
-                        <span class="dash-lbl">Safety Score</span>
-                    </div>
-                </div>
-                <div class="dash-stat">
-                    <i class="fas fa-clock" style="color:#ff9800;"></i>
-                    <div>
-                        <span class="dash-val" id="dashTime">--:--</span>
-                        <span class="dash-lbl">Local Time</span>
-                    </div>
-                </div>
-                <div class="dash-stat">
-                    <i class="fas fa-database" style="color:#00d2ff;"></i>
-                    <div>
-                        <span class="dash-val" id="dashDb">Connecting...</span>
-                        <span class="dash-lbl">Database</span>
-                    </div>
-                </div>
-                <div class="dash-stat">
-                    <i class="fas fa-satellite-dish" style="color:#9d4edd;"></i>
-                    <div>
-                        <span class="dash-val" id="dashGps">Detecting...</span>
-                        <span class="dash-lbl">GPS Signal</span>
-                    </div>
-                </div>
-                <div class="dash-stat">
-                    <i class="fas fa-lightbulb" style="color:#ffeb3b;"></i>
-                    <div>
-                        <span class="dash-val" id="dashLights">Scanning...</span>
-                        <span class="dash-lbl">Street Lighting</span>
-                    </div>
-                </div>
-            </div>
+
+            <!-- End of section -->
 
             </div>
         </section>
@@ -1354,10 +1277,11 @@
     <!-- AUDIO FOR FAKE CALL RELAY -->
     <audio id="fakeRelayAudio" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" loop></audio>
 
-    <script src="script.js?v=12"></script>
+    <script src="script.js?v=20"></script>
     <script src="background.js"></script>
     <div id="strobeOverlay"></div>
 </body>
 
 </html>
 
+<!-- AGENT_VERIFICATION_TAG_XYZ_1 -->
