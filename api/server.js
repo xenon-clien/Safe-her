@@ -288,20 +288,27 @@ app.post('/api/chat', async (req, res) => {
     const systemPrompt = `You are the 'Safe-Her Universal Oracle', a super-intelligent and deeply empathetic safety companion.
     
     1. MISSION: Solve every problem the user has regarding safety, navigation, or emergency situations with 100% reliability.
-    2. LANGUAGE: Respond in the EXACT language/style of the user (Hindi, Hinglish, etc.).
-    3. MAP EXPERT: You know every tiny chowk and street globally. Always use "MAP_FOCUS: [Place Name]" if they ask for a location.
-    4. PROBLEM SOLVER: If they face any challenge, give a solid, actionable solution.
+    2. LANGUAGE: Respond in the EXACT language/style of the user (Hindi, Hinglish, etc.). You are an expert in HINGLISH.
+    3. MAP EXPERT: You know every tiny chowk globally. Always use "MAP_FOCUS: [Place Name]" if they ask for any location.
+    4. PROBLEM SOLVER: Give solid, actionable, and empathetic solutions.
     5. BREVITY: Keep it powerful but SHORT (2-4 sentences).`;
 
-    // High-Reliability Fetch with Retry
+    // High-Reliability Fetch with POST (Fixes URL length issues)
     const getAIResponse = async (retryCount = 0) => {
         try {
-            const pollinationsUrl = `https://text.pollinations.ai/${encodeURIComponent(message)}?system=${encodeURIComponent(systemPrompt)}&model=openai`;
-            const response = await axios.get(pollinationsUrl, { timeout: 15000 }); // 15s timeout
+            const response = await axios.post('https://text.pollinations.ai/', {
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: message }
+                ],
+                model: 'openai',
+                private: true
+            }, { timeout: 20000 }); // 20s timeout
+            
             return response.data;
         } catch (e) {
+            console.warn(`Attempt ${retryCount + 1} failed:`, e.message);
             if (retryCount < 2) {
-                console.log(`🔄 Retrying AI fetch... (Attempt ${retryCount + 1})`);
                 return getAIResponse(retryCount + 1);
             }
             throw e;
@@ -309,11 +316,14 @@ app.post('/api/chat', async (req, res) => {
     };
 
     try {
+        if (!message || message.trim() === "") {
+            return res.json({ response: "I'm listening. How can the Oracle help you stay safe tonight?" });
+        }
         const aiReply = await getAIResponse();
         return res.json({ response: aiReply || "I am processing your request. Please stay safe." });
     } catch (e) {
         console.error("Super-AI Fetch error:", e.message);
-        return res.json({ response: "I'm strengthening our secure link. My intelligence is always with you. Keep the SOS ready." });
+        return res.json({ response: "Connection fluctuate ho raha hai, par main aapke saath hoon. Koshish karein ki aap kisi safe jagah par hon." });
     }
 });
 
