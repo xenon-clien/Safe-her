@@ -1127,19 +1127,46 @@ async function sendMessage() {
     }
 }
 
+let isVoiceEnabled = false;
+
+function toggleVoice() {
+    isVoiceEnabled = !isVoiceEnabled;
+    const btn = document.getElementById('voiceToggle');
+    if (btn) {
+        btn.style.color = isVoiceEnabled ? '#4caf50' : 'rgba(255,255,255,0.6)';
+        btn.innerHTML = `<i class="fas fa-volume-${isVoiceEnabled ? 'up' : 'mute'}"></i>`;
+    }
+    
+    if (isVoiceEnabled) {
+        showToast("Voice Assistant Activated", "success");
+        // Prime the engine (required by some browsers)
+        speakSafeHer("Voice assistant active.");
+    } else {
+        window.speechSynthesis.cancel();
+        showToast("Voice Assistant Muted", "info");
+    }
+}
+
 function speakSafeHer(text) {
+    if (!isVoiceEnabled) return;
+    
     if ('speechSynthesis' in window) {
-        // Cancel any ongoing speech
         window.speechSynthesis.cancel();
         
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = 1.0;
-        utterance.pitch = 1.1; // Slightly higher pitch for a female/empathetic tone
+        utterance.pitch = 1.1; 
         
-        // Try to find a female voice
+        // Find a suitable female voice
         const voices = window.speechSynthesis.getVoices();
-        const femaleVoice = voices.find(v => v.name.includes("Female") || v.name.includes("Google UK English Female") || v.name.includes("Microsoft Zira"));
-        if (femaleVoice) utterance.voice = femaleVoice;
+        const preferredVoices = voices.filter(v => 
+            v.lang.includes('en') && 
+            (v.name.includes("Female") || v.name.includes("Zira") || v.name.includes("Google UK English Female") || v.name.includes("Samantha"))
+        );
+        
+        if (preferredVoices.length > 0) {
+            utterance.voice = preferredVoices[0];
+        }
         
         window.speechSynthesis.speak(utterance);
     }

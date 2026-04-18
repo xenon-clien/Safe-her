@@ -1149,7 +1149,12 @@
                     <i class="fas fa-robot"></i>
                     <span>Safety Assistant</span>
                 </div>
-                <button class="close-chat" onclick="toggleChat()"><i class="fas fa-times"></i></button>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button id="voiceToggle" onclick="toggleVoice()" title="Toggle Voice Assistant" style="background: none; border: none; color: rgba(255,255,255,0.6); cursor: pointer;">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                    <button class="close-chat" onclick="toggleChat()"><i class="fas fa-times"></i></button>
+                </div>
             </div>
             <div class="chat-body" id="chatBody">
                 <div class="message bot">
