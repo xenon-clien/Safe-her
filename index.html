@@ -152,28 +152,7 @@
                 <h1>We are here to help you.</h1>
                 <p>Your personal safety companion — armed with AI-powered tools.</p>
             </div>
-            <!-- SOS Button SECTION (Now the PRIMARY Focal Point) -->
-            <div class="flex flex-col items-center justify-center pt-6 pb-12 w-full animate-fadeInUp">
-                <div class="sos-container relative scale-110">
-                    <div class="sos-glass-ring"></div>
-                    <div class="sos-glow-inner"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
 
-                    <button id="sosBtn" class="sos-btn premium-sos shadow-2xl shadow-red-500/50" onclick="triggerSOS()">
-                        <div class="sos-inner-glow"></div>
-                        <span class="sos-text">SOS</span>
-                    </button>
-
-                    <p id="sosStatus" class="sos-status-premium mt-2 font-bold text-white shadow-md bg-black/60 px-3 py-1 rounded-full backdrop-blur-md text-[10px] hidden"></p>
-                    
-                    <div id="blackboxStatus" class="blackbox-status-premium" style="display: none;">
-                        <span class="dot-premium pulse-red"></span> LIVE PROTECTION ACTIVE
-                    </div>
-                </div>
-            </div>
 
             <!-- Map -->
             <div class="location-container mb-8">
@@ -198,6 +177,27 @@
                 </div>
                 <div class="mt-4 text-[10px] text-zinc-600 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
                     <i class="fas fa-satellite text-blue-500/50"></i> Real-time Satellite Sync Active: Level 20 Precision
+                </div>
+            </div>
+
+            <!-- SOS Button SECTION (Moved Below Map) -->
+            <div class="flex flex-col items-center justify-center pt-6 pb-12 w-full animate-fadeInUp">
+                <div class="sos-container relative scale-110">
+                    <div class="sos-glass-ring"></div>
+                    <div class="sos-glow-inner"></div>
+                    <div class="sos-ripple"></div>
+                    <div class="sos-ripple"></div>
+
+                    <button id="sosBtn" class="sos-btn premium-sos shadow-2xl shadow-red-500/50" onclick="triggerSOS()">
+                        <div class="sos-inner-glow"></div>
+                        <span class="sos-text">SOS</span>
+                    </button>
+
+                    <p id="sosStatus" class="sos-status-premium mt-2 font-bold text-white shadow-md bg-black/60 px-3 py-1 rounded-full backdrop-blur-md text-[10px] hidden"></p>
+                    
+                    <div id="blackboxStatus" class="blackbox-status-premium" style="display: none;">
+                        <span class="dot-premium pulse-red"></span> LIVE PROTECTION ACTIVE
+                    </div>
                 </div>
             </div>
 
