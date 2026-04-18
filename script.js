@@ -1758,6 +1758,9 @@ function calculateRoute() {
                 router: L.Routing.osrmv1({ serviceUrl: routerUrl }),
                 createMarker: () => null,
                 show: false,
+                addWaypoints: false,
+                draggableWaypoints: false,
+                fitSelectedRoutes: false,
                 lineOptions: { styles: [{ color: '#2563eb', weight: 6, opacity: 0.8 }] }
             }).on('routesfound', function(e) {
                 const r = e.routes[0];
