@@ -1221,7 +1221,7 @@ async function findNearest(type) {
 
         // --- STEP 1: OVERPASS API (Standard for tagged amenities) ---
         try {
-            const overpassQuery = `[out:json];node(around:5000,${currentPos.lat},${currentPos.lng})[amenity=${type}];out;`;
+            const overpassQuery = `[out:json];node(around:2000,${currentPos.lat},${currentPos.lng})[amenity=${type}];out;`;
             const ovResp = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: overpassQuery });
             const ovData = await ovResp.json();
             nodes = ovData.elements || [];
@@ -1231,9 +1231,10 @@ async function findNearest(type) {
 
         // --- STEP 2: NOMINATIM FALLBACK ---
         if (nodes.length === 0) {
-            const delta = 0.1; // 10km box
+            const delta = 0.02; // Roughly 2km box
             const viewbox = `${currentPos.lng - delta},${currentPos.lat + delta},${currentPos.lng + delta},${currentPos.lat - delta}`;
             const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${type}&lat=${currentPos.lat}&lon=${currentPos.lng}&viewbox=${viewbox}&bounded=1&limit=10`;
+
             const nomResp = await fetch(nominatimUrl);
             const nomData = await nomResp.json();
             nodes = nomData.map(item => ({
