@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safe Her - Advanced Women's Security App</title>
+
+    <!-- OpenStreetMap (Leaflet) CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Leaflet Routing Machine CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.css" />
+    <!-- Leaflet Geocoder CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+
+    <!-- Leaflet JS Libraries (CRITICAL) -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <!-- Razorpay & Animation Libraries -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Google Services -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA_placeholder&libraries=places"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+    <!-- App Styling -->
+    <link rel="stylesheet" href="style.css?v=12">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'premium-gold': '#ffcc00',
+                        'safety-purple': '#9d4edd',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <!-- ========= THREE.JS BACKGROUND ========= -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- ========= LOADING SCREEN ========= -->
+    <div id="loaderScreen" class="loader-screen">
+        <div class="loader-content">
+            <div class="loader-shield">
+                <i class="fas fa-shield-halved"></i>
+                <div class="shield-pulse"></div>
+            </div>
+            <h1 class="loader-brand">Safe Her</h1>
+            <p class="loader-tagline">Your Personal Safety Companion</p>
+            <div class="loader-bar-track">
+                <div class="loader-bar-fill" id="loaderBar"></div>
+            </div>
+            <span class="loader-status" id="loaderStatus">Initializing safety systems...</span>
+        </div>
+    </div>
+    <!-- ===================================== -->
+
+    <!-- Full Screen Panic Strobe Overlay -->
+    <div id="strobeOverlay" class="strobe-overlay"></div>
+
+    <!-- Fake Call Incoming Screen Overlay -->
+    <div id="fakeCallScreen" class="fake-call-screen" style="display: none;">
+        <div class="fake-call-caller">
+            <div class="caller-avatar"><i class="fas fa-user-tie"></i></div>
+            <h2>Dad</h2>
+            <p>Mobile: +1 432-849-009</p>
+        </div>
+        <div class="fake-call-actions">
+            <button class="call-decline" onclick="stopFakeCall()"><i class="fas fa-phone-slash"></i></button>
+            <button class="call-answer" onclick="answerFakeCall()"><i class="fas fa-phone"></i></button>
+        </div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="logo">
+            <i class="fas fa-shield-heart"></i>
+            <span>Safe Her</span>
+            <!-- AURA RADAR SYSTEM -->
+            <div id="auraRadar"
+                class="hidden fixed inset-0 z-[100000] bg-black/90 backdrop-blur-3xl flex items-center justify-center transition-all duration-700">
+                <div class="relative w-[400px] h-[400px]">
+                    <!-- Radar Circles -->
+                    <div class="absolute inset-0 border-2 border-safety-purple/20 rounded-full animate-pulse"></div>
+                    <div class="absolute inset-4 border border-safety-purple/10 rounded-full"></div>
+                    <div class="absolute inset-16 border border-safety-purple/5 rounded-full"></div>
+
+                    <!-- Scanning Beam -->
+                    <div
+                        class="absolute inset-0 bg-conic-gradient from-safety-purple/40 to-transparent rounded-full animate-radarRotation">
+                    </div>
+
+                    <!-- Center Point -->
+                    <div
+                        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-safety-purple rounded-full shadow-[0_0_20px_#9d4edd]">
+                    </div>
+
+                    <!-- Scanning Data -->
+                    <div class="absolute -bottom-20 left-0 right-0 text-center">
+                        <h2 class="text-safety-purple font-black text-2xl uppercase tracking-tighter mb-2">Aura Scan
+                            Active</h2>
+                        <div id="radarStatus" class="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em]">
+                            Analyzing Vicinity...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <ul class="nav-links" id="navLinks">
+            <li><a href="#home" class="active" onclick="switchSection('home')">Home</a></li>
+            <li><a href="#route" onclick="switchSection('route')"><i class="fas fa-route"
+                        style="margin-right:5px;"></i>Route</a></li>
+            <li><a href="#contacts" onclick="switchSection('contacts')">Contacts</a></li>
+            <li><a href="#records" onclick="switchSection('records')">Logs</a></li>
+            <li id="proCenterLink" style="display:none;"><a href="#pro-center" onclick="switchSection('pro-center')"
+                    class="text-premium-gold font-bold"><i class="fas fa-crown"></i> Pro Command</a></li>
+            <li><a href="#tips" onclick="switchSection('tips')">Tips</a></li>
+            <li><a href="#feedback" onclick="switchSection('feedback')">Feedback</a></li>
+            <li id="navLogin"><a href="#loginView" class="btn-login" onclick="switchSection('loginView')">Login</a></li>
+            <li id="navLogout" style="display:none;"><a href="#" onclick="logout()" class="text-red-500 font-bold"><i
+                        class="fas fa-sign-out-alt"></i> Logout</a></li>
+            <li id="goPremiumNav"><button onclick="initiateRazorpayPayment()"
+                    class="bg-gradient-to-r from-premium-gold to-yellow-600 text-black px-4 py-2 rounded-full font-bold ml-2 hover:scale-105 transition-transform"><i
+                        class="fas fa-crown"></i> Go Premium</button></li>
+        </ul>
+        <div class="hamburger" onclick="toggleMobileMenu()">
+            <i class="fas fa-bars"></i>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="main-container">
+
+        <!-- 1. HOME SECTION -->
+        <section id="home" class="section-container" style="display: none;">
+
+            <div class="hero-header">
+                <h1>We are here to help you.</h1>
+                <p>Your personal safety companion — armed with AI-powered tools.</p>
+            </div>
+            <!-- SOS Button SECTION (Now the PRIMARY Focal Point) -->
+            <div class="flex flex-col items-center justify-center py-12 w-full">
+                <div class="sos-container relative scale-110">
+                    <div class="sos-glass-ring"></div>
+                    <!-- Glow & Rings Phase -->
+                    <div class="sos-glow-inner"></div>
+                    <div class="sos-ripple"></div>
+                    <div class="sos-ripple"></div>
+                    <div class="sos-ripple"></div>
+                    <div class="sos-ripple"></div>
+
+                    <button id="sosBtn" class="sos-btn" onclick="triggerSOS()">
+                        <span class="sos-text">SOS</span>
+                        <div class="sos-btn-glow"></div>
+                    </button>
+
+                    <!-- Status Display -->
+                    <p id="sosStatus" class="sos-status"></p>
+
+                    <div id="blackboxStatus" class="blackboxStatus" style="display: none;">
+                        <span class="dot pulse-red"></span> 🔴 SECURE EVIDENCE SYNC
+                    </div>
+                </div>
+            </div>
+
+            <!-- PREMIUM SAFETY METER -->
+            <div class="safety-meter-container">
+                <div class="meter-header">
+                    <span class="text-xs uppercase tracking-[0.2em] text-white/40">Radar Safety Score</span>
+                    <span id="safetyMeterLabel" class="text-[10px] font-black px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/30">ANALYZING...</span>
+                </div>
+                <div class="meter-bar-vault">
+                    <div id="safetyMeterBar" class="meter-fill" style="width: 0%;"></div>
+                </div>
+                <div class="flex justify-between mt-2">
+                    <span class="text-[9px] text-zinc-600 font-bold">DANGER</span>
+                    <span id="safetyMeterValue" class="text-xl font-black italic">--</span>
+                    <span class="text-[9px] text-zinc-600 font-bold">SECURE</span>
+                </div>
+            </div>
+
+            <!-- Daily Safety Forecast UI -->
+            <div class="safety-forecast-row">
+                <div class="forecast-card">
+                    <i class="fas fa-sun text-yellow-400"></i>
+                    <span class="forecast-time">Morning</span>
+                    <span class="forecast-score" id="scoreMorning">--</span>
+                </div>
+                <div class="forecast-card">
+                    <i class="fas fa-cloud-sun text-orange-400"></i>
+                    <span class="forecast-time">Evening</span>
+                    <span class="forecast-score" id="scoreEvening">--</span>
+                </div>
+                <div class="forecast-card">
+                    <i class="fas fa-moon text-blue-400"></i>
+                    <span class="forecast-time">Night</span>
+                    <span class="forecast-score" id="scoreNight">--</span>
+                </div>
+            </div>
+
+            <!-- Map -->
+            <div class="location-container mb-8">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-white"><i class="fab fa-google text-blue-500 mr-2"></i> Advanced Google Map</h2>
+                    <span id="gpsStatusBadge" class="text-[9px] bg-blue-500/10 text-blue-400 px-3 py-1 rounded-full border border-blue-500/20 font-black uppercase tracking-widest shadow-[0_0_15px_rgba(59,130,246,0.3)]">High Precision Link</span>
+                </div>
+                
+                <div class="relative w-full rounded-[2.5rem] overflow-hidden border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] bg-zinc-950">
+                    <div id="map" class="h-[400px] w-full z-10"></div>
+                    <!-- Manual Search Overlay -->
+                    <div class="absolute top-4 left-4 right-4 z-[1000] flex gap-2">
+                        <input type="text" id="manualLocationInput" placeholder="Search area (e.g. Ludhiana)..." 
+                               class="flex-1 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl px-5 py-3 text-white text-xs outline-none focus:border-safety-purple transition-all shadow-xl">
+                        <button onclick="handleManualSearch()" class="bg-safety-purple text-white px-6 py-3 rounded-2xl text-xs font-bold shadow-lg hover:scale-105 active:scale-95 transition-all">GO</button>
+                    </div>
+                </div>
+                <div class="mt-4 text-[10px] text-zinc-600 font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                    <i class="fas fa-satellite text-blue-500/50"></i> Real-time Satellite Sync Active: Level 20 Precision
+                </div>
+            </div>
+
+            <!-- Advanced Safety Tools Grid -->
+            <div class="tactical-tools">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="m-0"><i class="fas fa-toolbox"></i> Safety Arsenal</h3>
+                    <span
+                        class="text-xs bg-premium-gold/20 text-premium-gold px-2 py-1 rounded border border-premium-gold/30">PRO
+                        UNLOCKED</span>
+                </div>
+                <div class="tools-grid">
+
+                    <!-- Quick Share Location -->
+                    <div class="premium-tool-wrapper">
+                        <button class="tool-btn" onclick="quickShareLocation()" title="Share live location instantly">
+                            <i class="fas fa-share-nodes"></i>
+                            <span>Live Share</span>
+                        </button>
+                    </div>
+
+                    <!-- Blackbox (NOW FREE) -->
+                    <div class="premium-tool-wrapper" id="blackboxWrapper">
+                        <button class="tool-btn" id="blackboxBtn" onclick="toggleEvidenceLocker()"
+                            title="Start audio evidence recording">
+                            <i class="fas fa-file-audio"></i>
+                            <span>Blackbox</span>
+                        </button>
+                    </div>
+
+                    <!-- Safe Haven Radar -->
+                    <div class="premium-tool-wrapper">
+                        <button class="tool-btn" id="radarBtn" onclick="toggleAuraRadar()" title="Launch Matrix Scan">
+                            <i class="fas fa-tower-broadcast"></i>
+                            <span>Aura Radar</span>
+                        </button>
+                    </div>
+
+                    <!-- Refresh GPS / Tracking -->
+                    <div class="premium-tool-wrapper">
+                        <button class="tool-btn" onclick="startTracking()" title="Manually update current location">
+                            <i class="fas fa-location-crosshairs"></i>
+                            <span>Refresh GPS</span>
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- NEW: Life-Saving Shortcuts -->
+                <div class="emergency-shortcuts-grid mt-6 px-4 pb-4">
+                    <button class="esc-btn hospital" onclick="findNearest('hospital')">
+                        <i class="fas fa-hospital"></i>
+                        <span>Nearest Hospital</span>
+                    </button>
+                    <button class="esc-btn police" onclick="findNearest('police')">
+                        <i class="fas fa-handcuffs"></i>
+                        <span>Nearest Police Station</span>
+                    </button>
+                </div>
+            </div>
+
+
+
+            <!-- Check-In Timer Panel (hidden by default) -->
+            <div class="checkin-panel" id="checkinPanel" style="display:none;">
+                <div class="checkin-header">
+                    <i class="fas fa-hourglass-half"></i>
+                    <h4>Safety Check-In Timer</h4>
+                    <button onclick="closeCheckInPanel()" class="close-panel-btn"><i class="fas fa-times"></i></button>
+                </div>
+                <p>Set a timer. If you don't check-in before it ends, alerts will be sent to your contacts
+                    automatically.</p>
+                <div class="checkin-controls">
+                    <select id="checkinDuration">
+                        <option value="5">5 minutes</option>
+                        <option value="10">10 minutes</option>
+                        <option value="15" selected>15 minutes</option>
+                        <option value="30">30 minutes</option>
+                        <option value="60">1 hour</option>
+                    </select>
+                    <button class="start-timer-btn" id="timerToggleBtn" onclick="toggleCheckInTimer()">Start
+                        Timer</button>
+                </div>
+                <div class="timer-display" id="timerDisplay" style="display:none;">
+                    <div class="timer-ring">
+                        <span id="timerCountdown">15:00</span>
+                    </div>
+                    <p id="timerStatusMsg">Stay safe! Timer running...</p>
+                    <button class="checkin-now-btn" onclick="checkInNow()"><i class="fas fa-check"></i> I'm Safe — Check
+                        In</button>
+                </div>
+            </div>
+
+            <!-- Safety Dashboard Stats -->
+            <div class="safety-dashboard">
+                <div class="dash-stat">
+                    <i class="fas fa-location-arrow"></i>
+                    <div>
+                        <span class="dash-val" id="dashArea">Detecting...</span>
+                        <span class="dash-lbl">Your Area</span>
+                    </div>
+                </div>
+                <div class="dash-stat">
+                    <i class="fas fa-shield-halved" style="color:#4caf50;"></i>
+                    <div>
+                        <span class="dash-val" id="dashScore" style="color:#4caf50;">--</span>
+                        <span class="dash-lbl">Safety Score</span>
+                    </div>
+                </div>
+                <div class="dash-stat">
+                    <i class="fas fa-clock" style="color:#ff9800;"></i>
+                    <div>
+                        <span class="dash-val" id="dashTime">--:--</span>
+                        <span class="dash-lbl">Local Time</span>
+                    </div>
+                </div>
+                <div class="dash-stat">
+                    <i class="fas fa-database" style="color:#00d2ff;"></i>
+                    <div>
+                        <span class="dash-val" id="dashDb">Connecting...</span>
+                        <span class="dash-lbl">Database</span>
+                    </div>
+                </div>
+                <div class="dash-stat">
+                    <i class="fas fa-satellite-dish" style="color:#9d4edd;"></i>
+                    <div>
+                        <span class="dash-val" id="dashGps">Detecting...</span>
+                        <span class="dash-lbl">GPS Signal</span>
+                    </div>
+                </div>
+                <div class="dash-stat">
+                    <i class="fas fa-lightbulb" style="color:#ffeb3b;"></i>
+                    <div>
+                        <span class="dash-val" id="dashLights">Scanning...</span>
+                        <span class="dash-lbl">Street Lighting</span>
+                    </div>
+                </div>
+            </div>
+
+            </div>
+        </section>
+
+        <!-- ROUTE PLANNER SECTION -->
+        <section id="route" class="section-container" style="display: none;">
+            <div class="section-header">
+                <h2><i class="fas fa-route"></i> Safe Route Planner</h2>
+                <p>Apni location se destination tak ka safe rasta chuno — danger zones avoid karo.</p>
+            </div>
+
+            <div class="route-planner-card">
+                <!-- From / To Inputs -->
+                <div class="route-inputs">
+                    <div class="route-field">
+                        <label><i class="fas fa-circle" style="color:#4caf50;font-size:10px;"></i> Starting
+                            Point</label>
+                        <input type="text" id="routeFrom" placeholder="Your current location (auto-detected)" readonly>
+                    </div>
+                    <div class="route-arrow"><i class="fas fa-arrow-down"></i></div>
+                    <div class="route-field">
+                        <label><i class="fas fa-location-dot" style="color:#ff3366;"></i> Destination</label>
+                        <input type="text" id="routeTo" placeholder="Search destination...">
+                    </div>
+                </div>
+
+                <!-- Route Mode Selector -->
+                <div class="route-modes">
+                    <button class="route-mode-btn active" id="modeSafe" onclick="setRouteMode('safe')">
+                        <i class="fas fa-shield-halved"></i> Safest Route
+                    </button>
+                    <button class="route-mode-btn" id="modeFast" onclick="setRouteMode('fast')">
+                        <i class="fas fa-bolt"></i> Fastest Route
+                    </button>
+                    <button class="route-mode-btn" id="modeWalk" onclick="setRouteMode('walk')">
+                        <i class="fas fa-person-walking"></i> Walking
+                    </button>
+                </div>
+
+                <!-- Calculate Button -->
+                <button class="calculate-route-btn" onclick="calculateRoute()">
+                    <i class="fas fa-map-location-dot"></i> Find Safe Route
+                </button>
+
+                <!-- Route Info Panel (shown after route found) -->
+                <div class="route-info-panel" id="routeInfoPanel" style="display:none;">
+                    <div class="route-stat">
+                        <i class="fas fa-clock"></i>
+                        <div>
+                            <span class="stat-label">Est. Time</span>
+                            <span class="stat-value" id="routeTime">-- mins</span>
+                        </div>
+                    </div>
+                    <div class="route-stat">
+                        <i class="fas fa-road"></i>
+                        <div>
+                            <span class="stat-label">Distance</span>
+                            <span class="stat-value" id="routeDistance">-- km</span>
+                        </div>
+                    </div>
+                    <div class="route-stat">
+                        <i class="fas fa-shield-halved"></i>
+                        <div>
+                            <span class="stat-label">Safety Risk</span>
+                            <span class="stat-value" id="routeSafety" style="color:#4caf50;">Safe</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Emergency Facilities in Planner -->
+                <div class="planner-facilities mt-6 border-t border-white/10 pt-4">
+                    <p class="text-[10px] uppercase text-white/30 tracking-widest text-center mb-4">Emergency Support Nearby</p>
+                    <div class="grid grid-cols-2 gap-4">
+                        <button onclick="findNearest('hospital')" class="facility-pill hospital">
+                            <i class="fas fa-hospital-user"></i> Hospital
+                        </button>
+                        <button onclick="findNearest('police')" class="facility-pill police">
+                            <i class="fas fa-building-shield"></i> Police
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ROUTE TIME FORECAST -->
+                <div class="route-forecast-container" id="routeForecast" style="display:none;">
+                    <div class="forecast-item">
+                        <i class="fas fa-sun text-yellow-400"></i>
+                        <span class="f-lbl">Morning</span>
+                        <span class="f-val" id="routeScoreMorning">--</span>
+                    </div>
+                    <div class="forecast-item">
+                        <i class="fas fa-cloud-sun text-orange-400"></i>
+                        <span class="f-lbl">Evening</span>
+                        <span class="f-val" id="routeScoreEvening">--</span>
+                    </div>
+                    <div class="forecast-item">
+                        <i class="fas fa-moon text-blue-400"></i>
+                        <span class="f-lbl">Night</span>
+                        <span class="f-val" id="routeScoreNight">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Route Map -->
+            <div id="routeMap" style="width:100%;height:420px;border-radius:14px;
+                 border:1px solid rgba(255,255,255,0.1);margin-top:1.5rem;
+                 overflow:hidden;"></div>
+
+            <p class="route-hint">
+                <i class="fas fa-info-circle"></i>
+                Red zones = High crime area. Green zones = Safe. Route line avoids danger zones automatically.
+            </p>
+        </section>
+
+        <!-- 2. CONTACTS SECTION -->
+        <section id="contacts" class="section-container" style="display: none;">
+            <div class="section-header">
+                <h2>Emergency Contacts</h2>
+                <p>Your trusted circle and emergency services.</p>
+            </div>
+
+            <div class="add-contact-container">
+                <h3><i class="fas fa-user-plus"></i> Add Personal Contact</h3>
+                <form id="addContactForm" class="add-contact-form" onsubmit="addCustomContact(event)">
+                    <div class="input-row">
+                        <input type="text" id="contactName" placeholder="Contact Name (e.g. Alice)" required>
+                        <input type="tel" id="contactPhone" placeholder="Phone Number" required>
+                        <button type="submit" class="add-btn">Save Contact</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="contacts-grid" id="contactsGrid">
+                <!-- Immutable Emergency Services -->
+                <div class="contact-card police">
+                    <div class="contact-icon"><i class="fas fa-bullhorn"></i></div>
+                    <div class="contact-info">
+                        <h3>Police / Emergency</h3>
+                        <p>112 / 100</p>
+                    </div>
+                    <a href="tel:112" class="call-btn-link">Call</a>
+                </div>
+                <div class="contact-card help">
+                    <div class="contact-icon"><i class="fas fa-female"></i></div>
+                    <div class="contact-info">
+                        <h3>Women Helpline</h3>
+                        <p>1091</p>
+                    </div>
+                    <a href="tel:1091" class="call-btn-link">Call</a>
+                </div>
+                <!-- Dynamic Personal Contacts will be injected here via JavaScript -->
+            </div>
+        </section>
+
+        <!-- 4. PRO COMMAND CENTER SECTION -->
+        <section id="pro-center" class="section-container" style="display: none;">
+            <div class="max-w-6xl mx-auto py-12 px-6">
+                <!-- Pro Header -->
+                <div class="text-center mb-12 animate-fadeIn">
+                    <h2 class="text-5xl font-black text-white italic uppercase tracking-tighter mb-4">Pro Command Center
+                    </h2>
+                    <div
+                        class="inline-flex items-center bg-premium-gold text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-premium-gold/20">
+                        <i class="fas fa-crown mr-2"></i> Elite Safety Access
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Left: Elite Tools Arsenal -->
+                    <div class="lg:col-span-2 space-y-8">
+                        <div class="bg-zinc-900/80 border border-premium-gold/20 rounded-[3rem] p-8 backdrop-blur-xl">
+                            <h3 class="text-xl font-bold text-white mb-8 flex items-center">
+                                <i class="fas fa-shield-halved mr-3 text-premium-gold"></i> Advanced Tactical Tools
+                            </h3>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <!-- Fake Call -->
+                                <button onclick="initiateProfessionalFakeCall()"
+                                    class="p-6 bg-white/5 rounded-[2rem] border border-white/5 hover:border-premium-gold/30 hover:bg-white/10 transition-all text-left group">
+                                    <div
+                                        class="w-14 h-14 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500 mb-6 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-phone-volume text-2xl"></i>
+                                    </div>
+                                    <h4 class="text-white font-black uppercase text-xs tracking-widest mb-2">
+                                        Professional Fake Call</h4>
+                                    <p class="text-zinc-500 text-[11px] leading-relaxed">Schedule a realistic incoming
+                                        call to excuse yourself from any situation.</p>
+                                </button>
+
+                                <!-- Shadow Guardian -->
+                                <button onclick="toggleShadowGuardian()" id="guardianBtnPro"
+                                    class="p-6 bg-white/5 rounded-[2rem] border border-white/5 hover:border-premium-gold/30 hover:bg-white/10 transition-all text-left group">
+                                    <div
+                                        class="w-14 h-14 bg-safety-purple/10 rounded-2xl flex items-center justify-center text-safety-purple mb-6 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-user-secret text-2xl"></i>
+                                    </div>
+                                    <h4 class="text-white font-black uppercase text-xs tracking-widest mb-2">Shadow
+                                        Guardian</h4>
+                                    <p class="text-zinc-500 text-[11px] leading-relaxed">Proactive path monitoring.
+                                        Alerts contacts if you deviate or stop unexpectedly.</p>
+                                </button>
+
+                                <!-- Voice SOS -->
+                                <button onclick="toggleVoiceSOS()" id="voiceSOSBtnPro"
+                                    class="p-6 bg-white/5 rounded-[2rem] border border-white/5 hover:border-premium-gold/30 hover:bg-white/10 transition-all text-left group">
+                                    <div
+                                        class="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center text-blue-400 mb-6 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-microphone text-2xl"></i>
+                                    </div>
+                                    <h4 class="text-white font-black uppercase text-xs tracking-widest mb-2">Voice
+                                        Recognition SOS</h4>
+                                    <p class="text-zinc-500 text-[11px] leading-relaxed">Hands-free emergency activation
+                                        using encrypted voice keywords.</p>
+                                </button>
+
+                                <!-- Shake SOS -->
+                                <button onclick="toggleShakeSOS()" id="shakeBtnPro"
+                                    class="p-6 bg-white/5 rounded-[2rem] border border-white/5 hover:border-premium-gold/30 hover:bg-white/10 transition-all text-left group">
+                                    <div
+                                        class="w-14 h-14 bg-orange-500/10 rounded-2xl flex items-center justify-center text-orange-400 mb-6 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-mobile-screen-button text-2xl"></i>
+                                    </div>
+                                    <h4 class="text-white font-black uppercase text-xs tracking-widest mb-2">Intelligent
+                                        Shake SOS</h4>
+                                    <p class="text-zinc-500 text-[11px] leading-relaxed">High-sensitivity accelerometer
+                                        triggers SOS on rapid movement detection.</p>
+                                </button>
+                            </div>
+                            < <!-- Aura Scanner Info Card -->
+                                <div
+                                    class="p-6 rounded-3xl bg-black/40 border border-white/5 backdrop-blur-2xl relative overflow-hidden group hover:border-safety-purple/50 transition-all">
+                                    <div
+                                        class="absolute -right-4 -top-4 w-24 h-24 bg-safety-purple/10 blur-3xl rounded-full">
+                                    </div>
+                                    <div class="flex items-center gap-6">
+                                        <div
+                                            class="w-16 h-16 bg-safety-purple/20 rounded-2xl flex items-center justify-center text-safety-purple text-2xl group-hover:scale-110 transition-transform">
+                                            <i class="fas fa-satellite-dish animate-pulse"></i>
+                                        </div>
+                                        <div class="flex-1">
+                                            <h4 class="text-white font-bold mb-1">Aura Matrix Scanner</h4>
+                                            <p class="text-[10px] text-zinc-500 uppercase font-black leading-tight">Live
+                                                proximity monitoring. Scan nearby guardians and safe zones
+                                                automatically.</p>
+                                        </div>
+                                    </div>
+                                    <button onclick="toggleAuraRadar()"
+                                        class="w-full mt-6 bg-safety-purple text-white py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-safety-purple/80 transition-all shadow-lg shadow-safety-purple/20">
+                                        Launch Aura Scan
+                                    </button>
+                                </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Membership & Billing -->
+                    <div class="space-y-8">
+                        <div class="bg-zinc-900/80 border border-premium-gold/20 rounded-[3rem] p-8 backdrop-blur-xl">
+                            <h3 class="text-xl font-bold text-white mb-8 flex items-center">
+                                <i class="fas fa-id-card-clip mr-3 text-premium-gold"></i> Membership
+                            </h3>
+
+                            <div class="space-y-4">
+                                <div class="p-5 bg-white/5 rounded-[1.5rem] border border-white/5">
+                                    <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">Status</p>
+                                    <h4 class="text-premium-gold font-black italic uppercase">ACTIVE PRO</h4>
+                                </div>
+                                <div class="p-5 bg-white/5 rounded-[1.5rem] border border-white/5">
+                                    <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">Next Billing</p>
+                                    <h4 class="text-white font-black">May 5, 2026</h4>
+                                </div>
+                            </div>
+
+                            <hr class="my-8 border-white/5">
+
+                            <div class="space-y-4">
+                                <button onclick="showPaymentMethods()"
+                                    class="w-full flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all">
+                                    <span class="text-white text-xs font-bold">Payment Methods</span>
+                                    <i class="fas fa-chevron-right text-zinc-700"></i>
+                                </button>
+                                <button onclick="showBillingHistory()"
+                                    class="w-full flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all">
+                                    <span class="text-white text-xs font-bold">Billing History</span>
+                                    <i class="fas fa-chevron-right text-zinc-700"></i>
+                                </button>
+                                <button onclick="showTransactionHistory()"
+                                    class="w-full flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all">
+                                    <span class="text-white text-xs font-bold">Audit Logs</span>
+                                    <i class="fas fa-chevron-right text-zinc-700"></i>
+                                </button>
+                            </div>
+
+                            <div class="flex flex-col gap-4 mt-8">
+                                <button onclick="cancelSubscription()"
+                                    class="w-full py-4 text-red-500/50 hover:text-red-500 text-[10px] font-black uppercase tracking-widest transition-all">
+                                    Cancel Pro Access
+                                </button>
+                                <button onclick="logout()"
+                                    class="w-full py-4 bg-red-500 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-red-600 transition-all shadow-[0_10px_30px_rgba(239,68,68,0.3)]">
+                                    <i class="fas fa-power-off mr-2"></i> Immediate Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. SECURITY RECORDS SECTION -->
+        <section id="records" class="section-container" style="display:none;">
+            <div class="section-header">
+                <h2>Security Evidence Vault</h2>
+                <p>Cloud-synced logs and encrypted incident records.</p>
+            </div>
+
+            <div id="evidenceDashboard"
+                class="bg-black/40 p-8 rounded-[3rem] border border-white/5 backdrop-blur-3xl shadow-2xl relative overflow-hidden">
+                <!-- Background Glow -->
+                <div class="absolute -top-24 -right-24 w-64 h-64 bg-safety-purple/20 blur-[100px] rounded-full"></div>
+
+                <h3 class="text-2xl font-black text-white mb-8 flex items-center justify-between relative z-10">
+                    <span class="flex items-center"><i class="fas fa-box-archive mr-4 text-premium-gold"></i> Incident
+                        History</span>
+                    <button onclick="clearLogs()"
+                        class="text-[10px] bg-red-500/10 text-red-500 px-4 py-2 rounded-full border border-red-500/20 hover:bg-red-500 hover:text-white transition-all uppercase tracking-widest font-bold">
+                        Clear All Logs
+                    </button>
+                </h3>
+
+                <div class="space-y-4 relative z-10" id="evidenceHistory">
+                    <!-- Logs injection -->
+                </div>
+
+                <div class="mt-12 p-6 rounded-2xl bg-white/5 border border-white/5 text-center">
+                    <i class="fas fa-cloud-check text-safety-purple text-3xl mb-3"></i>
+                    <p class="text-xs text-zinc-500 uppercase tracking-widest leading-relaxed">
+                        All evidence is automatically encrypted with AES-256 <br> and synced to secure off-site servers.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. SAFETY TIPS SECTION -->
+        <section id="tips" class="section-container" style="display: none;">
+            <div class="section-header">
+                <h2>Safety Tips & Guidelines</h2>
+                <p>Keep these in mind for your personal security.</p>
+            </div>
+
+            <div class="tips-grid">
+                <!-- ... existing tips ... -->
+                <div class="tip-card">
+                    <div class="tip-icon"><i class="fas fa-walking"></i></div>
+                    <h4>Stay Aware</h4>
+                    <p>Avoid distractions like texting while walking alone. Be mindful of your surroundings at all
+                        times.</p>
+                </div>
+                <!-- ... other cards ... -->
+            </div>
+
+            <!-- PREMIUM SAFETY SHOP -->
+            <div
+                class="mt-12 bg-zinc-900 overflow-hidden rounded-3xl border border-premium-gold/20 shadow-2xl shadow-premium-gold/5">
+                <div class="bg-gradient-to-r from-premium-gold to-yellow-600 p-6 flex justify-between items-center">
+                    <div>
+                        <h3 class="text-2xl font-black text-black m-0 uppercase tracking-tighter">Premium Safety Shop
+                        </h3>
+                        <p class="text-black/70 font-bold text-xs">Professional-grade security gear for modern women.
+                        </p>
+                    </div>
+                    <i class="fas fa-shopping-cart text-3xl text-black/40"></i>
+                </div>
+                <div class="p-8">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <!-- Product 1 -->
+                        <div
+                            class="bg-black/60 p-5 rounded-2xl border border-white/5 hover:border-premium-gold/50 transition-all group">
+                            <div
+                                class="h-44 bg-zinc-800/50 rounded-xl mb-4 flex items-center justify-center overflow-hidden relative">
+                                <span
+                                    class="absolute top-2 left-2 bg-premium-gold text-black text-[10px] font-black px-2 py-1 rounded">BEST
+                                    SELLER</span>
+                                <i
+                                    class="fas fa-shield-virus text-6xl text-premium-gold/30 group-hover:scale-125 transition-transform duration-500"></i>
+                            </div>
+                            <h4 class="text-white font-bold text-lg">Police Grade CS Spray</h4>
+                            <p class="text-gray-500 text-xs mb-6">Invisible UV dye for suspect identification. 15ft
+                                blast range.</p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-white text-xl font-black">₹499 <span
+                                        class="text-[10px] text-gray-600 line-through">₹899</span></span>
+                                <button
+                                    class="bg-premium-gold text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">Buy
+                                    Now</button>
+                            </div>
+                        </div>
+                        <!-- Product 2 -->
+                        <div
+                            class="bg-black/60 p-5 rounded-2xl border border-white/5 hover:border-premium-gold/50 transition-all group">
+                            <div
+                                class="h-44 bg-zinc-800/50 rounded-xl mb-4 flex items-center justify-center overflow-hidden">
+                                <i
+                                    class="fas fa-bolt-lightning text-6xl text-premium-gold/30 group-hover:scale-125 transition-transform duration-500"></i>
+                            </div>
+                            <h4 class="text-white font-bold text-lg">Stun Flashlight Pro</h4>
+                            <div class="flex space-x-1 mb-2">
+                                <i class="fas fa-star text-premium-gold text-[10px]"></i>
+                                <i class="fas fa-star text-premium-gold text-[10px]"></i>
+                                <i class="fas fa-star text-premium-gold text-[10px]"></i>
+                                <i class="fas fa-star text-premium-gold text-[10px]"></i>
+                                <i class="fas fa-star text-premium-gold text-[10px]"></i>
+                            </div>
+                            <p class="text-gray-500 text-xs mb-6">5 million volt discharge. Ultra-bright blinding CREE
+                                LED.</p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-white text-xl font-black">₹1,299</span>
+                                <button
+                                    class="bg-premium-gold text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">Buy
+                                    Now</button>
+                            </div>
+                        </div>
+                        <!-- Product 3 -->
+                        <div
+                            class="bg-black/60 p-5 rounded-2xl border border-white/5 hover:border-premium-gold/50 transition-all group">
+                            <div
+                                class="h-44 bg-zinc-800/50 rounded-xl mb-4 flex items-center justify-center overflow-hidden">
+                                <i
+                                    class="fas fa-satellite text-6xl text-premium-gold/30 group-hover:scale-125 transition-transform duration-500"></i>
+                            </div>
+                            <h4 class="text-white font-bold text-lg">Smart GPS Jewelry</h4>
+                            <p class="text-gray-500 text-xs mb-6">Discrete necklace with one-tap location broadcasting.
+                            </p>
+                            <div class="flex items-center justify-between">
+                                <span class="text-white text-xl font-black">₹2,499</span>
+                                <button
+                                    class="bg-premium-gold text-black px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">Buy
+                                    Now</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FREE SAFETY KIT (PRO-BONO FEATURE) -->
+            <div class="mt-12 bg-green-900/20 p-6 rounded-2xl border border-green-500/30">
+                <h3 class="text-2xl font-bold text-white mb-2 flex items-center">
+                    <i class="fas fa-gift mr-3 text-green-400"></i> Free Safety Kit Initiative
+                </h3>
+                <p class="text-gray-400 mb-6 italic text-sm">Safe Her initiative: Request essential safety tools for
+                    free. Priority for students and night-shifters.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Product 1 -->
+                    <div
+                        class="bg-black/40 p-4 rounded-xl border border-white/10 hover:border-premium-gold transition-all group">
+                        <div class="h-40 bg-zinc-800 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                            <i
+                                class="fas fa-spray-can text-5xl text-gray-500 group-hover:scale-110 transition-transform"></i>
+                        </div>
+                        <h4 class="text-white font-bold">Max-Strength Pepper Spray</h4>
+                        <p class="text-gray-400 text-sm mb-4">Quick-release keychain, 10ft range.</p>
+                        <div class="flex items-center justify-between">
+                            <span class="text-green-400 font-bold">FREE</span>
+                            <button
+                                class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-opacity-80"
+                                onclick="showToast('Request Received! We will contact you for delivery.', 'success')">Claim
+                                Free</button>
+                        </div>
+                    </div>
+                    <!-- Product 2 -->
+                    <div
+                        class="bg-black/40 p-4 rounded-xl border border-white/10 hover:border-premium-gold transition-all group">
+                        <div class="h-40 bg-zinc-800 rounded-lg mb-4 flex items-center justify-center">
+                            <i
+                                class="fas fa-bullhorn text-5xl text-gray-500 group-hover:scale-110 transition-transform"></i>
+                        </div>
+                        <h4 class="text-white font-bold">Personal Safety Alarm</h4>
+                        <p class="text-gray-400 text-sm mb-4">130dB siren with LED flashlight.</p>
+                        <div class="flex items-center justify-between">
+                            <span class="text-green-400 font-bold">FREE</span>
+                            <button
+                                class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-opacity-80"
+                                onclick="showToast('Request Received! We will contact you for delivery.', 'success')">Claim
+                                Free</button>
+                        </div>
+                    </div>
+                    <!-- Product 3 -->
+                    <div
+                        class="bg-black/40 p-4 rounded-xl border border-white/10 hover:border-premium-gold transition-all group">
+                        <div class="h-40 bg-zinc-800 rounded-lg mb-4 flex items-center justify-center">
+                            <i
+                                class="fas fa-location-dot text-5xl text-gray-500 group-hover:scale-110 transition-transform"></i>
+                        </div>
+                        <h4 class="text-white font-bold">Hidden GPS Tracker</h4>
+                        <p class="text-gray-400 text-sm mb-4">Mini real-time tracking for bags.</p>
+                        <div class="flex items-center justify-between">
+                            <span class="text-green-400 font-bold">FREE</span>
+                            <button
+                                class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-opacity-80"
+                                onclick="showToast('Request Received! We will contact you for delivery.', 'success')">Claim
+                                Free</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. PREMIUM DASHBOARD SECTION -->
+        <section id="premium" class="section-container" style="display: none;">
+            <div class="max-w-4xl mx-auto py-12 px-6">
+                <div class="bg-zinc-900 border border-premium-gold/30 rounded-[2rem] overflow-hidden">
+                    <div class="p-8 md:p-12 bg-gradient-to-br from-zinc-800 to-black">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-12">
+                            <div>
+                                <h2 class="text-4xl font-black text-white mb-2 italic uppercase">Premium Dashboard</h2>
+                                <p class="text-premium-gold font-bold tracking-widest text-xs uppercase">Level Up Your
+                                    Security Status</p>
+                            </div>
+                            <div
+                                class="mt-6 md:mt-0 bg-premium-gold text-black px-6 py-3 rounded-2xl font-black shadow-lg shadow-premium-gold/20 flex items-center">
+                                <i class="fas fa-crown mr-3"></i> ACTIVE PRO MEMBER
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                            <div class="bg-black/40 border border-white/5 p-6 rounded-3xl">
+                                <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">Billing Cycle</p>
+                                <h4 class="text-white font-black text-xl">Monthly</h4>
+                                <p class="text-zinc-600 text-[10px] mt-2">Next payment: May 5, 2026</p>
+                            </div>
+                            <div class="bg-black/40 border border-white/5 p-6 rounded-3xl">
+                                <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">Plan Cost</p>
+                                <h4 class="text-white font-black text-xl">₹1.00 <span
+                                        class="text-xs text-gray-600">/mo</span></h4>
+                                <p class="text-green-500 text-[10px] mt-2 flex items-center"><i
+                                        class="fas fa-check-circle mr-1"></i> Auto-renewal ON</p>
+                            </div>
+                            <div class="bg-black/40 border border-white/5 p-6 rounded-3xl">
+                                <p class="text-gray-500 text-[10px] font-bold uppercase mb-1">Current Status</p>
+                                <h4 class="text-premium-gold font-black text-xl italic uppercase">Verified Pro</h4>
+                                <div class="w-full bg-zinc-800 h-1.5 mt-3 rounded-full overflow-hidden">
+                                    <div class="bg-premium-gold w-[92%] h-full"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <!-- Payment Methods -->
+                            <button onclick="showPaymentMethods()"
+                                class="w-full flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors group">
+                                <div class="flex items-center">
+                                    <div
+                                        class="w-12 h-12 bg-premium-gold/20 rounded-2xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-credit-card text-premium-gold"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <h4 class="text-white font-bold">Payment Methods</h4>
+                                        <p class="text-gray-500 text-xs">Manage your UPI and cards</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-700"></i>
+                            </button>
+
+                            <!-- Billing History -->
+                            <button onclick="showBillingHistory()"
+                                class="w-full flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors group">
+                                <div class="flex items-center">
+                                    <div
+                                        class="w-12 h-12 bg-premium-gold/20 rounded-2xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-receipt text-premium-gold"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <h4 class="text-white font-bold">Billing History</h4>
+                                        <p class="text-gray-500 text-xs">View and download invoices</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-700"></i>
+                            </button>
+
+                            <!-- Transaction History -->
+                            <button onclick="showTransactionHistory()"
+                                class="w-full flex items-center justify-between p-6 bg-white/5 rounded-3xl border border-white/5 hover:bg-white/10 transition-colors group">
+                                <div class="flex items-center">
+                                    <div
+                                        class="w-12 h-12 bg-premium-gold/20 rounded-2xl flex items-center justify-center mr-4 group-hover:scale-110 transition-transform">
+                                        <i class="fas fa-list-check text-premium-gold"></i>
+                                    </div>
+                                    <div class="text-left">
+                                        <h4 class="text-white font-bold">Transaction History</h4>
+                                        <p class="text-gray-500 text-xs">Technical audit of recent payments</p>
+                                    </div>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-700"></i>
+                            </button>
+                        </div>
+
+                        <button onclick="cancelSubscription()"
+                            class="w-full mt-12 py-5 text-gray-500 font-bold text-xs uppercase tracking-[0.2em] border border-white/5 hover:text-red-500 hover:border-red-500/30 transition-all rounded-3xl">
+                            Cancel Subscription
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. AUTHENTICATION SECTION -->
+        <!-- 5. LOGIN SECTION -->
+        <section id="loginView" class="section-container premium-auth-bg active-section">
+            <div class="auth-box auth-midnight-gold luxury-card">
+                <div class="auth-header">
+                    <h2 class="text-gold shimmer-text">Secure Access</h2>
+                    <p>Enter your credentials to access your safety dashboard</p>
+                </div>
+
+                <form id="loginForm" class="auth-form active">
+                    <div class="input-group">
+                        <label>Email Address</label>
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="loginEmail" placeholder="Enter your email" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Password</label>
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="loginPassword" placeholder="Enter password" required>
+                    </div>
+                    <button type="submit" class="auth-submit">Authorize Session</button>
+
+                    <div class="flex items-center my-6">
+                        <div class="line"></div>
+                        <span class="px-3 text-[10px] text-zinc-600 font-bold uppercase">OR CONTINUE WITH</span>
+                        <div class="line"></div>
+                    </div>
+
+                    <!-- Official Google Button Container (Required for real SSO to work without browser errors) -->
+                    <div id="googleBtnLogin" class="w-full mb-4"></div>
+
+                    <!-- Fallback Sync (Hidden if Real Google is active) -->
+                    <button id="googleContinueBtn" type="button" onclick="openGoogleAccountPicker()"
+                        class="hidden w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-bold py-3 px-6 rounded-2xl border border-gray-200 hover:bg-gray-50 hover:shadow-lg transition-all active:scale-95"
+                        style="min-height:48px;">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"
+                            style="width:22px;height:22px;">
+                        <span style="font-size:0.95rem;">Continue with Google (Sync)</span>
+                    </button>
+
+                    <p class="auth-footer-link">New to Safe Her? <a href="#signupView"
+                            onclick="switchSection('signupView')">Create a Identity</a></p>
+                </form>
+            </div>
+        </section>
+
+        <!-- 6. SIGNUP SECTION -->
+        <section id="signupView" class="section-container premium-auth-bg" style="display: none;">
+            <div class="auth-box auth-midnight-gold luxury-card">
+                <div class="auth-header">
+                    <h2 class="text-gold shimmer-text">New Identity</h2>
+                    <p>Join our protection network and start your safety journey</p>
+                </div>
+
+                <form id="signupForm" class="auth-form active">
+                    <div class="input-group">
+                        <label>Full Name</label>
+                        <i class="fas fa-user"></i>
+                        <input type="text" id="signupName" placeholder="Enter your name" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Email Address</label>
+                        <i class="fas fa-envelope"></i>
+                        <input type="email" id="signupEmail" placeholder="Enter your email" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Phone Number</label>
+                        <i class="fas fa-phone"></i>
+                        <input type="tel" id="signupPhone" placeholder="Enter phone number" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Password</label>
+                        <i class="fas fa-lock"></i>
+                        <input type="password" id="signupPassword" placeholder="Create a password" required>
+                    </div>
+                    <button type="submit" class="auth-submit">Create My Identity</button>
+
+                    <div class="flex items-center my-6">
+                        <div class="line"></div>
+                        <span class="px-3 text-[10px] text-zinc-600 font-bold uppercase">OR CONTINUE WITH</span>
+                        <div class="line"></div>
+                    </div>
+
+                    <!-- Official Google Button Container (Signup) -->
+                    <div id="googleBtnSignup" class="w-full mb-4"></div>
+
+                    <button id="googleContinueBtnSignup" type="button" onclick="openGoogleAccountPicker()"
+                        class="hidden w-full flex items-center justify-center gap-3 bg-white text-gray-800 font-bold py-3 px-6 rounded-2xl border border-gray-200 hover:bg-gray-50 hover:shadow-lg transition-all active:scale-95"
+                        style="min-height:48px;">
+                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"
+                            style="width:22px;height:22px;">
+                        <span style="font-size:0.95rem;">Continue with Google (Sync)</span>
+                    </button>
+
+                    <p class="auth-footer-link">Already protected? <a href="#loginView"
+                            onclick="switchSection('loginView')">Login to Session</a></p>
+                </form>
+            </div>
+        </section>
+        </div>
+        </section>
+
+        <!-- 6. FEEDBACK SECTION -->
+        <section id="feedback" class="section-container" style="display: none;">
+            <div class="max-w-4xl mx-auto py-12 px-6">
+                <div class="bg-zinc-900/80 border border-safety-purple/20 rounded-[3rem] p-12 backdrop-blur-xl">
+                    <div class="text-center mb-12">
+                        <div
+                            class="w-20 h-20 bg-safety-purple/10 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+                            <i class="fas fa-comment-dots text-4xl text-safety-purple"></i>
+                        </div>
+                        <h2 class="text-4xl font-black text-white italic uppercase tracking-tighter mb-4">Your
+                            Experience Matters</h2>
+                        <p class="text-zinc-500 font-medium">Help us improve Safe Her by sharing your safety feedback or
+                            reporting app issues.</p>
+                    </div>
+
+                    <form id="feedbackForm" onsubmit="submitFeedback(event)" class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <label class="text-[10px] text-zinc-600 font-black uppercase tracking-widest ml-4">Full
+                                    Name</label>
+                                <input type="text" id="fbName" placeholder="Anonymous"
+                                    class="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-white focus:border-safety-purple outline-none transition-all">
+                            </div>
+                            <div class="space-y-2">
+                                <label
+                                    class="text-[10px] text-zinc-600 font-black uppercase tracking-widest ml-4">Category</label>
+                                <select id="fbCategory"
+                                    class="w-full bg-black/40 border border-white/5 rounded-2xl px-6 py-4 text-white focus:border-safety-purple outline-none transition-all appearance-none cursor-pointer">
+                                    <option value="General">General Feedback</option>
+                                    <option value="Safety">Safety Concern</option>
+                                    <option value="Feature">Feature Request</option>
+                                    <option value="Bug">Technical Bug</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <label class="text-[10px] text-zinc-600 font-black uppercase tracking-widest ml-4">Detailed
+                                Message</label>
+                            <textarea id="fbMessage" rows="5" placeholder="Tell us about your experience..."
+                                class="w-full bg-black/40 border border-white/5 rounded-[2rem] px-6 py-4 text-white focus:border-safety-purple outline-none transition-all"
+                                required></textarea>
+                        </div>
+
+                        <div class="flex flex-col md:flex-row items-center justify-between gap-8 pt-6">
+                            <div class="flex flex-col items-center md:items-start">
+                                <p class="text-[10px] text-zinc-600 font-black uppercase tracking-widest mb-3">Overall
+                                    Rating</p>
+                                <div class="flex space-x-3 text-2xl text-zinc-800" id="fbRating">
+                                    <i class="fas fa-star cursor-pointer hover:scale-125 transition-all hover:text-yellow-500"
+                                        onclick="setFbRating(1)"></i>
+                                    <i class="fas fa-star cursor-pointer hover:scale-125 transition-all hover:text-yellow-500"
+                                        onclick="setFbRating(2)"></i>
+                                    <i class="fas fa-star cursor-pointer hover:scale-125 transition-all hover:text-yellow-500"
+                                        onclick="setFbRating(3)"></i>
+                                    <i class="fas fa-star cursor-pointer hover:scale-125 transition-all hover:text-yellow-500"
+                                        onclick="setFbRating(4)"></i>
+                                    <i class="fas fa-star cursor-pointer hover:scale-125 transition-all hover:text-yellow-500"
+                                        onclick="setFbRating(5)"></i>
+                                </div>
+                            </div>
+                            <button type="submit"
+                                class="w-full md:w-auto bg-gradient-to-r from-safety-purple to-indigo-600 text-white px-12 py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-105 hover:shadow-2xl hover:shadow-purple-500/30 transition-all">
+                                Send Report <i class="fas fa-paper-plane ml-2"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FLOATING FAKE CHAT ASSISTANT -->
+    <div class="chat-wrapper">
+        <div class="chat-container" id="chatBox">
+            <div class="chat-header">
+                <div>
+                    <i class="fas fa-robot"></i>
+                    <span>Safety Assistant</span>
+                </div>
+                <button class="close-chat" onclick="toggleChat()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="chat-body" id="chatBody">
+                <div class="message bot">
+                    Hello! I'm your digital safety assistant. How can I help you today?
+                </div>
+            </div>
+            <div class="chat-footer">
+                <input type="text" id="chatInput" placeholder="Type a message..." onkeypress="handleChatEnter(event)">
+                <button onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+        <button class="chat-fab" onclick="toggleChat()">
+            <i class="fas fa-comment-dots"></i>
+        </button>
+    </div>
+
+    <!-- Low Battery Guardian Modal -->
+    <div id="batteryModal" class="battery-modal" style="display: none;">
+        <div class="battery-modal-content">
+            <div class="battery-icon-large">
+                <i class="fas fa-battery-empty pulse-red"></i>
+            </div>
+            <h2>Low Battery Warning!</h2>
+            <p>Your battery is below 15%. For your safety, please check-in within 2 minutes or an emergency alert will
+                be sent to your contacts.</p>
+            <div class="battery-timer" id="batteryCountdown">120</div>
+            <button class="battery-checkin-btn" onclick="batteryCheckIn()"><i class="fas fa-check"></i> I'M
+                ALRIGHT</button>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <!-- OpenStreetMap Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Leaflet Routing Machine JS -->
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    <!-- Leaflet Geocoder JS -->
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <!-- 💰 CUSTOM PREMIUM PAYMENT SIMULATOR MODAL -->
+    <div id="customPaymentSimulator"
+        class="fixed inset-0 z-[250000] bg-black/95 backdrop-blur-md hidden items-center justify-center p-6 transition-all duration-300">
+        <div
+            class="bg-zinc-950 border border-[#D4AF37]/40 rounded-[2rem] w-full max-w-lg overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.15)] relative">
+
+            <!-- Header -->
+            <div
+                class="bg-gradient-to-r from-zinc-900 to-black p-6 border-b border-[#D4AF37]/20 flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-shield-halved text-[#D4AF37] text-2xl"></i>
+                    <h3 class="text-white font-black italic tracking-widest text-lg m-0 uppercase">Safe Her Checkout
+                    </h3>
+                </div>
+                <div class="text-right">
+                    <p class="text-zinc-500 text-[10px] font-black tracking-widest uppercase mb-1">Total Payable</p>
+                    <h2 id="simPayAmount" class="text-[#D4AF37] font-black text-2xl m-0">₹1.00</h2>
+                </div>
+            </div>
+
+            <!-- Body -->
+            <div class="p-8">
+                <div
+                    class="bg-zinc-900 border border-white/5 rounded-2xl p-6 mb-8 text-center relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-br from-[#D4AF37]/5 to-transparent"></div>
+                    <h4 class="text-white text-lg font-bold mb-2">Simulated Bank Gateway</h4>
+                    <p class="text-zinc-400 text-sm mb-4">You are in Test Mode. No real money will be deducted. Please
+                        select the outcome of this transaction.</p>
+                    <div class="flex justify-center gap-2">
+                        <span class="bg-zinc-800 text-zinc-400 px-3 py-1 rounded-full text-xs font-bold font-mono">ID:
+                            <span id="simOrderId">order_xxxx</span></span>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="handleSimulatedPayment(true)"
+                        class="bg-[#D4AF37] text-black py-4 rounded-xl font-black uppercase text-sm tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-[0_0_20px_rgba(212,175,55,0.3)] flex items-center justify-center gap-2">
+                        <i class="fas fa-check-circle"></i> Success
+                    </button>
+                    <button onclick="handleSimulatedPayment(false)"
+                        class="bg-zinc-800 border border-red-500/30 text-red-400 py-4 rounded-xl font-black uppercase text-sm tracking-widest hover:bg-red-500/10 active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <i class="fas fa-times-circle"></i> Failure
+                    </button>
+                </div>
+
+                <button onclick="closeSimulator()"
+                    class="w-full mt-6 text-zinc-600 font-bold text-xs uppercase tracking-widest hover:text-white transition-colors">
+                    Cancel Payment
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. SECURE OTP VERIFICATION MODAL -->
+    <div id="otpModal"
+        class="fixed inset-0 z-[200000] bg-black/90 backdrop-blur-sm hidden items-center justify-center p-6">
+        <div
+            class="bg-zinc-900 border border-[#D4AF37]/30 rounded-[2.5rem] w-full max-w-md p-10 relative overflow-hidden shadow-2xl shadow-[#D4AF37]/10">
+            <!-- Decorative gradient -->
+            <div class="absolute -top-24 -right-24 w-48 h-48 bg-[#D4AF37]/10 rounded-full blur-3xl"></div>
+
+            <div class="text-center relative z-10">
+                <!-- Icon -->
+                <div
+                    class="w-20 h-20 bg-gradient-to-br from-[#D4AF37] to-[#8A6D3B] rounded-[1.5rem] flex items-center justify-center mx-auto mb-6 shadow-lg shadow-[#D4AF37]/20">
+                    <i class="fas fa-mobile-screen-button text-3xl text-black"></i>
+                </div>
+
+                <h2 class="text-white text-2xl font-black italic uppercase tracking-tighter mb-2">Verify Your Identity
+                </h2>
+                <p class="text-zinc-400 text-sm font-medium leading-relaxed mb-1">
+                    OTP sent to your mobile number
+                </p>
+                <p id="otpPhoneDisplay" class="text-[#D4AF37] font-black text-sm tracking-widest mb-6">+91 ***** *****
+                </p>
+
+                <!-- OTP Input Group — auto-advance -->
+                <div class="flex justify-center gap-2 mb-3" id="otpInputGroup">
+                    <input type="tel" maxlength="1"
+                        class="otp-digit w-11 h-14 bg-black/50 border-2 border-zinc-700 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+                    <input type="tel" maxlength="1"
+                        class="otp-digit w-11 h-14 bg-black/50 border-2 border-zinc-700 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+                    <input type="tel" maxlength="1"
+                        class="otp-digit w-11 h-14 bg-black/50 border-2 border-zinc-700 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+                    <input type="tel" maxlength="1"
+                        class="otp-digit w-11 h-14 bg-black/50 border-2 border-zinc-700 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+                    <input type="tel" maxlength="1"
+                        class="otp-digit w-11 h-14 bg-black/50 border-2 border-zinc-700 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+                    <input type="tel" maxlength="1"
+                        class="otp-digit w-11 h-14 bg-black/50 border-2 border-zinc-700 rounded-xl text-center text-xl font-black text-[#D4AF37] focus:border-[#D4AF37] outline-none transition-all">
+                </div>
+
+                <!-- Timer -->
+                <p class="text-zinc-600 text-[11px] uppercase tracking-widest mb-6">
+                    Expires in <span id="otpTimerDisplay" class="text-[#D4AF37] font-black">5:00</span>
+                </p>
+
+                <div class="space-y-3">
+                    <button onclick="verifySecurityCode()" id="otpConfirmBtn"
+                        class="w-full bg-[#D4AF37] text-black py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-[#D4AF37]/20">
+                        <i class="fas fa-shield-halved mr-2"></i> Confirm & Unlock Premium
+                    </button>
+                    <button onclick="resendOtp()"
+                        class="w-full text-zinc-500 hover:text-[#D4AF37] py-3 text-xs font-bold uppercase tracking-widest transition-all">
+                        <i class="fas fa-rotate-right mr-1"></i> Resend OTP
+                    </button>
+                    <button onclick="closeOtpModal()"
+                        class="w-full bg-zinc-800/50 text-zinc-600 py-3 rounded-2xl font-bold text-xs tracking-widest hover:text-white transition-all">
+                        Cancel
+                    </button>
+                </div>
+
+                <p class="text-[10px] text-zinc-700 font-bold uppercase tracking-widest mt-6">
+                    Ref ID: <span id="otpRefId" class="text-zinc-500">SH-0000</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Custom Logic -->
+    <!-- PROFESSIONAL FAKE CALL OVERLAY -->
+    <div id="fakeCallOverlay"
+        class="fixed inset-0 z-[100000] bg-black hidden flex-col items-center justify-between py-24 animate-fadeIn">
+        <div class="text-center">
+            <div
+                class="w-24 h-24 bg-gradient-to-br from-zinc-700 to-zinc-900 rounded-full mx-auto mb-6 flex items-center justify-center border border-white/10 shadow-2xl">
+                <i class="fas fa-user text-4xl text-white/40"></i>
+            </div>
+            <h2 class="text-white text-3xl font-bold mb-2">Unknown</h2>
+            <p class="text-zinc-500 font-medium">Safe-Her Relay Call</p>
+        </div>
+
+        <div class="flex flex-col items-center gap-12 w-full px-12">
+            <div class="flex justify-between w-full max-w-sm">
+                <div class="flex flex-col items-center gap-2">
+                    <button onclick="stopProfessionalFakeCall()"
+                        class="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center text-white text-2xl shadow-lg hover:bg-red-700 active:scale-95 transition-all">
+                        <i class="fas fa-phone-slash rotate-[135deg]"></i>
+                    </button>
+                    <span class="text-white/60 text-xs font-bold uppercase tracking-wider">Decline</span>
+                </div>
+                <div class="flex flex-col items-center gap-2">
+                    <button onclick="answerProfessionalFakeCall()"
+                        class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center text-white text-2xl shadow-lg animate-bounce hover:bg-green-600 active:scale-95 transition-all">
+                        <i class="fas fa-phone"></i>
+                    </button>
+                    <span class="text-white/60 text-xs font-bold uppercase tracking-wider">Accept</span>
+                </div>
+            </div>
+            <p class="text-[10px] text-zinc-700 text-center leading-relaxed">
+                SAFE HER RELAY: Pressing accept will trigger an automated AI conversation to help you leave a
+                potentially dangerous situation. Stay calm.
+            </p>
+        </div>
+    </div>
+
+    <!-- AUDIO FOR FAKE CALL RELAY -->
+    <audio id="fakeRelayAudio" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" loop></audio>
+
+    <script src="script.js?v=12"></script>
+    <script src="background.js"></script>
+    <div id="strobeOverlay"></div>
+</body>
+
+</html>
+
