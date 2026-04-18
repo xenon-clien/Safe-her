@@ -1185,7 +1185,8 @@ function showToast(message, type) {
 // ============================================
 let routeMap = null;
 let routeControl = null;
-const nearestCache = {}; // { type: { timestamp: Date, result: node } }
+let currentRouteMode = 'safe'; // Added missing declaration
+const nearestCache = {}; 
 // ============================================
 //   NEARBY FACILITIES (Hospital / Police)
 // ============================================
