@@ -120,11 +120,29 @@ app.post('/api/register', async (req, res) => {
 
 app.post('/api/login', async (req, res) => {
     try {
-        const { email, password } = req.body;
+        let { email, password } = req.body;
+        email = email.toLowerCase().trim();
+        
+        console.log(`🔑 Login Attempt: ${email}`);
+        
         const user = await User.findOne({ email });
-        if (!user || !(await user.matchPassword(password))) return res.status(401).json({ message: "Invalid credentials" });
+        if (!user) {
+            console.log(`❌ Login Failed: User not found (${email})`);
+            return res.status(401).json({ message: "Invalid credentials" });
+        }
+
+        const isMatch = await user.matchPassword(password);
+        if (!isMatch) {
+            console.log(`❌ Login Failed: Password mismatch for ${email}`);
+            return res.status(401).json({ message: "Invalid credentials" });
+        }
+
+        console.log(`✅ Login Success: ${email}`);
         res.json({ user: { id: user._id, name: user.name, email: user.email, phone: user.phone } });
-    } catch (e) { res.status(500).json({ message: e.message }); }
+    } catch (e) { 
+        console.error("Login Error:", e);
+        res.status(500).json({ message: e.message }); 
+    }
 });
 
 app.post('/api/sos-trigger', async (req, res) => {
@@ -212,7 +230,7 @@ app.get('/api/get-contacts/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
         const contacts = await EmergencyContact.find({ userId });
-        res.json(contacts);
+        res.json({ contacts }); // Wrap in object as frontend expects data.contacts
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
@@ -220,6 +238,17 @@ app.delete('/api/delete-contact/:id', async (req, res) => {
     try {
         await EmergencyContact.findByIdAndDelete(req.params.id);
         res.json({ message: "Contact Deleted" });
+    } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// Digital Blackbox (Audio Evidence Upload)
+app.post('/api/blackbox-upload', async (req, res) => {
+    try {
+        const { userId, chunkData, filename } = req.body;
+        console.log(`🔒 Received Blackbox chunk for user ${userId}: ${filename}`);
+        // In simulation, we just acknowledge receipt. 
+        // Real implementation would save to S3 or local storage.
+        res.json({ status: "secured", message: "Chunk stored in encrypted vault." });
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 

@@ -9,7 +9,9 @@ const userSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
-        unique: true
+        unique: true,
+        lowercase: true,
+        trim: true
     },
     password: {
         type: String,
@@ -26,12 +28,13 @@ const userSchema = new mongoose.Schema({
 });
 
 // Hash the password before saving
-userSchema.pre('save', async function() {
+userSchema.pre('save', async function(next) {
     if (!this.isModified('password')) {
-        return;
+        return next();
     }
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
+    next();
 });
 
 // Method to validate password

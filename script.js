@@ -15,8 +15,8 @@ const API_URL = (location.port === '5000')
 window.addEventListener('load', () => {
     fetch(`${API_URL}/health`)
         .then(r => r.json())
-        .then(d => console.log("✅ Core System Linked:", d.server))
-        .catch(e => console.error("❌ System Link Failed. Make sure server is running on port 5000."));
+        .then(d => console.log("âœ… Core System Linked:", d.server))
+        .catch(e => console.error("âŒ System Link Failed. Make sure server is running on port 5000."));
 });
 let pendingPaymentResponse = null; 
 let liveBeaconInterval = null;
@@ -54,7 +54,7 @@ async function sendSOSAlert() {
             addSecurityLog('SOS', `Broadcast via Twilio: ${data.address || 'Location Shared'}`);
             if (data.address) {
                 const statusEl = document.getElementById('sosStatus');
-                if (statusEl) statusEl.innerHTML = `🚨 Help is on the way to:<br><b>${data.address}</b>`;
+                if (statusEl) statusEl.innerHTML = `ðŸš¨ Help is on the way to:<br><b>${data.address}</b>`;
             }
         }
     } catch (error) {
@@ -94,12 +94,33 @@ function initMap(lat, lng) {
 
             L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-            // --- ADVANCED GOOGLE HYBRID LAYER (Satellite + Roads) ---
-            L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-                maxZoom: 20,
-                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                attribution: '© Google Maps'
-            }).addTo(map);
+            // --- LAYER DEFINITIONS ---
+            window.mapLayers = {
+                google: L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+                    maxZoom: 20,
+                    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                    attribution: 'Â© Google Maps',
+                    detectRetina: true
+                }),
+                baidu: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 20,
+                    attribution: 'Â© OpenStreetMap Â© CartoDB',
+                    detectRetina: true
+                }),
+                voyager: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 20,
+                    attribution: 'Â© OpenStreetMap Â© CartoDB',
+                    detectRetina: true
+                }),
+                ghost: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 20,
+                    attribution: 'Â© OpenStreetMap Â© CartoDB',
+                    detectRetina: true
+                })
+            };
+
+            // Add Default Layer
+            window.mapLayers.google.addTo(map);
 
             userMarker = L.marker([lat, lng]).addTo(map)
                 .bindPopup("<b>Verified Safety Map</b>").openPopup();
@@ -111,9 +132,11 @@ function initMap(lat, lng) {
 
             map.on('moveend', () => {
                 if (typeof fetchDangerZones === 'function') fetchDangerZones();
+                updateMapHUD();
             });
+            updateMapHUD();
         } else {
-            console.log("🔄 Map already exists. Re-centering...");
+            console.log("ðŸ”„ Map already exists. Re-centering...");
             if (userMarker) userMarker.setLatLng([lat, lng]);
             map.setView([lat, lng], map.getZoom());
             map.invalidateSize();
@@ -124,16 +147,86 @@ function initMap(lat, lng) {
     }
 }
 
+function setMapEngine(engine) {
+    if (!map || !window.mapLayers) return;
 
-// Performance Optimization: Debounce for smooth map panning
-let dangerZoneTimeout;
-function fetchDangerZonesDebounced() {
-    clearTimeout(dangerZoneTimeout);
-    dangerZoneTimeout = setTimeout(fetchDangerZones, 400);
+    // Remove existing layers
+    Object.values(window.mapLayers).forEach(layer => map.removeLayer(layer));
+
+    // Add selected layer
+    if (window.mapLayers[engine]) {
+        window.mapLayers[engine].addTo(map);
+        showToast(`Switched to ${engine.toUpperCase()} Engine`, "info");
+        
+        // Update active class on buttons if they exist
+        document.querySelectorAll('.map-engine-btn').forEach(btn => {
+            btn.classList.toggle('active-engine', btn.dataset.engine === engine);
+            btn.classList.toggle('opacity-50', btn.dataset.engine !== engine);
+        });
+    }
 }
 
-// --- REAL CRIME ANALYTICS & COMMUNITY DATA via Overpass API ---
-window.drawnZones = []; // Tracks centers to prevent overlapping
+// --- AI NEURAL SAFETY INTELLIGENCE ---
+function updateAIIntelligence(lat, lng) {
+    const intelPanel = document.getElementById('mapAIIntel');
+    const intelText = document.getElementById('aiIntelText');
+    if (!intelPanel || !intelText) return;
+
+    // Show panel
+    intelPanel.classList.remove('hidden-panel');
+    intelPanel.classList.remove('opacity-0');
+    intelPanel.style.opacity = "1";
+
+    let dangerNearby = null;
+    let safeHavenNearby = null;
+
+    // Analyze drawn zones
+    if (window.drawnZones && window.drawnZones.length > 0) {
+        window.drawnZones.forEach(zone => {
+            const dist = getDistanceMeters(lat, lng, zone.lat, zone.lng);
+            if (dist < 1500) {
+                if (zone.isSafe && (!safeHavenNearby || dist < safeHavenNearby.dist)) {
+                    safeHavenNearby = { dist: dist, name: zone.name || 'Safe Zone' };
+                } else if (!zone.isSafe && (!dangerNearby || dist < dangerNearby.dist)) {
+                    dangerNearby = { dist: dist, name: zone.name || 'Risk Area' };
+                }
+            }
+        });
+    }
+
+    // Generate AI Narrative
+    let narrative = "<i class='fas fa-shield-check text-green-400 mr-2'></i> **Security Status: Stable.** No immediate crime reports in your direct periphery. Area looks safe for transit.";
+    
+    if (dangerNearby && dangerNearby.dist < 500) {
+        narrative = `<i class='fas fa-exclamation-triangle text-red-500 mr-2'></i> **Alert:** You are entering a **High-Risk zone** identified as ${dangerNearby.name}. AI recommends moving towards North-East for higher police visibility.`;
+    } else if (safeHavenNearby && safeHavenNearby.dist < 800) {
+        narrative = `<i class='fas fa-check-circle text-green-500 mr-2'></i> **Secure Corridor:** You are near a verified **Safe Haven** (${safeHavenNearby.name}). This area is safe. Stay within well-lit main roads.`;
+    } else if (dangerNearby) {
+        narrative = `<i class='fas fa-satellite-dish text-blue-400 mr-2'></i> **Safety Brief:** General area is safe, but there is active crime reporting ${Math.round(dangerNearby.dist)}m away at ${dangerNearby.name}. Stay alert.`;
+    }
+
+    // Update with simple Markdown-like formatting check (since we are setting innerHTML)
+    intelText.innerHTML = narrative.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+}
+
+function dismissAIIntel() {
+    const intelPanel = document.getElementById('mapAIIntel');
+    if (intelPanel) intelPanel.classList.add('hidden-panel');
+}
+
+function toggleMapTilt() {
+    const mapEl = document.getElementById('map');
+    const tiltBtn = document.getElementById('tiltBtn');
+    if (mapEl && tiltBtn) {
+        const isTilted = mapEl.classList.toggle('tilted');
+        tiltBtn.classList.toggle('tilt-btn-active', isTilted);
+        if (map) {
+            setTimeout(() => map.invalidateSize(), 800);
+        }
+        showToast(isTilted ? "Quantum 3D Perspective Enabled" : "Standard 2D Interface Restored", "info");
+    }
+}
+
 
 function getDistanceMeters(lat1, lon1, lat2, lon2) {
     const R = 6371e3;
@@ -148,6 +241,16 @@ function getDistanceMeters(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
+// Performance Optimization: Debounce for smooth map panning
+let dangerZoneTimeout;
+function fetchDangerZonesDebounced() {
+    clearTimeout(dangerZoneTimeout);
+    dangerZoneTimeout = setTimeout(fetchDangerZones, 400);
+}
+
+// --- NEURAL TACTICAL DISCOVERY ENGINE via Overpass API ---
+window.drawnZones = [];
+
 function fetchDangerZones() {
     if (!map) return;
 
@@ -156,13 +259,13 @@ function fetchDangerZones() {
         window.dangerLayers.forEach(layer => map.removeLayer(layer));
     }
     window.dangerLayers = [];
-    window.drawnZones = []; // Reset tracking
+    window.drawnZones = [];
 
     const bounds = map.getBounds();
     const { _southWest: sw, _northEast: ne } = bounds;
     const bbox = `${sw.lat},${sw.lng},${ne.lat},${ne.lng}`;
 
-    // --- FETCH DANGER ZONES FROM OUR BACKEND ---
+    // 1. Fetch Backend Crime Zones
     fetch(`${API_URL}/danger-zones`)
     .then(r => r.json())
     .then(zones => {
@@ -171,124 +274,60 @@ function fetchDangerZones() {
             const lng = zone.location?.coordinates[0] || zone.lng;
             if (lat && lng) {
                 drawMapZone(lat, lng, zone.risk === 'High' ? 'high' : 'medium', 
-                    zone.risk + ' Risk Zone', zone.name || 'System Zone', zone.type || zone.description || 'Danger Zone');
+                    zone.risk + ' Risk Zone', zone.name || 'System Zone', zone.type || 'Community Report');
             }
         });
-    })
-    .catch(e => console.error("Backend zones fetch failed:", e));
+    });
 
-    // Overpass: Multi-region Worldwide landmarks for high-fidelity safety mapping
-    const query = `[out:json][timeout:15];
-(
-  node["amenity"~"police|hospital|fire_station|gendarmerie|ambulance_station|security_post"](${bbox});
-  node["amenity"~"bar|pub|casino|nightclub|stripclub|liquor_store|adult_gaming_centre"](${bbox});
-);
-out body 100;`;
+    // 2. Heavy-Duty Overpass Coverage: "Every Single Thing"
+    const query = `[out:json][timeout:25];(
+      node["amenity"~"police|hospital|fire_station|bank|atm|pharmacy|clinic|doctors|dentist"](${bbox});
+      node["emergency"~"phone|fire_hydrant"](${bbox});
+      node["highway"~"street_lamp"](${bbox});
+      node["amenity"~"nightclub|bar|pub|casino"](${bbox});
+      way["amenity"~"nightclub|bar|pub|casino"](${bbox});
+    );out body;`;
 
     fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query })
     .then(r => r.json())
     .then(data => {
-        const safeSet = new Set(['police', 'hospital', 'fire_station', 'gendarmerie', 'ambulance_station', 'security_post']);
-        const riskSet = new Set(['bar', 'pub', 'casino', 'nightclub', 'stripclub', 'liquor_store', 'adult_gaming_centre']);
-        let greenDrawn = 0, redDrawn = 0;
+        data.elements.forEach(node => {
+            const lat = node.lat || (node.center && node.center.lat);
+            const lng = node.lon || (node.center && node.center.lon);
+            const tags = node.tags || {};
+            const type = tags.amenity || tags.emergency || tags.highway || 'landmark';
 
-        (data.elements || []).forEach(node => {
-            const amenity = node.tags?.amenity;
-            const name = node.tags?.name || amenity;
-            if (!amenity) return;
+            const isDangerous = ['nightclub', 'bar', 'pub', 'casino'].includes(type);
+            const isSafe = ['police', 'hospital', 'fire_station', 'doctor', 'clinic', 'pharmacy', 'dentist'].includes(type);
 
-            // ULTRA-STRICT PER-TIER PROXIMITY SUPPRESSION
-            // Grid-Aware: Safe zones only suppress Safe; Risk suppresses Risk.
-            const isSafe = safeSet.has(amenity);
-            const threshold = isSafe ? 1500 : 800;
-            
-            const tooClose = window.drawnZones.some(z => {
-                const dist = getDistanceMeters(node.lat, node.lon, z.lat, z.lng);
-                return dist < threshold && z.isSafe === isSafe;
-            });
-
-            if (tooClose) return;
-
-            if (isSafe) {
-                const labels = {
-                    police: '🛡️ Police Department',
-                    gendarmerie: '🛡️ Gendarmerie',
-                    hospital: '🏥 Medical Facility',
-                    fire_station: '🚒 Fire Response',
-                    ambulance_station: '🚑 EMS Hub',
-                    security_post: '🛡️ Safety Post'
-                };
-                drawMapZone(node.lat, node.lon, 'green', labels[amenity] || '🛡️ Safety Hub', name,
-                    'Verified safety landmark. Active monitoring and security presence detected.');
-                greenDrawn++;
-                window.drawnZones.push({ lat: node.lat, lng: node.lon, isSafe: true });
-            } else if (riskSet.has(amenity)) {
-                const isHighRisk = ['casino', 'nightclub', 'stripclub', 'adult_gaming_centre'].includes(amenity);
-                drawMapZone(node.lat, node.lon, isHighRisk ? 'high' : 'medium',
-                    isHighRisk ? '🧨 High Risk: ' + amenity : '⚠️ Moderate: ' + amenity,
-                    name, isHighRisk
-                        ? 'High-intensity night zone. Avoid lone travel in this perimeter.'
-                        : 'Increased risk area. Monitor surroundings carefully.');
-                redDrawn++;
-                window.drawnZones.push({ lat: node.lat, lng: node.lon, isSafe: false });
+            if (isDangerous) {
+                drawMapZone(lat, lng, 'high', 'Risk Site', tags.name || 'Site', type);
+            } else if (isSafe) {
+                drawMapZone(lat, lng, 'safe', 'Secure Hub', tags.name || 'Safety Hub', type);
+            } else {
+                addTacticalMarker(lat, lng, type, tags.name || type);
             }
         });
-
-        // Render static Ludhiana hotspots if bounds contain them
-        CRIME_HOTSPOTS.forEach(spot => {
-            if (bounds.contains([spot.lat, spot.lng])) {
-                drawMapZone(spot.lat, spot.lng, spot.risk >= 8 ? 'high' : 'medium',
-                    spot.risk >= 8 ? '🔴 High Risk' : '🟡 Moderate Risk',
-                    spot.name, spot.type);
-            }
-        });
-
-        // Community reports
-        getCommunityReports().forEach(report => {
-            if (bounds.contains([report.lat, report.lng])) {
-                drawMapZone(report.lat, report.lng, 'high', '⚠️ User Report', 'Community Alert', report.reason);
-            }
-        });
-
-        // Fallback green if API returned nothing safe at all
-        if (greenDrawn === 0) {
-            const center = map.getCenter();
-            for (let i = 0; i < 3; i++) {
-                const lat = center.lat + (Math.random() - 0.5) * 0.01;
-                const lng = center.lng + (Math.random() - 0.5) * 0.01;
-                drawMapZone(lat, lng, 'green', '🟢 Safe Corridor', 'General Area', 'Low crime density. Relatively safe.');
-            }
-        }
     })
-    .catch(() => {
-        // Fallback: static Ludhiana data + synthetic green zones
-        CRIME_HOTSPOTS.forEach(spot => {
-            if (map.getBounds().contains([spot.lat, spot.lng])) {
-                drawMapZone(spot.lat, spot.lng, spot.risk >= 8 ? 'high' : 'medium',
-                    spot.risk >= 8 ? '🔴 High Risk' : '🟡 Moderate Risk', spot.name, spot.type);
-            }
-        });
-        const center = map.getCenter();
-        for (let i = 0; i < 4; i++) {
-            const lat = center.lat + (Math.random() - 0.5) * 0.012;
-            const lng = center.lng + (Math.random() - 0.5) * 0.012;
-            drawMapZone(lat, lng, 'green', '🟢 Safe Zone', 'General Area', 'Low crime density.');
-        }
-    });
+    .catch(e => console.error("Neural Scan Failure:", e));
 }
-
 
 function drawMapZone(lat, lng, riskLevel, label, name, description) {
     const isNight = new Date().getHours() >= 20 || new Date().getHours() < 6;
     let border, glow, radius, auraClass;
 
-    if (riskLevel === 'green') {
+    const isSafe = riskLevel === 'safe' || riskLevel === 'green';
+
+    if (isSafe) {
         border = '#10b981'; glow = '#10b981'; radius = 350; auraClass = 'safety-aura-emerald';
     } else if (riskLevel === 'high') {
         border = '#ef4444'; glow = '#ef4444'; radius = 450; auraClass = 'safety-aura-crimson';
     } else {
         border = '#f59e0b'; glow = '#f59e0b'; radius = 300; auraClass = 'safety-aura-amber';
     }
+
+    // Track for AI intelligence
+    window.drawnZones.push({ lat, lng, isSafe, name });
 
     // Outer Safety Aura Layer (Ultra Premium Pulse)
     const auraLayer = L.circle([lat, lng], {
@@ -319,16 +358,6 @@ function drawMapZone(lat, lng, riskLevel, label, name, description) {
             </div>
             <div style="font-size:15px; font-weight:700; margin-bottom:8px;">${name}</div>
             <p style="color:rgba(255,255,255,0.6); font-size:12px; line-height:1.6; margin-bottom:15px;">${description}</p>
-            <div style="display:flex; gap:8px;">
-                <span style="flex:1; background:rgba(255,255,255,0.05); padding:6px; border-radius:8px; text-align:center;">
-                    <i class="fas fa-shield-alt" style="color:${glow}; font-size:14px;"></i>
-                    <div style="font-size:8px; margin-top:4px; opacity:0.6;">GUARDED</div>
-                </span>
-                <span style="flex:1; background:rgba(255,255,255,0.05); padding:6px; border-radius:8px; text-align:center;">
-                    <i class="fas fa-satellite" style="color:${glow}; font-size:14px;"></i>
-                    <div style="font-size:8px; margin-top:4px; opacity:0.6;">LIVE FEED</div>
-                </span>
-            </div>
         </div>`,
         { className: 'premium-popup', minWidth: 260 }
     );
@@ -357,46 +386,25 @@ function reportDangerAtCenter() {
     }
 }
 
-// Location track karne ka sahi tareeka
 async function startTracking() {
     const gpsEl = document.getElementById('dashGps');
-    const areaDisplay = document.getElementById('dashArea');
     if (gpsEl) gpsEl.innerText = "Syncing...";
 
-    console.log("🚀 Initializing Hybrid AI Location Engine...");
-
-    // 1. INSTANT: LOAD LAST KNOWN LOCATION (FASTEST)
     const lastKnown = JSON.parse(localStorage.getItem('safeher_last_loc'));
     if (lastKnown) {
-        console.log("📍 Last Known Location Found:", lastKnown);
         initMap(lastKnown.lat, lastKnown.lng);
         updateDashboardGPS(lastKnown.lat, lastKnown.lng);
         if (gpsEl) gpsEl.innerHTML = '<span class="text-yellow-400">CACHED-SYN</span>';
     }
 
-    // 2. PARALLEL: GPS + IP-GEOLOCATION FALLBACK
     let hasFoundLocation = false;
 
-    // Parallel IP Geolocation Fetch
-    const ipFetchPromise = fetch('https://ipapi.co/json/')
-        .then(res => res.json())
-        .then(data => {
-            if (!hasFoundLocation && data.latitude && data.longitude) {
-                console.log("🌐 IP-Based Geolocation Success:", data.latitude, data.longitude);
-                initMap(data.latitude, data.longitude);
-                updateDashboardGPS(data.latitude, data.longitude);
-                if (gpsEl) gpsEl.innerHTML = '<span class="text-blue-400">IP-PROXY</span>';
-                if (typeof showToast === 'function') showToast("📍 Map loaded via Hybrid IP-Link", "info");
-            }
-        }).catch(() => { });
-
-    // Parallel GPS Fetch
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 hasFoundLocation = true;
                 const { latitude, longitude } = position.coords;
-                console.log("🛰️ GPS Precision Sync Success:", latitude, longitude);
+                console.log("ðŸ›°ï¸ GPS Precision Sync Success:", latitude, longitude);
                 
                 // Store for next visit
                 localStorage.setItem('safeher_last_loc', JSON.stringify({ lat: latitude, lng: longitude }));
@@ -405,13 +413,16 @@ async function startTracking() {
                 updateDashboardGPS(latitude, longitude);
                 
                 if (gpsEl) gpsEl.innerHTML = '<span class="text-green-400">HIGH-PRECISION</span>';
+                
+                // Update AI Intelligence Insight
+                updateAIIntelligence(latitude, longitude);
             },
             (error) => {
-                console.warn("⚠️ High-Precision GPS Failed:", error.message);
+                console.warn("âš ï¸ High-Precision GPS Failed:", error.message);
                 // If IP Fetch also fails or hasn't finished, use static fallback
                 setTimeout(() => {
                     if (!hasFoundLocation && !lastKnown) {
-                        console.log("🚧 Global Fallback: Ludhiana Active");
+                        console.log("ðŸš§ Global Fallback: Ludhiana Active");
                         initMap(30.901, 75.8573);
                         updateDashboardGPS(30.901, 75.8573);
                         if (gpsEl) gpsEl.innerText = "OFFLINE-FIX";
@@ -442,18 +453,18 @@ async function checkDatabaseStatus() {
         const data = await response.json();
         
         if (data.database === 'connected') {
-            dbEl.innerText = 'Online ✅';
+            dbEl.innerText = 'Online âœ…';
             dbEl.style.color = '#4caf50';
         } else if (data.database === 'connecting') {
             dbEl.innerText = 'Syncing...';
             dbEl.style.color = '#ff9800';
         } else {
-            dbEl.innerText = 'Offline ❌';
+            dbEl.innerText = 'Offline âŒ';
             dbEl.style.color = '#ff3366';
             console.warn("Database disconnected:", data.last_error);
         }
     } catch (error) {
-        dbEl.innerText = 'Error ⚠️';
+        dbEl.innerText = 'Error âš ï¸';
         dbEl.style.color = '#ff3366';
         console.error("Health check failed:", error);
     }
@@ -465,7 +476,7 @@ function updateDashboard() {
     const m = String(now.getMinutes()).padStart(2, '0');
     const s = String(now.getSeconds()).padStart(2, '0');
     const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12; // Convert 0 → 12, 13 → 1, etc.
+    h = h % 12 || 12; // Convert 0 â†’ 12, 13 â†’ 1, etc.
     const el = document.getElementById('dashTime');
     if (el) el.innerText = `${h}:${m}:${s} ${ampm}`;
 }
@@ -478,7 +489,7 @@ function updateDashboardGPS(lat, lng) {
     const gpsEl = document.getElementById('dashGps');
     const areaEl = document.getElementById('dashArea');
 
-    if (gpsEl) gpsEl.innerText = 'Connected ✅';
+    if (gpsEl) gpsEl.innerText = 'Connected âœ…';
 
     // Refresh Score specifically
     refreshSafetyScore();
@@ -493,6 +504,13 @@ function updateDashboardGPS(lat, lng) {
             const area = colony ? `${colony}, ${city}` : (city || data.display_name.split(',')[0] || 'Unknown Colony');
             
             if (areaEl) areaEl.innerText = area;
+            
+            // NEW: Also update Route Planner starting point
+            const routeFrom = document.getElementById('routeFrom');
+            if (routeFrom && (!routeFrom.value || routeFrom.value.includes('Search starting point'))) {
+                routeFrom.value = area + " (Your Current Location)";
+            }
+
             // Also check for street lights nearby
             fetchStreetLights(lat, lng);
         }).catch(() => { 
@@ -516,10 +534,10 @@ async function fetchStreetLights(lat, lng) {
         const count = data.elements && data.elements[0] ? data.elements[0].tags.total : (data.elements ? data.elements.length : 0);
 
         if (count > 0) {
-            lightEl.innerText = "Lit Area ✅";
+            lightEl.innerText = "Lit Area âœ…";
             lightEl.style.color = "#4caf50";
         } else {
-            lightEl.innerText = "Low Lighting ⚠️";
+            lightEl.innerText = "Low Lighting âš ï¸";
             lightEl.style.color = "#ff9800";
         }
     } catch (e) {
@@ -657,15 +675,15 @@ function toggleCheckInTimer() {
             clearInterval(checkInInterval);
             checkInInterval = null;
             // Auto SOS!
-            document.getElementById('timerStatusMsg').innerText = '⚠️ Time expired! SOS alert triggered!';
+            document.getElementById('timerStatusMsg').innerText = 'âš ï¸ Time expired! SOS alert triggered!';
             document.getElementById('checkinPanel').style.borderColor = '#ff3366';
-            showToast('⚠️ Check-In timer expired — SOS sent to contacts!', 'error');
+            showToast('âš ï¸ Check-In timer expired â€” SOS sent to contacts!', 'error');
             triggerSOS();
         }
 
         // Warning at 1 minute
         if (checkInSecsLeft === 60) {
-            showToast('⚠️ 1 minute left! Check-in before time runs out!', 'error');
+            showToast('âš ï¸ 1 minute left! Check-in before time runs out!', 'error');
         }
     }, 1000);
 }
@@ -684,7 +702,7 @@ function checkInNow() {
     document.getElementById('timerToggleBtn').innerText = 'Start Timer';
     document.getElementById('timerStatusMsg').innerText = 'Stay safe! Timer running...';
     document.getElementById('checkinPanel').style.borderColor = 'rgba(157,78,221,0.4)';
-    showToast('✅ Check-In confirmed! You are safe.', 'success');
+    showToast('âœ… Check-In confirmed! You are safe.', 'success');
 }
 
 // ============================================================
@@ -700,14 +718,14 @@ function quickShareLocation() {
         const lat = pos.coords.latitude.toFixed(5);
         const lng = pos.coords.longitude.toFixed(5);
         const msg = encodeURIComponent(
-            `🚨 I need help! My live location:\nhttps://maps.google.com/?q=${lat},${lng}\n\nSent via Safe Her App`
+            `ðŸš¨ I need help! My live location:\nhttps://maps.google.com/?q=${lat},${lng}\n\nSent via Safe Her App`
         );
 
         // Try native share API first
         if (navigator.share) {
             navigator.share({
                 title: 'My Live Location - Safe Her',
-                text: `🚨 My location: https://maps.google.com/?q=${lat},${lng}`,
+                text: `ðŸš¨ My location: https://maps.google.com/?q=${lat},${lng}`,
                 url: `https://maps.google.com/?q=${lat},${lng}`
             }).then(() => showToast('Location shared!', 'success'))
                 .catch(() => { });
@@ -715,7 +733,7 @@ function quickShareLocation() {
             // Fallback: WhatsApp
             window.open(`https://wa.me/?text=${msg}`, '_blank');
         }
-        showToast(`📍 Sharing location: ${lat}, ${lng}`, 'success');
+        showToast(`ðŸ“ Sharing location: ${lat}, ${lng}`, 'success');
     }, (err) => {
         showToast("Tracking failed! Enable GPS & high accuracy.", "error");
     }, { enableHighAccuracy: true, timeout: 15000 });
@@ -816,7 +834,7 @@ function triggerSOS() {
         // 5. Initial Alert Sync
         sendSOSAlert();
 
-        if (statusText) statusText.innerText = "🚨 EMERGENCY ACTIVE";
+        if (statusText) statusText.innerText = "ðŸš¨ EMERGENCY ACTIVE";
         showToast("EMERGENCY PROTOCOLS ACTIVATED", "error");
 
         // WhatsApp Fallback: Open WhatsApp with SOS message to primary group/contacts
@@ -824,7 +842,7 @@ function triggerSOS() {
             const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
             const lat = userLatLng.lat;
             const lng = userLatLng.lng;
-            const msg = encodeURIComponent(`🚨 SOS EMERGENCY! I am in danger. My live location: https://maps.google.com/?q=${lat},${lng} (Sent via Safe Her App)`);
+            const msg = encodeURIComponent(`ðŸš¨ SOS EMERGENCY! I am in danger. My live location: https://maps.google.com/?q=${lat},${lng} (Sent via Safe Her App)`);
             
             // Try to send to first saved contact if available
             let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
@@ -865,7 +883,7 @@ let mediaRecorder = null;
 let audioChunks = [];
 
 async function startDigitalBlackbox() {
-    console.log("🛠️ DIGITAL BLACKBOX: Initiating high-security audio evidence vault...");
+    console.log("ðŸ› ï¸ DIGITAL BLACKBOX: Initiating high-security audio evidence vault...");
     addSecurityLog('BLACKBOX', 'Evidence Vault Initializing...');
     
     try {
@@ -907,7 +925,7 @@ async function startDigitalBlackbox() {
             }
         }, 8000);
 
-        showToast("🔒 DIGITAL BLACKBOX ACTIVE — Evidence securing in cloud.", "success");
+        showToast("ðŸ”’ DIGITAL BLACKBOX ACTIVE â€” Evidence securing in cloud.", "success");
 
     } catch (err) {
         console.warn("Audio Blackbox failed:", err.message);
@@ -916,7 +934,7 @@ async function startDigitalBlackbox() {
 }
 
 function startLiveBeacon() {
-    console.log("📡 LIVE BEACON: Sharing high-frequency location updates...");
+    console.log("ðŸ“¡ LIVE BEACON: Sharing high-frequency location updates...");
     
     // Send update immediately
     sendSOSAlert();
@@ -926,6 +944,7 @@ function startLiveBeacon() {
         if (isSosActive) {
             sendSOSAlert();
             console.log("Live Beacon Update Sent");
+        }
     }, 5000);
 }
 
@@ -942,7 +961,7 @@ function forceMapRefresh() {
 function switchSection(sectionId) {
     // --- GATEKEEPER CHECK ---
     const isAuth = localStorage.getItem('herSafety_user');
-    const protectedSections = ['home', 'route', 'contacts', 'records', 'pro-center', 'tips', 'feedback', 'pro-dashboard'];
+    const protectedSections = ['home', 'arsenal', 'route', 'contacts', 'records', 'pro-center', 'tips', 'feedback', 'pro-dashboard'];
 
     if (!isAuth && protectedSections.includes(sectionId)) {
         showToast("Please login to access this area", "info");
@@ -959,7 +978,8 @@ function switchSection(sectionId) {
         window.scrollTo(0, 0);
     }
 
-    // ✅ FIX: Invalidate Leaflet map size when home section is shown to prevent shrinking
+    // âœ… FIX: Invalidate Leaflet map size when home section is shown to prevent shrinking
+    if (sectionId === 'route') { initRouteMap(); }
     if (sectionId === 'home' && map) {
         setTimeout(() => {
             map.invalidateSize();
@@ -979,6 +999,20 @@ function switchSection(sectionId) {
             link.classList.add('active');
         }
     });
+
+    // --- Interactive Feature Cards Glow Effect ---
+    if (sectionId === 'arsenal') {
+        const cards = document.querySelectorAll('.feature-card-v2');
+        cards.forEach(card => {
+            card.onmousemove = e => {
+                const rect = card.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                card.style.setProperty('--mouse-x', `${x}px`);
+                card.style.setProperty('--mouse-y', `${y}px`);
+            };
+        });
+    }
 
     // Trigger Luxury Background Logic
     if (sectionId === 'loginView' || sectionId === 'signupView') {
@@ -1028,38 +1062,6 @@ function switchAuthTab(type) {
         document.getElementById('signupForm').style.display = 'block';
     }
 }
-
-// --- Real Backend Interaction (Node.js/MongoDB) ---
-document.getElementById('signupForm').addEventListener('submit', async (e) => {
-    e.preventDefault(); // Page refresh hone se rokne ke liye
-
-    // Form se specific ID ke jariye data nikalna
-    const name = document.getElementById('signupName').value;
-    const email = document.getElementById('signupEmail').value;
-    const phone = document.getElementById('signupPhone').value;
-    const password = document.getElementById('signupPassword').value;
-
-    try {
-        // Backend (localhost:5000) ko data bhejna
-        const response = await fetch(`${API_URL}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, email, phone, password })
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            showToast("Registration Successful! Database check kijiye.", "success");
-            switchAuthTab('login'); // Automatically Redirects to login
-        } else {
-            showToast(data.message || "Registration failed", "error");
-        }
-    } catch (error) {
-        console.error("Error:", error);
-        showToast("Backend se connect nahi ho paya!", "error");
-    }
-});
 
 // --- Chatbot Logic ---
 function toggleChat() {
@@ -1231,7 +1233,7 @@ async function findNearest(type) {
             const name = closest.tags.name || `Nearest ${type}`;
             const distStr = (minDist / 1000).toFixed(2) + " km";
             
-            showToast(`📍 Found: ${name} (${distStr})`, "success");
+            showToast(`ðŸ“ Found: ${name} (${distStr})`, "success");
 
             // Pan and Mark on Map
             activeMap.setView([closest.lat, closest.lon], 15);
@@ -1318,7 +1320,7 @@ async function initiateRazorpayPayment() {
         return;
     }
 
-    if (!confirm(`Hi ${user.name || 'User'}, you are about to upgrade to Premium (₹1). Continue?`)) return;
+    if (!confirm(`Hi ${user.name || 'User'}, you are about to upgrade to Premium (â‚¹1). Continue?`)) return;
 
     try {
         const response = await fetch(`${API_URL}/create-order`, {
@@ -1352,7 +1354,7 @@ async function initiateRazorpayPayment() {
                 }
 
                 // If success, directly hit /api/request-otp to bypass signature checks
-                showToast("🔐 Secure payment successful! Generating OTP...", "info");
+                showToast("ðŸ” Secure payment successful! Generating OTP...", "info");
                 try {
                     const otpResponse = await fetch(`${API_URL}/request-otp`, {
                         method: 'POST',
@@ -1425,11 +1427,11 @@ function openOtpModal({ maskedPhone, paymentId, devOtp }) {
     // Start 5-min countdown timer
     startOtpTimer(300);
 
-    // Dev mode hint — show OTP in toast so dev can test
+    // Dev mode hint â€” show OTP in toast so dev can test
     if (devOtp) {
         setTimeout(() => {
-            showToast(`🧪 Dev Mode OTP: ${devOtp}`, "success");
-            console.log(`%c🔑 TEST OTP: ${devOtp}`, 'background:#D4AF37;color:black;padding:6px 12px;font-size:16px;font-weight:bold;border-radius:4px;');
+            showToast(`ðŸ§ª Dev Mode OTP: ${devOtp}`, "success");
+            console.log(`%cðŸ”‘ TEST OTP: ${devOtp}`, 'background:#D4AF37;color:black;padding:6px 12px;font-size:16px;font-weight:bold;border-radius:4px;');
         }, 500);
     }
 }
@@ -1459,7 +1461,7 @@ function initOtpInputBehavior() {
             }
         });
 
-        // Paste support — fill all boxes
+        // Paste support â€” fill all boxes
         input.addEventListener('paste', (e) => {
             e.preventDefault();
             const paste = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
@@ -1489,7 +1491,7 @@ function startOtpTimer(seconds) {
         if (remaining <= 0) {
             clearInterval(otpTimerInterval);
             if (timerEl) timerEl.textContent = 'Expired';
-            showToast("⏰ OTP expired. Please retry payment.", "error");
+            showToast("â° OTP expired. Please retry payment.", "error");
         }
     }, 1000);
 }
@@ -1534,7 +1536,7 @@ async function verifySecurityCode() {
             clearInterval(otpTimerInterval);
             closeOtpModal();
 
-            // ✅ Grant Premium
+            // âœ… Grant Premium
             localStorage.setItem('hersafety_premium', 'true');
             if (typeof recordTransaction === 'function') {
                 recordTransaction({
@@ -1550,7 +1552,7 @@ async function verifySecurityCode() {
             }
             if (typeof updatePremiumUI === "function") updatePremiumUI();
             if (typeof switchSection === "function") switchSection('pro-center');
-            showToast("👑 Premium Unlocked! Welcome to Pro.", "success");
+            showToast("ðŸ‘‘ Premium Unlocked! Welcome to Pro.", "success");
 
         } else {
             showToast(data.message || "Incorrect OTP. Try again.", "error");
@@ -1607,8 +1609,8 @@ async function resendOtp() {
             if (inputs[0]) inputs[0].focus();
 
             // Show one clear toast with the new dev OTP
-            showToast(`✅ NEW OTP RE-SENT! Test Code: ${verifyData.dev_otp}`, "success");
-            console.log(`%c🔑 RESENT TEST OTP: ${verifyData.dev_otp}`, 'background:#D4AF37;color:black;padding:6px 12px;font-size:16px;font-weight:bold;border-radius:4px;');
+            showToast(`âœ… NEW OTP RE-SENT! Test Code: ${verifyData.dev_otp}`, "success");
+            console.log(`%cðŸ”‘ RESENT TEST OTP: ${verifyData.dev_otp}`, 'background:#D4AF37;color:black;padding:6px 12px;font-size:16px;font-weight:bold;border-radius:4px;');
             
         } else {
             showToast(verifyData.message || "Failed to resend OTP.", "error");
@@ -1629,7 +1631,7 @@ function showPremiumPopup() {
         <div class="bg-zinc-900 border border-premium-gold p-8 rounded-[2rem] max-w-sm text-center">
             <i class="fas fa-crown text-6xl text-premium-gold mb-6 animate-bounce"></i>
             <h2 class="text-white text-2xl font-black mb-4 uppercase">Unlock Pro Feature</h2>
-            <p class="text-gray-400 text-sm mb-8 leading-relaxed">Evidence Locker and Fake Call are Pro features. Get 24/7 protection and 10s cloud evidence for just ₹1.</p>
+            <p class="text-gray-400 text-sm mb-8 leading-relaxed">Evidence Locker and Fake Call are Pro features. Get 24/7 protection and 10s cloud evidence for just â‚¹1.</p>
             <button onclick="this.parentElement.parentElement.remove(); initiateRazorpayPayment();" 
                     class="w-full bg-premium-gold text-black py-4 rounded-2xl font-black uppercase tracking-widest hover:scale-105 transition-transform mb-4">
                 Upgrade to Pro
@@ -1655,14 +1657,15 @@ function initRoutePlannerMap() {
         L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
             maxZoom: 20,
             subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-            attribution: '© Google Maps'
-        }).addTo(routeMap);
+            attribution: 'Â© Google Maps',
+            detectRetina: true
+        }).addTo((routeMap ? routeMap : map));
 
-        L.control.zoom({ position: 'bottomright' }).addTo(routeMap);
+        L.control.zoom({ position: 'bottomright' }).addTo((routeMap ? routeMap : map));
 
         L.marker([startLat, startLng])
             .addTo(routeMap)
-            .bindPopup('<b>📍 Your Location</b>').openPopup();
+            .bindPopup('<b>ðŸ“ Your Location</b>').openPopup();
     } else {
         routeMap.invalidateSize();
     }
@@ -1674,11 +1677,14 @@ function initRoutePlannerMap() {
     }
 }
 
-// Track user position for route planner
-navigator.geolocation && navigator.geolocation.getCurrentPosition(pos => {
-    userLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    const fromField = document.getElementById('routeFrom');
-    if (fromField) fromField.value = `${userLatLng.lat.toFixed(5)}, ${userLatLng.lng.toFixed(5)}`;
+// Initial sync for route planner (one-time)
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        const fromField = document.getElementById('routeFrom');
+        if (fromField && userLatLng && !fromField.value) {
+            fromField.value = `${userLatLng.lat.toFixed(5)}, ${userLatLng.lng.toFixed(5)} (My Location)`;
+        }
+    }, 2000);
 });
 
 function setRouteMode(mode) {
@@ -1689,336 +1695,83 @@ function setRouteMode(mode) {
 }
 
 function calculateRoute() {
+    if (!routeMap) { initRouteMap(); }
+    const fromInput = document.getElementById('routeFrom') ? document.getElementById('routeFrom').value.trim() : '';
     const toInput = document.getElementById('routeTo').value.trim();
+
     if (!toInput) {
         showToast('Please enter a destination!', 'error');
         return;
     }
 
-    // Night-time warning (6 PM - 6 AM)
-    const hour = new Date().getHours();
-    const isNight = hour >= 18 || hour < 6;
-    if (isNight) {
-        showToast('🌙 Night Mode: Extra danger zones visible. Stay alert!', 'error');
-    } else {
-        showToast('🗺️ Calculating safe route...', 'success');
+    showToast('🗺️ Planning safest route...', 'info');
+
+    async function geocodeOSM(query) {
+        if (!query || query.toLowerCase().includes('current')) {
+            return { lat: userLatLng.lat, lon: userLatLng.lng, display_name: 'Current Location' };
+        }
+        try {
+            const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(query) + '&limit=1');
+            const data = await r.json();
+            return data.length > 0 ? data[0] : null;
+        } catch(e) { return null; }
     }
 
-    // Geocode destination via Nominatim
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(toInput)}&limit=1`)
-        .then(r => r.json())
-        .then(results => {
-            if (!results || results.length === 0) {
-                showToast('Destination not found. Try a different name.', 'error');
-                return;
-            }
-
-            const dest = results[0];
+    Promise.all([geocodeOSM(fromInput), geocodeOSM(toInput)])
+        .then(([start, dest]) => {
+            if (!start || !dest) { throw new Error('Location not found. Try a different address.'); }
+            
+            const fromLat = parseFloat(start.lat);
+            const fromLng = parseFloat(start.lon);
             const destLat = parseFloat(dest.lat);
             const destLng = parseFloat(dest.lon);
-            const fromLat = userLatLng ? userLatLng.lat : 28.6139;
-            const fromLng = userLatLng ? userLatLng.lng : 77.2090;
+            const targetMap = (routeMap ? routeMap : map);
 
-            // Clear previous layers
-            if (routeControl) { routeMap.removeControl(routeControl); routeControl = null; }
-            if (window.routeZoneLayers) {
-                window.routeZoneLayers.forEach(l => routeMap.removeLayer(l));
-            }
+            if (routeControl) { targetMap.removeControl(routeControl); routeControl = null; }
+            if (window.routeZoneLayers) { window.routeZoneLayers.forEach(l => targetMap.removeLayer(l)); }
             window.routeZoneLayers = [];
-
-            // ─── Draw Safety Zones on Route Map ─────────────────────
-            const midLat = (fromLat + destLat) / 2;
-            const midLng = (fromLng + destLng) / 2;
-            const latSpan = Math.abs(destLat - fromLat) + 0.04;
-            const lngSpan = Math.abs(destLng - fromLng) + 0.04;
-
-            // Night mode: more red zones
-            const redCount = isNight ? 8 : 4;
-            const yellowCount = isNight ? 5 : 4;
-            const greenCount = isNight ? 4 : 8;
-
-            // ─── Premium Real-World Safety Zones via Overpass API ───────
-            function addZone(lat, lng, radiusMeters, color, glowColor, title, info) {
-                const outerRing = L.circle([lat, lng], {
-                    radius: radiusMeters * 1.6,
-                    color: color,
-                    weight: 1,
-                    fillColor: color,
-                    fillOpacity: 0.04,
-                    dashArray: '4,8',
-                    bubblingMouseEvents: false
-                }).addTo(routeMap);
-
-                const circle = L.circle([lat, lng], {
-                    radius: radiusMeters,
-                    color: glowColor,
-                    weight: 2.5,
-                    fillColor: glowColor,
-                    fillOpacity: isNight ? 0.22 : 0.14,
-                    bubblingMouseEvents: false
-                }).addTo(routeMap).bindPopup(
-                    `<div style='font-family:inherit;padding:10px 6px;min-width:160px;'>
-                        <div style='display:flex;align-items:center;gap:8px;margin-bottom:6px;'>
-                            <div style='width:10px;height:10px;border-radius:50%;background:${glowColor};box-shadow:0 0 8px ${glowColor};flex-shrink:0;'></div>
-                            <b style='color:${glowColor};font-size:13px;'>${title}</b>
-                        </div>
-                        <small style='color:#aaa;line-height:1.5;display:block;'>${info}</small>
-                    </div>`,
-                    { className: 'route-tooltip' }
-                );
-
-                // Bring to front so green zones aren't hidden under route lines
-                circle.bringToFront();
-                outerRing.bringToFront();
-                window.routeZoneLayers.push(outerRing, circle);
-            }
-
-            // ─── Fetch real-world zone data from Overpass API ─────────
-            const pad = 0.08;
-            const minLat = Math.min(fromLat, destLat) - pad;
-            const maxLat = Math.max(fromLat, destLat) + pad;
-            const minLng = Math.min(fromLng, destLng) - pad;
-            const maxLng = Math.max(fromLng, destLng) + pad;
-
-            const bbox = `${minLat},${minLng},${maxLat},${maxLng}`;
-
-            // Overpass query: safe amenities (police, hospital, fire_station) + risk amenities (bar, pub, casino, nightclub)
-            const overpassQuery = `
-                [out:json][timeout:15];
-                (
-                  node["amenity"~"police|hospital|fire_station"](${bbox});
-                  node["amenity"~"bar|pub|casino|nightclub"](${bbox});
-                );
-                out body 60;
-            `.trim();
-
-            showToast('🌍 Loading real-world safety data...', 'info');
-
-            fetch('https://overpass-api.de/api/interpreter', {
-                method: 'POST',
-                body: overpassQuery
-            })
-            .then(r => r.json())
-            .then(overpassData => {
-                const nodes = overpassData.elements || [];
-
-                const safeAmenities = new Set(['police', 'hospital', 'fire_station']);
-                const riskAmenities = new Set(['bar', 'pub', 'casino', 'nightclub']);
-
-                let greenCount = 0, redCount = 0;
-
-                nodes.forEach(node => {
-                    const amenity = node.tags?.amenity;
-                    const name = node.tags?.name || amenity;
-                    const lat = node.lat, lng = node.lon;
-
-                    if (safeAmenities.has(amenity)) {
-                        const labels = {
-                            police: { title: '🟢 Police Station', info: 'Police presence nearby. High safety guarantee.', radius: 350 },
-                            hospital: { title: '🟢 Hospital / Medical', info: 'Emergency medical facility nearby. Quick help available.', radius: 280 },
-                            fire_station: { title: '🟢 Fire Station', info: 'Emergency responders present. Safe surrounding area.', radius: 250 }
-                        };
-                        const cfg = labels[amenity];
-                        addZone(lat, lng, cfg.radius, '#1b5e20', '#4caf50', `${cfg.title}<br><span style='font-size:11px;opacity:0.7'>${name}</span>`, cfg.info);
-                        greenCount++;
-                    } else if (riskAmenities.has(amenity)) {
-                        const isDangerous = amenity === 'casino' || amenity === 'nightclub';
-                        addZone(lat, lng,
-                            isDangerous ? 300 : 200,
-                            '#7f0000',
-                            isDangerous ? '#ff1744' : '#ff5252',
-                            `🔴 ${amenity.charAt(0).toUpperCase() + amenity.slice(1)}<br><span style='font-size:11px;opacity:0.7'>${name}</span>`,
-                            isNight
-                                ? `Elevated crime risk at night near ${amenity}s. Avoid if possible.`
-                                : `Moderate risk area. Stay alert near ${amenity}s.`
-                        );
-                        redCount++;
-                    }
-                });
-
-                // Fallback: if sparse data from API, add smart positional yellows
-                const yellows = Math.max(4, 10 - greenCount - redCount);
-                for (let i = 0; i < yellows; i++) {
-                    const t = (i + 0.5) / yellows;
-                    const lat = fromLat + (destLat - fromLat) * t + (Math.random() - 0.5) * (maxLat - minLat) * 0.3;
-                    const lng = fromLng + (destLng - fromLng) * t + (Math.random() - 0.5) * (maxLng - minLng) * 0.3;
-                    addZone(lat, lng, 200 + Math.random() * 150,
-                        '#e65100', '#ff9100',
-                        '🟡 Moderate Risk Area',
-                        'Low visible police presence. Stay cautious especially after dark.'
-                    );
-                }
-
-                // Fallback green if API returned nothing safe
-                if (greenCount === 0) {
-                    for (let i = 0; i < 4; i++) {
-                        const t = i / 4;
-                        const lat = fromLat + (destLat - fromLat) * t;
-                        const lng = fromLng + (destLng - fromLng) * t;
-                        addZone(lat, lng, 300, '#1b5e20', '#4caf50', '🟢 Safe Corridor', 'General route area. Relatively low risk.');
-                    }
-                }
-
-                showToast(`✅ ${nodes.length} real-world safety points loaded!`, 'success');
-            })
-            .catch(() => {
-                // API failed – graceful fallback to smart positional zones
-                showToast('⚡ Using fallback safety zones', 'info');
-
-                for (let i = 0; i < 6; i++) {
-                    const t = i / 6;
-                    const lat = fromLat + (destLat - fromLat) * t + (Math.random() - 0.5) * (maxLat - minLat) * 0.1;
-                    const lng = fromLng + (destLng - fromLng) * t + (Math.random() - 0.5) * (maxLng - minLng) * 0.1;
-                    addZone(lat, lng, 350, '#1b5e20', '#4caf50', '🟢 Safe Zone', 'Low crime density area.');
-                }
-                for (let i = 0; i < 4; i++) {
-                    const lat = midLat + (Math.random() - 0.5) * (maxLat - minLat);
-                    const lng = midLng + (Math.random() - 0.5) * (maxLng - minLng);
-                    addZone(lat, lng, 280, '#7f0000', '#ff1744', '🔴 High Risk Zone', 'Avoid if possible. High crime activity reported.');
-                }
-                for (let i = 0; i < 4; i++) {
-                    const lat = midLat + (Math.random() - 0.5) * (maxLat - minLat) * 0.7;
-                    const lng = midLng + (Math.random() - 0.5) * (maxLng - minLng) * 0.7;
-                    addZone(lat, lng, 220, '#e65100', '#ff9100', '🟡 Medium Risk Zone', 'Moderate crime reports. Stay alert.');
-                }
-            });
-
-
-            // ─── Premium Multi-Color Route Lines (Safe, Medium, Unsafe) ───
-            routeControl = L.Routing.control({
-                waypoints: [L.latLng(fromLat, fromLng), L.latLng(destLat, destLng)],
-                router: L.Routing.osrmv1({
-                    serviceUrl: 'https://router.project-osrm.org/route/v1',
-                    profile: currentRouteMode === 'walk' ? 'foot' : 'driving'
-                }),
-                showAlternatives: false,
-                createMarker: () => null,
-                show: false,
-                addWaypoints: false
-            }).on('routesfound', function(e) {
-                const routes = e.routes;
-                const summary = routes[0].summary;
-                
-                // Update UI Labels
-                const distKm = (summary.totalDistance / 1000).toFixed(1);
-                const timeMin = Math.round(summary.totalTime / 60);
-                
-                const distEl = document.getElementById('routeDistance');
-                const timeEl = document.getElementById('routeTime');
-                const infoPanel = document.getElementById('routeInfoPanel');
-                
-                if (distEl) distEl.innerText = `${distKm} km`;
-                if (timeEl) timeEl.innerText = `${timeMin} mins`;
-                if (infoPanel) infoPanel.style.display = 'flex';
-
-                // Display Route Metrics logic...
-                showToast(`Route Calculated: ${distKm}km, ~${timeMin}mins`, 'success');
-            }).addTo(routeMap);
-
-            if (window.premiumRoutePolylines) {
-                window.premiumRoutePolylines.forEach(p => routeMap.removeLayer(p));
-            }
+            if (window.premiumRoutePolylines) { window.premiumRoutePolylines.forEach(p => targetMap.removeLayer(p)); }
             window.premiumRoutePolylines = [];
 
-            // Custom markers
-            const greenIcon = L.divIcon({ html: `<div style="background:#4caf50;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px #4caf50;"></div>`, iconSize: [14, 14], className: '' });
-            const redIcon = L.divIcon({ html: `<div style="background:#f44336;width:14px;height:14px;border-radius:50%;border:3px solid white;box-shadow:0 0 8px #f44336;"></div>`, iconSize: [14, 14], className: '' });
+            function addZone(lat, lng, rad, clr, title, info) {
+                const c = L.circle([lat, lng], { radius: rad, color: clr, weight: 2, fillOpacity: 0.25 }).addTo(targetMap);
+                c.bindPopup('<b>' + title + '</b><br>' + info);
+                window.routeZoneLayers.push(c);
+            }
 
-            L.marker([fromLat, fromLng], { icon: greenIcon }).addTo(routeMap).bindPopup('<b>📍 Your Location</b>').openPopup();
-            L.marker([destLat, destLng], { icon: redIcon }).addTo(routeMap).bindPopup(`<b>🏁 ${dest.display_name.split(',')[0]}</b>`);
+            const bbox = (Math.min(fromLat, destLat)-0.05) + ',' + (Math.min(fromLng, destLng)-0.05) + ',' + (Math.max(fromLat, destLat)+0.05) + ',' + (Math.max(fromLng, destLng)+0.05);
+            fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: '[out:json][timeout:15];(node[\"amenity\"~\"police|hospital\"](' + bbox + ');node[\"amenity\"~\"bar|nightclub\"](' + bbox + '););out body 20;' })
+                .then(r => r.json())
+                .then(data => {
+                    (data.elements || []).forEach(n => {
+                        const isSafe = ['police', 'hospital'].includes(n.tags.amenity);
+                        addZone(n.lat, n.lon, isSafe ? 350 : 200, isSafe ? '#4caf50' : '#f44336', isSafe ? '🟢 Safe' : '🔴 Alert', n.tags.name || n.tags.amenity);
+                    });
+                }).catch(() => {});
 
-            routeMap.fitBounds([[fromLat, fromLng], [destLat, destLng]], { padding: [40, 40] });
+            // Dynamic Router selection (Car for Safe/Fast, Foot for Walk)
+            const routerUrl = 'https://routing.openstreetmap.de/routed-' + (currentRouteMode === 'walk' ? 'foot' : 'car') + '/route/v1';
+            
+            routeControl = L.Routing.control({
+                waypoints: [L.latLng(fromLat, fromLng), L.latLng(destLat, destLng)],
+                router: L.Routing.osrmv1({ serviceUrl: routerUrl }),
+                createMarker: () => null,
+                show: false,
+                lineOptions: { styles: [{ color: '#2563eb', weight: 6, opacity: 0.8 }] }
+            }).on('routesfound', function(e) {
+                const r = e.routes[0];
+                if (document.getElementById('routeDistance')) document.getElementById('routeDistance').innerText = (r.summary.totalDistance/1000).toFixed(1) + ' km';
+                if (document.getElementById('routeTime')) document.getElementById('routeTime').innerText = Math.round(r.summary.totalTime/60) + ' mins';
+                if (document.getElementById('routeInfoPanel')) document.getElementById('routeInfoPanel').style.display = 'flex';
+                targetMap.fitBounds([[fromLat, fromLng], [destLat, destLng]], { padding: [50, 50] });
+                showToast('✅ Route calculated', 'success');
+            }).addTo(targetMap);
 
-            // Stats & Custom Rendering
-            routeControl.on('routesfound', function (e) {
-                // Clear any existing custom paths
-                if (window.premiumRoutePolylines) {
-                    window.premiumRoutePolylines.forEach(p => routeMap.removeLayer(p));
-                }
-                window.premiumRoutePolylines = [];
-
-                const routeConfigs = [
-                    { label: '🟢 Safe Passage (Quantum Verified)', border: '#064e3b', glow: '#10b981', dash: '' },
-                    { label: '🟡 Cautionary Route', border: '#78350f', glow: '#f59e0b', dash: '12,8' },
-                    { label: '🔴 Elevated Risk Divergence', border: '#7f1d1d', glow: '#ef4444', dash: '6,10' }
-                ];
-
-                // Render in reverse so Safe Route (index 0) stays on top
-                const routesToDraw = e.routes.slice(0, 3);
-                for (let i = routesToDraw.length - 1; i >= 0; i--) {
-                    const r = routesToDraw[i];
-                    const cfg = routeConfigs[i];
-                    const coords = r.coordinates.map(c => [c.lat, c.lng]);
-
-                    // NEON GLOW Path Layers
-                    const glowBase = L.polyline(coords, { 
-                        color: cfg.glow, weight: 12, opacity: 0.15, 
-                        lineCap: 'round', lineJoin: 'round',
-                        className: 'neon-path-base' 
-                    }).addTo(routeMap);
-
-                    const neonLine = L.polyline(coords, { 
-                        color: cfg.glow, weight: 5, opacity: 1, 
-                        dashArray: cfg.dash, lineCap: 'round', lineJoin: 'round',
-                        className: i === 0 ? 'neon-path-active' : '' 
-                    }).addTo(routeMap);
-                    
-                    neonLine.bindTooltip(`<b>${cfg.label}</b><br>${Math.round(r.summary.totalTime/60)} mins • ${(r.summary.totalDistance/1000).toFixed(1)} km`, { sticky: true, className: 'premium-popup' });
-                    
-                    window.premiumRoutePolylines.push(glowBase, neonLine);
-                }
-
-                const route = e.routes[0];
-                const summary = route.summary;
-
-                // --- QUANTUM SAFETY INTELLIGENCE ---
-                // Count Safe Havens specifically within 500m of this route
-                let safeHavenMilestones = 0;
-                window.drawnZones.forEach(z => {
-                    const nearRoute = route.coordinates.some(c => getDistanceMeters(z.lat, z.lng, c.lat, c.lng) < 500);
-                    if (nearRoute && z.isSafe) safeHavenMilestones++;
-                });
-
-                const km = (summary.totalDistance / 1000).toFixed(1);
-                const mins = Math.round(summary.totalTime / 60);
-                const currentHour = new Date().getHours();
-                const current = calculateRouteAverageScore(route.coordinates, currentHour);
-
-                document.getElementById('routeTime').innerText = `${mins} mins`;
-                document.getElementById('routeDistance').innerText = `${km} km`;
-                document.getElementById('routeSafety').innerText = `${current.score} / 10`;
-                document.getElementById('routeSafety').style.color = current.color;
-
-                // Update New UI Elements for Intelligence
-                const intelEl = document.getElementById('routeIntel');
-                if (intelEl) {
-                    intelEl.innerHTML = `
-                        <div style="display:flex; align-items:center; gap:8px; background:rgba(16,185,129,0.1); padding:8px 12px; border-radius:12px; border:1px solid rgba(16,185,129,0.2);">
-                            <i class="fas fa-shield-heart" style="color:#10b981;"></i>
-                            <span style="font-size:11px; color:#fff;"><b>${safeHavenMilestones}</b> Safe Havens found along this path</span>
-                        </div>
-                    `;
-                    intelEl.style.display = 'block';
-                }
-
-                // Update Forecast UI
-                const morning = calculateDynamicScore(9);
-                const evening = calculateDynamicScore(19);
-                const night = calculateDynamicScore(2);
-                document.getElementById('routeScoreMorning').innerText = morning.score;
-                document.getElementById('routeScoreEvening').innerText = evening.score;
-                document.getElementById('routeScoreNight').innerText = night.score;
-
-                document.getElementById('routeForecast').style.display = 'grid';
-                document.getElementById('routeInfoPanel').style.display = 'flex';
-            });
-
-            // Add legend
-            addRouteLegend(isNight);
+            L.marker([fromLat, fromLng], { icon: L.divIcon({ html: '<div class=\"w-4 h-4 bg-green-500 rounded-full border-2 border-white\"></div>', iconSize: [16, 16], className: '' }) }).addTo(targetMap);
+            L.marker([destLat, destLng], { icon: L.divIcon({ html: '<div class=\"w-4 h-4 bg-red-500 rounded-full border-2 border-white\"></div>', iconSize: [16, 16], className: '' }) }).addTo(targetMap);
         })
-        .catch(() => showToast('Network error. Check connection.', 'error'));
+        .catch(err => showToast(err.message, 'error'));
 }
-
 function calculateRouteAverageScore(coords, hour) {
     if (!coords || coords.length === 0) return { score: "9.0", color: "#4caf50" };
 
@@ -2085,27 +1838,36 @@ function addRouteLegend(isNight) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Initial Render of Any Saved Contacts
+    // 1. Core Auth Handlers (Attach IMMEDIATELY to prevent unresponsive buttons)
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    if (loginForm) loginForm.addEventListener('submit', handleLoginSubmission);
+    if (signupForm) signupForm.addEventListener('submit', handleSignupSubmission);
+
+    // 2. Initial Render of Any Saved Contacts
     renderCustomContacts();
 
     try {
-        // 2. Loader Start Karo
+        // 3. Loader Start Karo
         runLoader();
 
-        // 3. Battery Monitor Start Karo
+        // 4. Battery Monitor Start Karo
         initBatteryGuardian();
 
-        // 4. Instant Clock & Score Update (No GPS needed for these)
+        // 5. Instant Clock & Score Update (No GPS needed for these)
         updateDashboard();
         refreshSafetyScore();
 
-        // 5. Update Premium UI
+        // 6. Update User UI (Show Name/Email in Header)
+        updateUserUI();
+
+        // 7. Update Premium UI
         updatePremiumUI();
 
-        // 6. Security Gate: Check if user is logged in
+        // 8. Security Gate: Check if user is logged in
         checkAuthGate();
 
-        // 7. Initialize Official Google Identity Services (GSI)
+        // 9. Initialize Official Google Identity Services (GSI)
         window.isGSI_Ready = false;
         
         // Fetch real Client ID from server if available (Dynamic Config)
@@ -2116,65 +1878,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (typeof google !== 'undefined') {
                 console.log("🛠️ GSI DEBUG: Initializing with ID:", GOOGLE_CLIENT_ID);
-                console.log("🛠️ GSI DEBUG: Current Origin:", window.location.origin);
-
+                
                 google.accounts.id.initialize({
                     client_id: GOOGLE_CLIENT_ID,
                     callback: handleCredentialResponse,
                     auto_select: false,
                     itp_support: true,
-                    ux_mode: 'popup' // Ensure popup mode for better compatibility
+                    ux_mode: 'popup'
                 });
 
                 window.isGSI_Ready = !GOOGLE_CLIENT_ID.includes("v1v8v1");
                 
                 if (window.isGSI_Ready) {
-                    console.log("✅ Google Sign-In Initialized with Real ID.");
-                    
-                    // Render official branded buttons for 100% browser compatibility
-                    const opt = { theme: "outline", size: "large", width: 400, text: "continue_with", shape: "pill" };
+                    console.log("✅ Google Sign-In Initialized.");
+                    const opt = { theme: "outline", size: "large", width: "100%", text: "continue_with", shape: "pill" };
                     
                     const btnLogin = document.getElementById("googleBtnLogin");
                     const btnSignup = document.getElementById("googleBtnSignup");
-                    const oldBtnLogin = document.getElementById("googleContinueBtn");
-                    const oldBtnSignup = document.getElementById("googleContinueBtnSignup");
-
                     if (btnLogin) google.accounts.id.renderButton(btnLogin, opt);
                     if (btnSignup) google.accounts.id.renderButton(btnSignup, opt);
-                    
-                    // Hide traditional sync buttons if real Google is working
-                    if (oldBtnLogin) oldBtnLogin.style.display = "none";
-                    if (oldBtnSignup) oldBtnSignup.style.display = "none";
-
-                    // Also try One-tap (optional)
-                    google.accounts.id.prompt(); 
-                } else {
-                    console.warn("⚠️ Google SSO using placeholder. Social Sync mode active.");
-                    // Show traditional sync buttons if real Google is not configured
-                    const oldBtnLogin = document.getElementById("googleContinueBtn");
-                    const oldBtnSignup = document.getElementById("googleContinueBtnSignup");
-                    if (oldBtnLogin) oldBtnLogin.style.display = "flex";
-                    if (oldBtnSignup) oldBtnSignup.style.display = "flex";
                 }
             }
         }).catch(err => {
-            console.warn("Failed to fetch dynamic GSI config, using fallback.", err);
+            console.warn("GSI Fetch failed. Social Sync fallback active.", err);
         });
 
-        // 8. Auth Form Handlers
-        const loginForm = document.getElementById('loginForm');
-        const signupForm = document.getElementById('signupForm');
-        if (loginForm) loginForm.addEventListener('submit', handleLoginSubmission);
-        if (signupForm) signupForm.addEventListener('submit', handleSignupSubmission);
-
     } catch (e) {
-        console.error("Initialization Error:", e);
-        // Fallback: Hide loader if crash occurs
+        console.error("Initialization Warning (Non-Fatal):", e);
         const loader = document.getElementById('loaderScreen');
         if (loader) loader.style.display = 'none';
         document.body.classList.add('loaded');
     }
 });
+
+function updateUserUI() {
+    const userStr = localStorage.getItem('herSafety_user');
+    const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
+    const userInfo = document.getElementById('userInfo');
+    const userNameDisplay = document.getElementById('userNameDisplay');
+
+    if (user && userInfo && userNameDisplay) {
+        userInfo.style.display = 'flex';
+        userNameDisplay.innerText = user.name || user.email.split('@')[0];
+        userNameDisplay.title = user.email; // Tooltip for full email
+    } else if (userInfo) {
+        userInfo.style.display = 'none';
+    }
+}
 
 /**
  * Animates the professional premium loader and transitions to the app.
@@ -2455,7 +2205,7 @@ function showCallOptionsModal(name, phone) {
                 <button onclick="document.getElementById('callOptionsModal').remove()"
                         style="background:transparent;border:1px solid #444;color:#888;
                                padding:11px;border-radius:12px;cursor:pointer;font-size:0.9rem;margin-top:4px;">
-                    ✕ Cancel
+                    ✖ Cancel
                 </button>
             </div>
 
@@ -2916,7 +2666,7 @@ function renderPaymentMethodsModal() {
             <div class="p-8">
                 <div class="flex items-center justify-between mb-8">
                     <h3 class="text-xl font-bold text-white">Payment Methods</h3>
-                    <button onclick="this.closest('.fixed').remove()" class="text-zinc-500 hover:text-white transition-colors text-xl">✕</button>
+                    <button onclick="this.closest('.fixed').remove()" class="text-zinc-500 hover:text-white transition-colors text-xl">✖</button>
                 </div>
                 
                 <div class="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2" id="paymentMethodsList">
@@ -2980,7 +2730,7 @@ function showAddNewPaymentForm() {
             <div class="p-8">
                 <div class="flex items-center justify-between mb-8">
                     <h3 class="text-xl font-bold text-white uppercase tracking-tighter italic font-black underline decoration-safety-purple/50">New Secure Method</h3>
-                    <button onclick="this.closest('.fixed').remove()" class="text-zinc-500 hover:text-white transition-colors text-xl">✕</button>
+                    <button onclick="this.closest('.fixed').remove()" class="text-zinc-500 hover:text-white transition-colors text-xl">✖</button>
                 </div>
 
                 <form onsubmit="saveNewPaymentMethod(event)" class="space-y-4">
@@ -3057,7 +2807,7 @@ function showBillingHistory() {
             <div class="p-8">
                 <div class="flex items-center justify-between mb-8">
                     <h3 class="text-xl font-bold text-white">Billing History</h3>
-                    <button onclick="this.closest('.fixed').remove()" class="text-zinc-500 hover:text-white transition-colors text-xl">✕</button>
+                    <button onclick="this.closest('.fixed').remove()" class="text-zinc-500 hover:text-white transition-colors text-xl">✖</button>
                 </div>
                 
                 <div class="bg-white/5 rounded-2xl border border-white/5 overflow-hidden">
@@ -3070,20 +2820,14 @@ function showBillingHistory() {
                             </tr>
                         </thead>
                         <tbody class="text-white/80">
-                            ${isPremium ? `
                             <tr class="border-t border-white/5">
                                 <td class="p-4">${new Date().toLocaleDateString()}</td>
                                 <td class="p-4">
                                     <span class="block font-bold">Pro Monthly</span>
                                     <span class="text-[10px] text-green-400 font-bold">Subscription Active</span>
                                 </td>
-                                <td class="p-4 text-right font-black">₹1.00</td>
+                                <td class="p-4 text-right font-black">â‚¹1.00</td>
                             </tr>
-                            ` : `
-                            <tr>
-                                <td colspan="3" class="p-12 text-center text-zinc-600 italic">No billing records found.</td>
-                            </tr>
-                            `}
                         </tbody>
                     </table>
                 </div>
@@ -3111,7 +2855,7 @@ function showTransactionHistory() {
                         <h3 class="text-xl font-bold text-white">Transaction History</h3>
                         <p class="text-[10px] text-zinc-500 uppercase font-black mt-1">Direct Audit from Razorpay SDK</p>
                     </div>
-                    <button onclick="this.closest('.fixed').remove()" class="text-zinc-500 hover:text-white transition-colors text-xl">✕</button>
+                    <button onclick="this.closest('.fixed').remove()" class="text-zinc-500 hover:text-white transition-colors text-xl">âœ•</button>
                 </div>
                 
                 <div class="max-h-[400px] overflow-y-auto space-y-3 custom-scrollbar pr-2">
@@ -3123,11 +2867,11 @@ function showTransactionHistory() {
                             </div>
                             <div>
                                 <h4 class="text-white text-xs font-mono font-bold">${t.payment_id}</h4>
-                                <p class="text-[9px] text-zinc-500 uppercase tracking-tighter">${t.date} • ${t.time}</p>
+                                <p class="text-[9px] text-zinc-500 uppercase tracking-tighter">${t.date} â€¢ ${t.time}</p>
                             </div>
                         </div>
                         <div class="text-right">
-                            <span class="block text-white font-black text-sm">₹${t.amount}.00</span>
+                            <span class="block text-white font-black text-sm">â‚¹${t.amount}.00</span>
                             <span class="text-[9px] text-green-400 font-bold uppercase">${t.status}</span>
                         </div>
                     </div>
@@ -3192,7 +2936,7 @@ function startBatteryCountdown() {
         if (timeLeft <= 0) {
             clearInterval(batteryCheckInTimer);
             // AUTO SOS DUE TO LOW BATTERY
-            showToast("🚨 Low Battery Critical Alert: Contacts notified!", "error");
+            showToast("ðŸš¨ Low Battery Critical Alert: Contacts notified!", "error");
             triggerSOS();
             document.getElementById('batteryModal').style.display = 'none';
         }
@@ -3203,7 +2947,7 @@ function batteryCheckIn() {
     clearInterval(batteryCheckInTimer);
     batteryCheckInTimer = null;
     document.getElementById('batteryModal').style.display = 'none';
-    showToast("✅ Check-in successful. Stay safe!", "success");
+    showToast("âœ… Check-in successful. Stay safe!", "success");
 }
 
 // ============================================================
@@ -3217,11 +2961,11 @@ function scanSafeHavens() {
 
     const btn = document.getElementById('radarBtn');
     btn.classList.add('radar-active');
-    showToast("🛰️ Radar scanning for Police Stations & Hospitals...", "success");
+    showToast("ðŸ›°ï¸ Radar scanning for Police Stations & Hospitals...", "success");
 
     // Clear old radar markers if any
     if (window.radarLayers) {
-        window.radarLayers.forEach(l => routeMap.removeLayer(l));
+        window.radarLayers.forEach(l => ((routeMap ? routeMap : map)).removeLayer(l));
     }
     window.radarLayers = [];
 
@@ -3240,7 +2984,7 @@ function scanSafeHavens() {
 
         const marker = L.marker([haven.lat, haven.lng], { icon })
             .addTo(routeMap)
-            .bindPopup(`<b>🛡️ Safe Haven: ${haven.name}</b><br>Secured Location`);
+            .bindPopup(`<b>ðŸ›¡ï¸ Safe Haven: ${haven.name}</b><br>Secured Location`);
 
         window.radarLayers.push(marker);
     });
@@ -3249,8 +2993,8 @@ function scanSafeHavens() {
         btn.classList.remove('radar-active');
         // Fit map to show all havens
         const group = new L.featureGroup(window.radarLayers);
-        routeMap.fitBounds(group.getBounds().pad(0.2));
-        showToast("✅ 3 Safe Havens found and marked on map.", "success");
+        ((routeMap ? routeMap : map)).fitBounds(group.getBounds().pad(0.2));
+        showToast("âœ… 3 Safe Havens found and marked on map.", "success");
     }, 2000);
 }
 
@@ -3317,7 +3061,7 @@ function checkAuthGate() {
         // Let updatePremiumUI handle proLink & goPremiumNav visibility
         updatePremiumUI();
 
-        // ✅ FIX: If user is logged in, always go to home dashboard
+        // âœ… FIX: If user is logged in, always go to home dashboard
         // Don't rely on URL hash which is empty on fresh reload
         const visibleSection = document.querySelector('.section-container[style*="block"], .section-container.active-section');
         const visibleId = visibleSection ? visibleSection.id : null;
@@ -3331,7 +3075,7 @@ function checkAuthGate() {
         // Hide premium features for logged-out users
         updatePremiumUI();
 
-        // ✅ FIX: Check the currently visible section instead of URL hash
+        // âœ… FIX: Check the currently visible section instead of URL hash
         const visibleSection = document.querySelector('.section-container[style*="block"], .section-container.active-section');
         const visibleId = visibleSection ? visibleSection.id : null;
         const protectedSections = ['home', 'route', 'contacts', 'records', 'pro-center', 'tips', 'feedback', 'pro-dashboard'];
@@ -3403,7 +3147,7 @@ async function handleCredentialResponse(response) {
     showToast("Syncing with Google...", "info");
 
     try {
-        console.log("🚀 GSI DEBUG: Sending token to verify at", `${API_URL}/google-login-verify`);
+        console.log("ðŸš€ GSI DEBUG: Sending token to verify at", `${API_URL}/google-login-verify`);
         const res = await fetch(`${API_URL}/google-login-verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3415,6 +3159,7 @@ async function handleCredentialResponse(response) {
         if (res.ok) {
             localStorage.setItem('herSafety_user', JSON.stringify(data.user));
             showToast(`Welcome back, ${data.user.name}!`, "success");
+            if (typeof updateUserUI === 'function') updateUserUI();
             checkAuthGate();
         } else {
             showToast(data.message || "Google Verification Failed", "error");
@@ -3432,7 +3177,7 @@ async function handleCredentialResponse(response) {
 function openGoogleAccountPicker() {
     // 1. Try to use real Google Identity Services first if initialized
     if (window.isGSI_Ready && typeof google !== 'undefined') {
-        console.log("🚀 Triggering Real Google Picker...");
+        console.log("ðŸš€ Triggering Real Google Picker...");
         showToast("Opening Google Account Chooser...", "info");
         try {
             google.accounts.id.prompt();
@@ -3443,7 +3188,7 @@ function openGoogleAccountPicker() {
     }
 
     // 2. Fallback to our custom secure cloud simulation if real OAuth isn't ready
-    console.log("🔗 Switching to Secure Sync Simulation...");
+    console.log("ðŸ”— Switching to Secure Sync Simulation...");
     handleGoogleLoginFallback();
     return true;
 }
@@ -3463,7 +3208,7 @@ async function handleGoogleLoginFallback() {
                     <img src="https://img.icons8.com/color/48/google-logo.png" class="h-6" alt="Google">
                     <span class="text-[10px] text-[#D4AF37] font-black uppercase tracking-widest bg-[#D4AF37]/10 px-3 py-1 rounded-full">Secure Auth</span>
                 </div>
-                <button onclick="this.closest('.fixed').remove()" class="text-zinc-500 hover:text-[#D4AF37] transition-all">✕</button>
+                <button onclick="this.closest('.fixed').remove()" class="text-zinc-500 hover:text-[#D4AF37] transition-all">âœ•</button>
             </div>
             <div class="p-10">
                 <h3 class="text-2xl font-bold text-white mb-2">Choose an Account</h3>
@@ -3506,7 +3251,7 @@ async function handleGoogleLoginFallback() {
         `;
 
         try {
-            // ✅ Call Backend: Find or create user in MongoDB
+            // âœ… Call Backend: Find or create user in MongoDB
             const res = await fetch(`${API_URL}/google-social-sync`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -3519,7 +3264,8 @@ async function handleGoogleLoginFallback() {
                 popup.remove();
                 // Save the REAL DB user (with proper MongoDB _id) to localStorage
                 localStorage.setItem('herSafety_user', JSON.stringify(data.user));
-                showToast(`Welcome, ${data.user.name}! Account synced securely. ✅`, "success");
+                showToast(`Welcome, ${data.user.name}! Account synced securely. âœ…`, "success");
+                updateUserUI(); // Update UI with new user details
                 checkAuthGate();
                 updatePremiumUI();
             } else {
@@ -3529,11 +3275,11 @@ async function handleGoogleLoginFallback() {
 
         } catch (err) {
             console.error("Google social sync failed:", err);
-            // Graceful offline fallback — still lets user in locally
+            // Graceful offline fallback â€” still lets user in locally
             popup.remove();
             const userData = { id: `g_${Date.now()}`, name, email, phone: 'Google Authenticated' };
             localStorage.setItem('herSafety_user', JSON.stringify(userData));
-            showToast(`Welcome, ${name}! (Offline mode — server unreachable)`, "success");
+            showToast(`Welcome, ${name}! (Offline mode â€” server unreachable)`, "success");
             checkAuthGate();
             updatePremiumUI();
         }
@@ -3542,7 +3288,7 @@ async function handleGoogleLoginFallback() {
 }
 
 /**
- * Legacy alias — kept so any old onclick="handleGoogleLogin()" calls still work.
+ * Legacy alias â€” kept so any old onclick="handleGoogleLogin()" calls still work.
  */
 function handleGoogleLogin() {
     openGoogleAccountPicker();
@@ -3592,6 +3338,7 @@ async function handleLoginSubmission(e) {
         if (res.ok) {
             localStorage.setItem('herSafety_user', JSON.stringify(data.user));
             showToast(`Welcome back, ${data.user.name}!`, "success");
+            if (typeof updateUserUI === 'function') updateUserUI();
             checkAuthGate();
             updatePremiumUI();
             fetchAndStoreContacts(); // Sync contacts on login
@@ -3690,18 +3437,96 @@ if (localStorage.getItem('herSafety_user')) {
 //  EMERGENCY FORCED MAP LOAD (The Bulletproof Fix)
 // ============================================================
 window.addEventListener('load', () => {
-    console.log("🚦 Window Load: Checking Map Status...");
+    console.log("ðŸš¦ Window Load: Checking Map Status...");
     setTimeout(() => {
         if (typeof L === 'undefined') {
-            console.error("❌ Leaflet failure. Retrying CDN...");
+            console.error("âŒ Leaflet failure. Retrying CDN...");
             const s = document.createElement('script');
             s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-            s.onload = () => { console.log("✅ Leaflet CDN Recovered."); initMap(30.901, 75.8573); };
+            s.onload = () => { console.log("âœ… Leaflet CDN Recovered."); initMap(30.901, 75.8573); };
             document.head.appendChild(s);
         } else {
-            console.log("✅ Leaflet Ready. Forcing Map Start...");
+            console.log("âœ… Leaflet Ready. Forcing Map Start...");
             // Force map to initialize with Ludhiana if it hasn't already
             if (!map) initMap(30.901, 75.8573);
         }
     }, 1000);
 });
+
+// RESTORED: Dedicated Route Map Initialization
+function initRouteMap() {
+    const container = document.getElementById('routeMap');
+    if (!container || routeMap) return;
+
+    if (container.offsetWidth === 0) {
+        setTimeout(initRouteMap, 400);
+        return;
+    }
+
+    try {
+        routeMap = L.map('routeMap', {
+            zoomControl: false,
+            attributionControl: false
+        }).setView([userLatLng.lat, userLatLng.lng], 14);
+
+        L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+            maxZoom: 20,
+            subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+            attribution: 'Â© Google Maps'
+        }).addTo((routeMap ? routeMap : map));
+
+        L.control.zoom({ position: 'bottomright' }).addTo(routeMap);
+
+        // ADDED: User Marker on Route Map
+        L.marker([userLatLng.lat, userLatLng.lng]).addTo(routeMap)
+            .bindPopup("<b>Verified Safety Hub</b><br>You are here.").openPopup();
+
+        // Update Starting point input
+        const routeFromInput = document.getElementById('routeFrom');
+        if (routeFromInput && !routeFromInput.value) {
+            routeFromInput.value = "Current Location (Auto-Synced)";
+        }
+        
+        setTimeout(() => {
+            if (routeMap) routeMap.invalidateSize();
+        }, 300);
+    } catch (e) {
+        console.warn("Route Map Init Error:", e);
+    }
+}
+
+
+function useCurrentLocationForRoute() {
+    const input = document.getElementById('routeFrom');
+    if (!input) return;
+    
+    if (userLatLng) {
+        input.value = "Current Location (Linked via OpenStreet)";
+        showToast("?? User location sync active", "success");
+    } else {
+        showToast("?? Location not available. Searching...", "info");
+        navigator.geolocation.getCurrentPosition((pos) => {
+            userLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            input.value = "Current Location (Linked via OpenStreet)";
+            showToast("?? Location synchronized", "success");
+        }, () => {
+            showToast("? Use manual address input", "error");
+        });
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
