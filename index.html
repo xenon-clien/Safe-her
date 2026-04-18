@@ -153,28 +153,7 @@
                 <p>Your personal safety companion — armed with AI-powered tools.</p>
             </div>
 
-            <!-- SOS Button SECTION (Now the PRIMARY Focal Point) -->
-            <div class="flex flex-col items-center justify-center pt-6 pb-12 w-full animate-fadeInUp">
-                <div class="sos-container relative scale-110">
-                    <div class="sos-glass-ring"></div>
-                    <div class="sos-glow-inner"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
-                    <div class="sos-ripple"></div>
 
-                    <button id="sosBtn" class="sos-btn premium-sos" onclick="triggerSOS()">
-                        <div class="sos-inner-glow"></div>
-                        <span class="sos-text">SOS</span>
-                    </button>
-
-                    <p id="sosStatus" class="sos-status-premium"></p>
-                    
-                    <div id="blackboxStatus" class="blackbox-status-premium" style="display: none;">
-                        <span class="dot-premium pulse-red"></span> LIVE PROTECTION ACTIVE
-                    </div>
-                </div>
-            </div>
 
             <!-- Safety Dashboard Stats -->
             <div class="safety-dashboard">
@@ -254,6 +233,27 @@
                     <i class="fas fa-moon text-blue-400"></i>
                     <span class="forecast-time">Night</span>
                     <span class="forecast-score" id="scoreNight">--</span>
+                </div>
+            </div>
+
+            <!-- SOS Button SECTION (Moved Right Above the Map) -->
+            <div class="flex flex-col items-center justify-center pt-6 pb-6 w-full animate-fadeInUp">
+                <div class="sos-container relative scale-110">
+                    <div class="sos-glass-ring"></div>
+                    <div class="sos-glow-inner"></div>
+                    <div class="sos-ripple"></div>
+                    <div class="sos-ripple"></div>
+
+                    <button id="sosBtn" class="sos-btn premium-sos" onclick="triggerSOS()">
+                        <div class="sos-inner-glow"></div>
+                        <span class="sos-text">SOS</span>
+                    </button>
+
+                    <p id="sosStatus" class="sos-status-premium"></p>
+                    
+                    <div id="blackboxStatus" class="blackbox-status-premium" style="display: none;">
+                        <span class="dot-premium pulse-red"></span> LIVE PROTECTION ACTIVE
+                    </div>
                 </div>
             </div>
 

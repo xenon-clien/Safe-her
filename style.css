@@ -584,7 +584,7 @@ a {
 
 @keyframes rippleEffect {
     0% { transform: translate(-50%, -50%) scale(1); opacity: 1; border-width: 4px; }
-    100% { transform: translate(-50%, -50%) scale(5); opacity: 0; border-width: 1px; }
+    100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; border-width: 1px; }
 }
 
 .sos-status {
