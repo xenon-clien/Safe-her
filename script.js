@@ -1182,16 +1182,22 @@ function speakSafeHer(text) {
         utterance.rate = 1.0;
         utterance.pitch = 1.0; 
         
-        // --- Detect Language (Simplistic check for Hindi characters) ---
-        const isHindi = /[\u0900-\u097F]/.test(text);
-        utterance.lang = isHindi ? 'hi-IN' : 'en-US';
+        // --- Smart Language Detection ---
+        const hasHindiScript = /[\u0900-\u097F]/.test(text);
+        const hingesWords = ['hai', ' kyo', ' kya', ' nahi', ' rha', ' rahi', ' raha', ' toh', ' gya', ' gaya', ' kar ', ' karo ', ' rhi ', ' meri ', ' mera ', ' hum ', ' app ', ' aap ', ' kahan ', ' kidhar ', ' bas ', ' kijiye ', ' karke ', ' liye '];
+        const hasHinglish = hingesWords.some(word => text.toLowerCase().includes(word));
+        
+        const isLikelyHindi = hasHindiScript || hasHinglish;
+        utterance.lang = isLikelyHindi ? 'hi-IN' : 'en-US';
 
         let selectedVoice = null;
-        if (isHindi) {
-            selectedVoice = availableVoices.find(v => v.lang.includes('hi') || v.name.includes('Hindi') || v.name.includes('Kalpana') || v.name.includes('Hemant'));
+        if (isLikelyHindi) {
+            // Find any Indian-sounding voice
+            selectedVoice = availableVoices.find(v => v.lang.includes('hi') || v.name.includes('India') || v.name.includes('Hindi') || v.name.includes('Kalpana'));
         }
 
         if (!selectedVoice) {
+            // Fallback to high-quality female voice
             selectedVoice = availableVoices.find(v => 
                 v.lang.includes('en') && 
                 (v.name.includes("Female") || v.name.includes("Zira") || v.name.includes("Google UK English Female") || v.name.includes("Samantha"))
