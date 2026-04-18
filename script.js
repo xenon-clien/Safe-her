@@ -1270,7 +1270,7 @@ function toggleMic() {
             if (event.error === 'not-allowed') {
                 showToast("🎤 Mic Blocked: Please click the LOCK icon in your browser address bar and ALLOW Microphone access.", "error");
             } else if (event.error === 'network') {
-                showToast("🌐 Network Error: Voice recognition needs an active internet connection.", "error");
+                showToast("🌐 Network Error: Brave users must enable 'Google Services for Speech' in brave://settings/privacy", "error");
             } else {
                 showToast("Mic Error: " + event.error, "error");
             }
