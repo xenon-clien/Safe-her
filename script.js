@@ -1225,47 +1225,57 @@ async function findNearest(type) {
 
     const currentPos = userLatLng || { lat: 30.901, lng: 75.8573 };
 
-    showToast(`Searching for nearest ${type}...`, 'info');
-
-    // Overpass API Query
-    const query = `[out:json];node(around:3000,${currentPos.lat},${currentPos.lng})[amenity=${type}];out;`;
-    
     try {
-        const response = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
-        const data = await response.json();
-        const nodes = data.elements || [];
+        showToast(`Searching for nearest ${type}...`, 'info');
+        
+        // --- STEP 1: TRY NOMINATIM ---
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${type}&lat=${currentPos.lat}&lon=${currentPos.lng}&limit=3`;
+        
+        let nodes = [];
+        try {
+            const nomResp = await fetch(nominatimUrl, { headers: { 'Accept-Language': 'en' } });
+            const nomData = await nomResp.json();
+            nodes = nomData.map(item => ({
+                lat: parseFloat(item.lat),
+                lon: parseFloat(item.lon),
+                tags: { name: item.display_name.split(',')[0] }
+            }));
+        } catch (nomErr) {
+            console.warn("Nominatim failed, falling back to Overpass...");
+        }
+
+        // --- STEP 2: FALLBACK TO OVERPASS ---
+        if (nodes.length === 0) {
+            const overpassQuery = `[out:json];node(around:3000,${currentPos.lat},${currentPos.lng})[amenity=${type}];out;`;
+            const ovResp = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: overpassQuery });
+            const ovData = await ovResp.json();
+            nodes = ovData.elements || [];
+        }
 
         if (nodes.length === 0) {
-            showToast(`No ${type}s detected within 5km. Try a different area.`, 'error');
+            showToast(`No ${type}s detected nearby.`, 'error');
             return;
         }
 
-        // Find Closest Node
         let closest = null;
         let minDist = Infinity;
 
         nodes.forEach(node => {
-            // calculate distance in km for caching
-            const d = calculateDistance(currentPos.lat, currentPos.lng, node.lat, node.lon);
+            const d = calculateDistance(currentPos.lat, currentPos.lng, node.lat, node.lon || node.lng);
             if (d < minDist) {
                 minDist = d;
                 closest = node;
-                closest._dist = d / 1000; // store km distance for UI
+                closest._dist = d / 1000; 
             }
         });
 
-
         if (closest) {
-            // Save to cache
             nearestCache[type] = { timestamp: Date.now(), result: closest };
-
             const name = closest.tags.name || `Nearest ${type}`;
             const distStr = (minDist / 1000).toFixed(2) + " km";
             
-            showToast(`ðŸ“ Found: ${name} (${distStr})`, "success");
-
-            // Pan and Mark on Map
-            activeMap.setView([closest.lat, closest.lon], 15);
+            showToast(`📍 Found: ${name}`, "success");
+            activeMap.setView([closest.lat, closest.lon || closest.lng], 15);
             
             const color = type === 'hospital' ? '#ef4444' : '#3b82f6';
             const icon = L.divIcon({
@@ -1274,20 +1284,15 @@ async function findNearest(type) {
                 iconSize: [34, 34]
             });
 
-            L.marker([closest.lat, closest.lon], { icon }).addTo(activeMap)
-                .bindPopup(`<b>${name}</b><br>Distance: ${distStr}<br><button onclick="navigateToCoords(${closest.lat}, ${closest.lon})" class="emergency-nav-btn">Start Route</button>`)
+            L.marker([closest.lat, closest.lon || closest.lng], { icon }).addTo(activeMap)
+                .bindPopup(`<b>${name}</b><br>Distance: ${distStr}<br><button onclick="navigateToCoords(${closest.lat}, ${closest.lon || closest.lng})" class="emergency-nav-btn">Start Route</button>`)
                 .openPopup();
 
-            // Auto-fill Route Planner if user wants to go there
             const routeToField = document.getElementById('routeTo');
-            if (routeToField) {
-                routeToField.value = `${closest.lat}, ${closest.lon}`;
-            }
+            if (routeToField) routeToField.value = `${closest.lat}, ${closest.lon || closest.lng}`;
         }
-
     } catch (error) {
         console.error("Facility search error:", error);
-        showToast("Satellite Servers Busy. Please try again in 30s.", "error");
     }
 }
 
