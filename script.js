@@ -1112,22 +1112,41 @@ async function sendMessage() {
         const typingEl = document.getElementById(typingId);
         if (typingEl) typingEl.remove();
 
-        const botReply = data.response || "I'm having trouble connecting to my central brain.";
-        
-        // --- MAP INTEGRATION: Check for Location Tokens ---
+        // --- MAP & ACTION INTEGRATION: Parse Tokens ---
         let cleanReply = botReply;
+        
+        // 1. Map Focus
         if (botReply.includes("MAP_FOCUS:")) {
             const parts = botReply.split("MAP_FOCUS:");
             cleanReply = parts[0].trim();
             const locationQuery = parts[1].trim();
-            
             showToast(`📍 AI Focusing Map: ${locationQuery}`, "info");
-            // Trigger a manual search on the map
             const searchInput = document.getElementById('manualLocationInput');
             if (searchInput) {
                 searchInput.value = locationQuery;
-                handleManualSearch(); // This function should exist globally
+                handleManualSearch();
             }
+        }
+
+        // 2. SOS Trigger
+        if (botReply.includes("SOS_TRIGGER")) {
+            cleanReply = cleanReply.replace("SOS_TRIGGER", "").trim();
+            showToast("🚨 AI recognized emergency! Activating SOS...", "error");
+            if (typeof triggerSOS === 'function') triggerSOS();
+        }
+
+        // 3. Tracking Trigger
+        if (botReply.includes("START_TRACKING")) {
+            cleanReply = cleanReply.replace("START_TRACKING", "").trim();
+            showToast("🛰️ Starting Live Tracking...", "success");
+            if (typeof startTracking === 'function') startTracking();
+        }
+
+        // 4. Fake Call Trigger
+        if (botReply.includes("FAKE_CALL_TRIGGER")) {
+            cleanReply = cleanReply.replace("FAKE_CALL_TRIGGER", "").trim();
+            showToast("📞 Simulating Fake Call...", "info");
+            if (typeof simulateCall === 'function') simulateCall("Safe-Her Support");
         }
 
         appendMessage(cleanReply, 'bot');
