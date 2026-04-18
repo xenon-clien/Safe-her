@@ -135,6 +135,11 @@ function initMap(lat, lng) {
                 updateMapHUD();
             });
             updateMapHUD();
+            
+            // Fix white screen on window resize or rotational change
+            window.addEventListener('resize', () => {
+                if(map) map.invalidateSize();
+            });
         } else {
             userLatLng = { lat, lng }; // UPDATE GLOBAL COORDS
             console.log("🔄 Map already exists. Re-centering...");
@@ -2002,6 +2007,12 @@ function runLoader() {
                             if (typeof updatePremiumUI === 'function') updatePremiumUI();
                             startTracking();
                             startDashboardClock();
+                            
+                            // FORCE MAP RE-CALIBRATION AFTER LOADER
+                            setTimeout(() => {
+                                if (map) map.invalidateSize();
+                                if (routeMap) routeMap.invalidateSize();
+                            }, 500);
                         } catch (err) {
                             console.error("Post-loader startup failed:", err);
                         }
