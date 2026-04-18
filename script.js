@@ -1217,34 +1217,34 @@ async function findNearest(type) {
     try {
         showToast(`📍 Searching near ${centerName}...`, 'info');
         
-        // --- STEP 1: NOMINATIM (High Precision 10km box) ---
-        const delta = 0.1; 
-        const viewbox = `${currentPos.lng - delta},${currentPos.lat + delta},${currentPos.lng + delta},${currentPos.lat - delta}`;
-        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${type}&lat=${currentPos.lat}&lon=${currentPos.lng}&viewbox=${viewbox}&bounded=1&limit=8`;
-        
         let nodes = [];
+
+        // --- STEP 1: OVERPASS API (Standard for tagged amenities) ---
         try {
-            const nomResp = await fetch(nominatimUrl, { headers: { 'Accept-Language': 'en' } });
+            const overpassQuery = `[out:json];node(around:5000,${currentPos.lat},${currentPos.lng})[amenity=${type}];out;`;
+            const ovResp = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: overpassQuery });
+            const ovData = await ovResp.json();
+            nodes = ovData.elements || [];
+        } catch (ovErr) {
+            console.warn("Overpass failed, trying Nominatim...");
+        }
+
+        // --- STEP 2: NOMINATIM FALLBACK ---
+        if (nodes.length === 0) {
+            const delta = 0.1; // 10km box
+            const viewbox = `${currentPos.lng - delta},${currentPos.lat + delta},${currentPos.lng + delta},${currentPos.lat - delta}`;
+            const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${type}&lat=${currentPos.lat}&lon=${currentPos.lng}&viewbox=${viewbox}&bounded=1&limit=10`;
+            const nomResp = await fetch(nominatimUrl);
             const nomData = await nomResp.json();
             nodes = nomData.map(item => ({
                 lat: parseFloat(item.lat),
                 lon: parseFloat(item.lon),
                 tags: { name: item.display_name.split(',')[0] }
             }));
-        } catch (nomErr) {
-            console.warn("Nominatim failed, falling back to Overpass...");
-        }
-
-        // --- STEP 2: FALLBACK TO OVERPASS ---
-        if (nodes.length === 0) {
-            const overpassQuery = `[out:json];node(around:3000,${currentPos.lat},${currentPos.lng})[amenity=${type}];out;`;
-            const ovResp = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: overpassQuery });
-            const ovData = await ovResp.json();
-            nodes = ovData.elements || [];
         }
 
         if (nodes.length === 0) {
-            showToast(`No ${type}s detected nearby.`, 'error');
+            showToast(`No ${type}s found within 5km.`, 'error');
             return;
         }
 
@@ -1284,6 +1284,7 @@ async function findNearest(type) {
         }
     } catch (error) {
         console.error("Facility search error:", error);
+        showToast("Satellite Servers Busy. Please retry.", "error");
     }
 }
 
