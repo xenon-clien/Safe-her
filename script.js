@@ -1248,8 +1248,10 @@ async function findNearest(type) {
     try {
         showToast(`Searching for nearest ${type}...`, 'info');
         
-        // --- STEP 1: TRY NOMINATIM ---
-        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${type}&lat=${currentPos.lat}&lon=${currentPos.lng}&limit=3`;
+        // --- STEP 1: TRY NOMINATIM (Localized Search) ---
+        const delta = 0.5; // Approx 50km radius
+        const viewbox = `${currentPos.lng - delta},${currentPos.lat + delta},${currentPos.lng + delta},${currentPos.lat - delta}`;
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${type}&lat=${currentPos.lat}&lon=${currentPos.lng}&viewbox=${viewbox}&bounded=1&limit=5`;
         
         let nodes = [];
         try {
