@@ -1155,18 +1155,29 @@ function speakSafeHer(text) {
         
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = 1.0;
-        utterance.pitch = 1.1; 
+        utterance.pitch = 1.0; 
         
-        // Find a suitable female voice
+        // --- Detect Language (Simplistic check for Hindi characters) ---
+        const isHindi = /[\u0900-\u097F]/.test(text);
+        utterance.lang = isHindi ? 'hi-IN' : 'en-US';
+
         const voices = window.speechSynthesis.getVoices();
-        const preferredVoices = voices.filter(v => 
-            v.lang.includes('en') && 
-            (v.name.includes("Female") || v.name.includes("Zira") || v.name.includes("Google UK English Female") || v.name.includes("Samantha"))
-        );
-        
-        if (preferredVoices.length > 0) {
-            utterance.voice = preferredVoices[0];
+        let selectedVoice = null;
+
+        if (isHindi) {
+            // Priority for Hindi voices
+            selectedVoice = voices.find(v => v.lang.includes('hi') || v.name.includes('Hindi') || v.name.includes('Kalpana') || v.name.includes('Hemant'));
         }
+
+        if (!selectedVoice) {
+            // Find a suitable female voice
+            selectedVoice = voices.find(v => 
+                v.lang.includes('en') && 
+                (v.name.includes("Female") || v.name.includes("Zira") || v.name.includes("Google UK English Female") || v.name.includes("Samantha"))
+            );
+        }
+        
+        if (selectedVoice) utterance.voice = selectedVoice;
         
         window.speechSynthesis.speak(utterance);
     }
