@@ -1,3 +1,4 @@
+console.log("🚨 CORE SCRIPT SIGNAL: script.js is loading!");
 /* =========================================
    SCRIPT.JS - HerSafety App Logic
 ========================================= */
