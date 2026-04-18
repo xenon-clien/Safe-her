@@ -7,9 +7,9 @@ let userMarker;
 let isSosActive = false;
 let audioContext, oscillator, gainNode;
 let userLatLng = { lat: 30.901, lng: 75.8573 }; // Default Ludhiana
-const API_URL = (location.port === '5000') 
-    ? '/api' 
-    : `http://${location.hostname}:5000/api`;
+const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    ? (location.port === '5000' ? '/api' : 'http://localhost:5000/api')
+    : '/api'; 
 
 // Auto-check connection on load
 window.addEventListener('load', () => {
