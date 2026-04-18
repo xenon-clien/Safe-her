@@ -280,52 +280,27 @@ app.get('/api/safety-score', (req, res) => {
     res.json({ score, label, timestamp: new Date() });
 });
 
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-
-// AI Chat Assistant (Real Google Gemini Integration)
+// AI Chat Assistant (Free & Unlimited Localized AI)
 app.post('/api/chat', async (req, res) => {
     const { message, userId } = req.body;
     console.log(`🤖 Chat request from ${userId}: ${message}`);
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    
-    if (!apiKey || apiKey === "PENDING") {
-        // No key - use smart fallback
-        const msg = (message || "").toLowerCase();
-        let response = "I'm your Safe-Her AI assistant. ";
-        if (msg.includes("help") || msg.includes("unsafe") || msg.includes("scared")) {
-            response += "I sense you might be feeling unsafe. Please use the SOS button immediately or move to a well-lit area.";
-        } else if (msg.includes("where") || msg.includes("location")) {
-            response += "Use the Route Planner section to find safe routes near you.";
-        } else if (msg.includes("hi") || msg.includes("hello") || msg.includes("helo")) {
-            response += "Hello! I'm here to ensure your safety 24/7. How can I assist you today?";
-        } else {
-            response += "Stay alert and keep your phone charged. I am monitoring your current area's safety score in real-time.";
-        }
-        return res.json({ response });
-    }
-
     try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const prompt = `You are Safe-Her AI, an empathetic women's safety companion. 
-        User says: "${message}". 
-        Give a SHORT (2-3 sentences), helpful, safety-focused reply. If they seem in danger, advise using the SOS button.`;
-        const result = await model.generateContent(prompt);
-        return res.json({ response: result.response.text() });
+        // We use Pollinations.ai - it's free, unlimited, and provides high-quality chat responses
+        const systemPrompt = `You are Safe-Her AI, a professional and empathetic women's safety companion.
+        Your goal is to provide safety tips, help users navigate the app, and offer emotional support.
+        Keep replies SHORT (2-3 sentences max).
+        If the user is in immediate danger, tell them to HIT THE SOS BUTTON now.`;
+
+        const pollinationsUrl = `https://text.pollinations.ai/${encodeURIComponent(message)}?system=${encodeURIComponent(systemPrompt)}&model=openai`;
+        
+        const response = await axios.get(pollinationsUrl);
+        const aiReply = response.data || "I'm here for you. Stay safe.";
+
+        return res.json({ response: aiReply });
     } catch (e) {
-        console.error("Gemini Error Details:", e.message);
-        // Return exact error so user can see what's wrong
-        const errMsg = e.message || "Unknown error";
-        if (errMsg.includes("API_KEY_INVALID") || errMsg.includes("invalid")) {
-            return res.json({ response: "⚠️ Gemini Error: API Key invalid hai. Sahi key check karein." });
-        } else if (errMsg.includes("quota") || errMsg.includes("QUOTA") || errMsg.includes("429")) {
-            return res.json({ response: "⚠️ Gemini Error: API quota khatam ho gaya hai. Aap FREE limit par hain, please kuch der baad try karein." });
-        } else if (errMsg.includes("not found") || errMsg.includes("404")) {
-            return res.json({ response: "⚠️ Gemini Error: Model 'gemini-2.0-flash' available nahi hai ya deprecated hai." });
-        } else {
-            return res.json({ response: `⚠️ Gemini Error: ${errMsg.substring(0, 100)}` });
-        }
+        console.error("AI Fetch error:", e.message);
+        return res.json({ response: "I'm experiencing a bit of a signal delay, but I'm still here. How can I help you stay safe?" });
     }
 });
 
