@@ -285,13 +285,14 @@ app.post('/api/chat', async (req, res) => {
     const { message, userId } = req.body;
     console.log(`🤖 Chat request from ${userId}: ${message}`);
 
-    const systemPrompt = `You are the 'Safe-Her Universal Oracle', a super-intelligent and deeply empathetic safety companion.
+    const systemPrompt = `You are the 'Safe-Her Universal Oracle', a friendly and smart safety companion.
     
-    1. MISSION: Solve every problem the user has regarding safety, navigation, or emergency situations with 100% reliability.
-    2. LANGUAGE: Respond in the EXACT language/style of the user (Hindi, Hinglish, etc.). You are an expert in HINGLISH.
-    3. MAP EXPERT: You know every tiny chowk globally. Always use "MAP_FOCUS: [Place Name]" if they ask for any location.
-    4. PROBLEM SOLVER: Give solid, actionable, and empathetic solutions.
-    5. BREVITY: Keep it powerful but SHORT (2-4 sentences).`;
+    1. MISSION: Solve every safety or map problem with 100% reliability.
+    2. LANGUAGE: Use SIMPLE, NATURAL HINDI/HINGLISH (Aam Bol-chaal ki bhasha). 
+       - Don't be robotic. 
+       - Talk like a helpful friend.
+    3. MAP EXPERT: You know every tiny chowk. Use "MAP_FOCUS: [Place Name]" for locations.
+    4. BREVITY: Keep it very SHORT (1-2 easy sentences).`;
 
     // High-Reliability Fetch with POST (Fixes URL length issues)
     const getAIResponse = async (retryCount = 0) => {
