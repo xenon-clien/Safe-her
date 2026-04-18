@@ -1181,13 +1181,35 @@ function showToast(message, type) {
 // ============================================
 let routeMap = null;
 let routeControl = null;
-let currentRouteMode = 'safe';
+const nearestCache = {}; // { type: { timestamp: Date, result: node } }
 // ============================================
 //   NEARBY FACILITIES (Hospital / Police)
 // ============================================
 async function findNearest(type) {
+    // Use cached result if recent (within 2 minutes)
+    const cacheEntry = nearestCache[type];
+    if (cacheEntry && (Date.now() - cacheEntry.timestamp) < 2 * 60 * 1000) {
+        console.log(`🔄 Using cached ${type} result`);
+        const { result } = cacheEntry;
+        // Pan map and show marker using cached data
+        const activeMap = (document.getElementById('home').style.display !== 'none') ? map : routeMap;
+        activeMap.setView([result.lat, result.lon], 15);
+        const color = type === 'hospital' ? '#ef4444' : '#3b82f6';
+        const icon = L.divIcon({
+            html: `<div style="background:${color};width:34px;height:34px;border-radius:50%;border:4px solid white;display:flex;align-items:center;justify-content:center;color:white;box-shadow:0 0 15px ${color}"><i class="fas fa-${type === 'hospital' ? 'hospital' : 'building-shield'}"></i></div>`,
+            className: '',
+            iconSize: [34, 34]
+        });
+        L.marker([result.lat, result.lon], { icon }).addTo(activeMap)
+            .bindPopup(`<b>${result.tags.name || 'Nearest ${type}'}</b><br>Distance: ${result._dist.toFixed(2)} km`)
+            .openPopup();
+        return;
+    }
+
     // Determine active map (home main map or route map)
     const activeMap = (document.getElementById('home').style.display !== 'none') ? map : routeMap;
+
+
     
     // --- FORCE RE-CALIBRATE GPS FOR ACCURACY ---
     showToast(`Calibrating GPS for precise search...`, 'info');
@@ -1206,7 +1228,7 @@ async function findNearest(type) {
     showToast(`Searching for nearest ${type}...`, 'info');
 
     // Overpass API Query
-    const query = `[out:json];node(around:5000,${currentPos.lat},${currentPos.lng})[amenity=${type}];out;`;
+    const query = `[out:json];node(around:3000,${currentPos.lat},${currentPos.lng})[amenity=${type}];out;`;
     
     try {
         const response = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
@@ -1223,14 +1245,20 @@ async function findNearest(type) {
         let minDist = Infinity;
 
         nodes.forEach(node => {
+            // calculate distance in km for caching
             const d = calculateDistance(currentPos.lat, currentPos.lng, node.lat, node.lon);
             if (d < minDist) {
                 minDist = d;
                 closest = node;
+                closest._dist = d / 1000; // store km distance for UI
             }
         });
 
+
         if (closest) {
+            // Save to cache
+            nearestCache[type] = { timestamp: Date.now(), result: closest };
+
             const name = closest.tags.name || `Nearest ${type}`;
             const distStr = (minDist / 1000).toFixed(2) + " km";
             
