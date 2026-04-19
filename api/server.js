@@ -18,6 +18,8 @@ console.log("📦 Twilio loaded");
 // console.log("📦 AWS loaded");
 const axios = require('axios');
 console.log("📦 Axios loaded");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+console.log("📦 Gemini AI loaded");
 const { Queue, Worker } = require('bullmq');
 console.log("📦 BullMQ loaded");
 const IORedis = require('ioredis');
@@ -35,7 +37,13 @@ const app = express();
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
+
+// --- Neural Traffic Monitor ---
+app.use((req, res, next) => {
+    console.log(`📡 [${new Date().toLocaleTimeString()}] ${req.method} ${req.url} - (DB State: ${mongoose.connection.readyState})`);
+    next();
+});
 
 // Redis & Queue Setup (with fallback for local dev without Redis)
 let redisConn = null;
@@ -82,6 +90,9 @@ const googleClient = new OAuth2Client(process.env.G_CLIENT_ID);
 // Initialize Twilio
 const twilioClient = process.env.TWILIO_SID ? twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN) : null;
 
+// Initialize Gemini AI
+const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+
 // Initialize AWS S3 (Commented out until needed)
 /*
 const s3 = new AWS.S3({
@@ -94,15 +105,38 @@ const s3 = new AWS.S3({
 // --- ROUTES ---
 
 let lastDbError = null;
+let isConnecting = false;
+
+mongoose.connection.on('connected', () => {
+    console.log("✅ MongoDB Connection Established");
+    lastDbError = null;
+});
+
+mongoose.connection.on('error', (err) => {
+    console.error("❌ MongoDB Error:", err.message);
+    lastDbError = err.message;
+});
+
+mongoose.connection.on('disconnected', () => {
+    console.warn("⚠️ MongoDB Disconnected. Auto-Healer initiated...");
+    setTimeout(connectDB, 5000);
+});
+
+mongoose.connection.on('reconnected', () => {
+    console.log("✅ MongoDB Connection Restored: Neural Link Stable");
+    lastDbError = null;
+});
 
 app.get('/api/health', (req, res) => {
-    const isConnected = mongoose.connection.readyState === 1;
+    const states = ["disconnected", "connected", "connecting", "disconnecting"];
+    const readyState = mongoose.connection.readyState;
+    
     res.json({
         server: "online",
-        database: isConnected ? "connected" : "disconnected",
-        db_error: isConnected ? null : lastDbError,
+        database: states[readyState] || "unknown",
+        db_error: lastDbError,
+        last_error: lastDbError,
         timestamp: new Date().toISOString(),
-        g_client_id: process.env.G_CLIENT_ID || "PENDING",
         gemini_key_status: process.env.GEMINI_API_KEY ? "CONFIGURED ✅" : "MISSING ❌"
     });
 });
@@ -148,12 +182,16 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/sos-trigger', async (req, res) => {
     try {
         const { userId, lat, lng } = req.body;
+        if (!userId) return res.status(400).json({ message: "UserId is missing" });
         const user = await User.findById(userId);
         const contacts = await EmergencyContact.find({ userId });
         const alertText = `🚨 SOS EMERGENCY: ${user?.name || 'User'} needs help! 📍 Location: https://maps.google.com/?q=${lat},${lng}`;
         await sosQueue.add('send_sms', { contacts: contacts.map(c => c.contactPhone), message: alertText, userName: user?.name });
         res.json({ message: "SOS Distributed", address: "Real-time Location Sent" });
-    } catch (e) { res.status(500).json({ message: e.message }); }
+    } catch (e) { 
+        console.error("SOS Trigger Error:", e.message);
+        res.status(500).json({ message: "Failed to process SOS: " + e.message }); 
+    }
 });
 
 // Google Login Verification
@@ -229,9 +267,13 @@ app.post('/api/add-contact', async (req, res) => {
 app.get('/api/get-contacts/:userId', async (req, res) => {
     try {
         const { userId } = req.params;
+        if (!userId || userId === 'undefined') return res.json({ contacts: [] });
         const contacts = await EmergencyContact.find({ userId });
-        res.json({ contacts }); // Wrap in object as frontend expects data.contacts
-    } catch (e) { res.status(500).json({ message: e.message }); }
+        res.json({ contacts: contacts || [] }); 
+    } catch (e) { 
+        console.error("Get Contacts Error:", e.message);
+        res.status(500).json({ message: e.message }); 
+    }
 });
 
 app.delete('/api/delete-contact/:id', async (req, res) => {
@@ -283,50 +325,45 @@ app.get('/api/safety-score', (req, res) => {
 // AI Chat Assistant (Super-Solid Universal Safety Oracle)
 app.post('/api/chat', async (req, res) => {
     const { message, userId } = req.body;
-    console.log(`🤖 Chat request from ${userId}: ${message}`);
+    console.log(`🤖 Gemini Chat request from ${userId}: ${message}`);
 
-    const systemPrompt = `You are a highly advanced AI safety assistant for women's security.
+    const systemPrompt = `You are "The Oracle", a highly advanced AI safety assistant inspired by Alexa but built for extreme security.
     
-    CORE RULES:
-    1. SOS: If user says "help", "SOS", or seems in danger, reply and include "SOS_TRIGGER" in your response.
-    2. TRACKING: If they say "track me", reply and include "START_TRACKING".
-    3. FAKE CALL: If they ask for a fake call, reply and include "FAKE_CALL_TRIGGER".
-    4. LOCATIONS: For any place/chowk, use "MAP_FOCUS: [Place Name]".
-    5. LANGUAGE: Use SIMPLE, NATURAL HINDI/HINGLISH (Aam Bol-chaal). Be calm & supportive.
-    6. BREVITY: Keep replies very short (1-2 sentences).
+    TONE & PERSONALITY:
+    - Calm, authoritative but deeply supportive.
+    - Use natural Hinglish (bol-chaal ki bhasha). 
+    - You are the user's "Guardian Shadow". If connection is weak, say: "Connection fluctuate ho raha hai, par main aapke saath hoon. Chinta na karein, bas kisi safe jagah par hon."
     
-    BEHAVIOR: You are proactive. If battery is low or area is unsafe, warn them. You know every street globally.`;
-
-    // High-Reliability Fetch with POST (Fixes URL length issues)
-    const getAIResponse = async (retryCount = 0) => {
-        try {
-            const response = await axios.post('https://text.pollinations.ai/', {
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: message }
-                ],
-                model: 'openai',
-                private: true
-            }, { timeout: 20000 }); // 20s timeout
-            
-            return response.data;
-        } catch (e) {
-            console.warn(`Attempt ${retryCount + 1} failed:`, e.message);
-            if (retryCount < 2) {
-                return getAIResponse(retryCount + 1);
-            }
-            throw e;
-        }
-    };
+    CORE PROTOCOLS:
+    1. SOS: Respond with "SOS_TRIGGER" if danger is detected.
+    2. TRACKING: Respond with "START_TRACKING" to begin live sync.
+    3. FAKE CALL: Respond with "FAKE_CALL_TRIGGER" to simulate a decoy call.
+    4. MAP: Use "MAP_FOCUS: [Place]" to re-center the map.
+    5. SAFETY: Always check if the current area or score is concerning.
+    
+    LANGUAGE RULE: Use simple Hinglish (e.g., "Aap bilkul safe hain", "Main rasta check kar rahi hoon"). 
+    BREVITY: Maximum 2 small sentences.`;
 
     try {
         if (!message || message.trim() === "") {
             return res.json({ response: "I'm listening. How can the Oracle help you stay safe tonight?" });
         }
-        const aiReply = await getAIResponse();
+
+        if (!genAI) {
+            throw new Error("Gemini API not configured");
+        }
+
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-1.5-flash", // Using 1.5 Flash for maximum availability and speed
+            systemInstruction: systemPrompt 
+        });
+
+        const result = await model.generateContent(message);
+        const aiReply = result.response.text();
+        
         return res.json({ response: aiReply || "I am processing your request. Please stay safe." });
     } catch (e) {
-        console.error("Super-AI Fetch error:", e.message);
+        console.error("Gemini Chat Error:", e.message);
         return res.json({ response: "Connection fluctuate ho raha hai, par main aapke saath hoon. Koshish karein ki aap kisi safe jagah par hon." });
     }
 });
@@ -352,16 +389,38 @@ app.use(express.static(path.join(__dirname, '..')));
 // Start Server
 const PORT = process.env.PORT || 5000;
 
-console.log("📍 Attempting to connect to Database...");
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hersafety')
-    .then(() => {
-        console.log("✅ Database Connected Successfully");
-    })
-    .catch(e => {
+const connectDB = async () => {
+    if (isConnecting || mongoose.connection.readyState === 1) return;
+    
+    isConnecting = true;
+    try {
+        console.log("📍 Neural Link: Attempting to synchronize with Atlas Cluster...");
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hersafety', {
+            serverSelectionTimeoutMS: 10000, 
+            socketTimeoutMS: 45000,
+            connectTimeoutMS: 10000,
+            heartbeatFrequencyMS: 2000,
+            maxPoolSize: 50,
+            autoIndex: true
+        });
+        console.log("✅ Neural Link: Synchronization Successful");
+        lastDbError = null;
+    } catch (e) {
+        console.error("📛 Neural Link: Synchronization Failed!", e.message);
         lastDbError = e.message;
-        console.error("❌ DB Connection Error:", e.message);
-        console.log("⚠️ Server will continue to run in OFFLINE mode.");
-    });
+        // Retry after 5 seconds
+        setTimeout(connectDB, 5000);
+    } finally {
+        isConnecting = false;
+    }
+};
+
+connectDB();
+
+mongoose.connection.on('disconnected', () => {
+    console.warn("⚠️ Neural Link: Connection Severed. Retrying in 5s...");
+    setTimeout(connectDB, 5000);
+});
 
 // --- PREMIUM & PAYMENT INFRASTRUCTURE ---
 app.post('/api/create-order', async (req, res) => {

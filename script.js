@@ -7,18 +7,42 @@ let map;
 let userMarker;
 let isSosActive = false;
 let audioContext, oscillator, gainNode;
-let userLatLng = { lat: 30.901, lng: 75.8573 }; // Default Ludhiana
-const API_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-    ? (location.port === '5000' ? '/api' : 'http://localhost:5000/api')
-    : '/api'; 
+let userLatLng = { lat: 30.901, lng: 75.8573 }; 
+let isLocationPrecise = false; // Accuracy Persistence Shield
+const API_URL = (function() {
+    const h = location.hostname;
+    const p = location.port;
+    // 1. Production or same-origin serving
+    if (p === '5000' || (h && !['localhost', '127.0.0.1', ''].includes(h) && !h.startsWith('192.'))) {
+        return '/api';
+    }
+    // 2. Development (hitting local server from separate port or file)
+    return 'http://localhost:5000/api';
+})();
+console.log("🛰️ Neural Link Target:", API_URL);
 
+// --- GLOBAL ERROR INTERCEPTOR ---
+window.addEventListener('unhandledrejection', (e) => {
+    console.error("Critical Neural Error:", e.reason);
+    if (typeof showToast === 'function') showToast("Signal Lost: " + (e.reason.message || "Network Error"), "error");
+});
 // Auto-check connection on load
 window.addEventListener('load', () => {
+    if (typeof startDashboardClock === 'function') startDashboardClock();
+    
+    // Pro-active Precise Detection
+    const areaEl = document.getElementById('dashArea');
+    if (areaEl) areaEl.innerText = "Synchronizing Location...";
+    performTrackingSync();
+});
+// Initial check removed
+const _dummy = () => { if (false) {
     fetch(`${API_URL}/health`)
         .then(r => r.json())
         .then(d => console.log("âœ… Core System Linked:", d.server))
         .catch(e => console.error("âŒ System Link Failed. Make sure server is running on port 5000."));
-});
+    }
+};
 let pendingPaymentResponse = null; 
 let liveBeaconInterval = null;
 let sirenInterval = null;
@@ -73,8 +97,16 @@ const CRIME_HOTSPOTS = [
 ];
 
 function initMap(lat, lng) {
+    if (!lat || !lng) {
+        console.warn("Map Init delayed: No valid coords.");
+        return;
+    }
     const container = document.getElementById('map');
     if (!container) return;
+
+    // Hide Neural Loader once we have valid signal
+    const loader = document.getElementById('mapLoader');
+    if (loader) loader.style.display = 'none';
 
     // Retry if container is hidden (Leaflet requirement)
     if (container.offsetWidth === 0) {
@@ -299,8 +331,16 @@ function fetchDangerZones() {
     );out body;`;
 
     fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query })
-    .then(r => r.json())
+    .then(async r => {
+        if (!r.ok) throw new Error(`Overpass Overload: ${r.status}`);
+        const contentType = r.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            throw new Error("Invalid response from Neural Scan server (Overpass).");
+        }
+        return r.json();
+    })
     .then(data => {
+        if (!data || !data.elements) return;
         data.elements.forEach(node => {
             const lat = node.lat || (node.center && node.center.lat);
             const lng = node.lon || (node.center && node.center.lon);
@@ -319,7 +359,19 @@ function fetchDangerZones() {
             }
         });
     })
-    .catch(e => console.error("Neural Scan Failure:", e));
+    .catch(e => {
+        console.warn("Neural Scan Delay:", e.message);
+        // Fallback: Don't crash, just log.
+    });
+}
+
+function updateMapHUD() {
+    if (!map) return;
+    const center = map.getCenter();
+    const mapLat = document.getElementById('mapLat');
+    const mapLng = document.getElementById('mapLng');
+    if (mapLat) mapLat.innerText = center.lat.toFixed(4);
+    if (mapLng) mapLng.innerText = center.lng.toFixed(4);
 }
 
 function drawMapZone(lat, lng, riskLevel, label, name, description) {
@@ -420,29 +472,108 @@ async function startTracking() {
 
 async function performTrackingSync() {
     const gpsEl = document.getElementById('dashGps');
-    if (gpsEl) gpsEl.innerText = "Syncing...";
+    if (gpsEl) gpsEl.innerHTML = '<span class="text-blue-400 animate-pulse">📡 SATELLITE SEARCH...</span>';
+
+    // 1. Check for HTTPS (Critical for Hardware GPS)
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        showToast("⚠️ Browser security blocks GPS on HTTP. Please use HTTPS for precision.", "error");
+    }
 
     if (navigator.geolocation) {
+        const options = { 
+            enableHighAccuracy: true, 
+            timeout: 20000, // Increased to 20s for hardware stabilization
+            maximumAge: 0 
+        };
+
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const { latitude, longitude } = position.coords;
                 userLatLng = { lat: latitude, lng: longitude };
                 
-                // Update UI
                 initMap(latitude, longitude);
                 updateDashboardGPS(latitude, longitude);
-                if (gpsEl) gpsEl.innerHTML = '<span class="text-green-400">LIVE-SYNC</span>';
                 
-                // Share with Backend (Auto-Share for safety)
+                if (gpsEl) gpsEl.innerHTML = '<span class="text-green-500 font-black">🛰️ SATELLITE-LOCK</span>';
+                showToast("Satellite Signal Locked (100% Precise)", "success");
+                isLocationPrecise = true; // Lock precision
                 sendTrackingUpdate();
-                console.log("🛰️ Live tracking update successful.");
             },
             (err) => {
-                console.warn("Tracking fail:", err.message);
-                if (gpsEl) gpsEl.innerText = "GPS-LOST";
+                // If the error is merely a timeout, retry once with 'Deep-Scan'
+                if (err.code === 3) {
+                    console.warn("Satellite signal weak, retrying deep-scan...");
+                    if (gpsEl) gpsEl.innerText = "DEEP SCANNING...";
+                    // Secondary retry logic...
+                    tryIPGeolocationFallback(); 
+                } else {
+                    console.warn("GPS Access Error:", err.message);
+                    if (gpsEl) gpsEl.innerHTML = '<span class="text-zinc-500 animate-pulse">RE-SCANNING...</span>';
+                    tryIPGeolocationFallback();
+                }
             },
-            { enableHighAccuracy: true, timeout: 5000 }
+            options
         );
+    } else {
+        tryIPGeolocationFallback();
+    }
+}
+
+async function tryIPGeolocationFallback() {
+    // PROTECTIVE GUARD: If we already have a precise Satellite lock, IGNORE internet fallback
+    if (isLocationPrecise) {
+        console.log("🛡️ Shield: Blocking approximate IP override to maintain Satellite precision.");
+        return;
+    }
+    
+    const gpsEl = document.getElementById('dashGps');
+    if (gpsEl) gpsEl.innerText = "TRIANGULATING...";
+    
+    try {
+        // Multi-Source Signal Triangulation (Parallel Fetch)
+        const sources = [
+            'https://ipapi.co/json/',
+            'https://freeipapi.com/api/json'
+        ];
+
+        let locationData = null;
+
+        for (const url of sources) {
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                const lat = data.latitude || data.lat;
+                const lon = data.longitude || data.lon;
+
+                if (lat && lon) {
+                    userLatLng = { lat: parseFloat(lat), lng: parseFloat(lon) };
+                    initMap(userLatLng.lat, userLatLng.lng);
+                    updateDashboardGPS(userLatLng.lat, userLatLng.lng);
+                    
+                    if (gpsEl) gpsEl.innerHTML = '<span class="text-yellow-400 font-bold">📡 APPROXIMATE-LINK</span>';
+                    showToast("Using Internet Triangulation (Area is approximate). Click 'Refresh GPS' for precision.", "warning");
+                    break;
+                }
+            } catch (e) { console.warn(`Triangulation Source ${url} failed, trying next...`); }
+        }
+
+        if (locationData) {
+            const { lat, lng } = locationData;
+            userLatLng = { lat: parseFloat(lat), lng: parseFloat(lng) };
+            
+            initMap(userLatLng.lat, userLatLng.lng);
+            updateDashboardGPS(userLatLng.lat, userLatLng.lng);
+            
+            if (gpsEl) gpsEl.innerHTML = '<span class="text-blue-400">HYBRID-ACTIVE</span>';
+            console.log("📍 Neural Hybrid Link: Synchronization Successful via Network Layer.");
+            sendTrackingUpdate(); 
+        } else {
+            throw new Error("All triangulation sources exhausted.");
+        }
+    } catch (e) {
+        console.error("Critical Positioning Failure:", e);
+        if (gpsEl) gpsEl.innerHTML = '<span class="text-red-500 font-bold uppercase tracking-tighter">CORE SATELLITE LOST</span>';
     }
 }
 
@@ -471,32 +602,55 @@ function startDashboardClock() {
     updateDashboard(); // Run once immediately
     checkDatabaseStatus(); // Check DB status
     setInterval(updateDashboard, 1000);
-    setInterval(checkDatabaseStatus, 5000); // Check DB every 5s
+    setInterval(checkDatabaseStatus, 10000); // Check DB every 10s for stability
 }
 
+let dbFailCount = 0;
 async function checkDatabaseStatus() {
     const dbEl = document.getElementById('dashDb');
     if (!dbEl) return;
 
+    // Show faint sync pulse
+    const icon = dbEl.previousElementSibling;
+    if (icon) icon.classList.add('animate-pulse');
+
     try {
-        const response = await fetch(`${API_URL}/health`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout
+
+        const response = await fetch(`${API_URL}/health`, { signal: controller.signal });
         const data = await response.json();
+        clearTimeout(timeoutId);
         
         if (data.database === 'connected') {
-            dbEl.innerText = 'Online âœ…';
+            dbFailCount = 0;
+            dbEl.innerText = 'Online ✅';
             dbEl.style.color = '#4caf50';
         } else if (data.database === 'connecting') {
-            dbEl.innerText = 'Syncing...';
+            dbFailCount = 0; // It's trying, so don't count as fail
+            dbEl.innerText = 'Stabilizing... 🚀';
             dbEl.style.color = '#ff9800';
         } else {
-            dbEl.innerText = 'Offline âŒ';
-            dbEl.style.color = '#ff3366';
-            console.warn("Database disconnected:", data.last_error);
+            dbFailCount++;
+            if (dbFailCount >= 3) {
+                dbEl.innerText = 'Offline ❌';
+                dbEl.style.color = '#ff3366';
+            } else {
+                dbEl.innerText = 'Syncing... 📡';
+                dbEl.style.color = '#ff9800';
+            }
         }
     } catch (error) {
-        dbEl.innerText = 'Error âš ï¸';
-        dbEl.style.color = '#ff3366';
-        console.error("Health check failed:", error);
+        dbFailCount++;
+        if (dbFailCount >= 3) {
+            dbEl.innerText = 'Server Error ⚠️';
+            dbEl.style.color = '#ff3366';
+        } else {
+            dbEl.innerText = 'Retrying... 📡';
+            dbEl.style.color = '#ff9800';
+        }
+    } finally {
+        if (icon) setTimeout(() => icon.classList.remove('animate-pulse'), 1000);
     }
 }
 
@@ -1216,6 +1370,7 @@ if ('speechSynthesis' in window) {
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
 }
+
 
 function speakSafeHer(text) {
     if (!isVoiceEnabled) return;

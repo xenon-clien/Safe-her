@@ -269,6 +269,16 @@
                 
                 <div class="relative w-full rounded-[2.5rem] overflow-hidden border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] bg-zinc-950">
                     <div id="map" class="h-[400px] w-full z-10"></div>
+                    <!-- Neural Satellite Search Overlay -->
+                    <div id="mapLoader" class="absolute inset-0 flex flex-col items-center justify-center z-[1001] bg-black/50 backdrop-blur-md rounded-[2rem]">
+                        <div class="relative w-24 h-24 mb-6">
+                            <div class="absolute inset-0 border-4 border-safety-purple/20 rounded-full"></div>
+                            <div class="absolute inset-0 border-4 border-safety-purple border-t-transparent rounded-full animate-spin"></div>
+                            <i class="fas fa-satellite text-safety-purple absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl animate-pulse"></i>
+                        </div>
+                        <span class="text-white font-black italic uppercase tracking-widest text-[11px] shimmer-text">Establishing Neural Link...</span>
+                        <p class="text-[9px] text-zinc-500 font-bold mt-2 uppercase tracking-tighter">Triangulating via Satellite Core</p>
+                    </div>
                     <!-- Manual Search Overlay -->
                     <div class="absolute top-4 left-4 right-4 z-[1000] flex gap-2">
                         <input type="text" id="manualLocationInput" placeholder="Search area (e.g. Ludhiana)..." 
@@ -1376,7 +1386,7 @@
     <!-- AUDIO FOR FAKE CALL RELAY -->
     <audio id="fakeRelayAudio" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" loop></audio>
 
-    <script src="script.js?v=alexa_v1_fixed"></script>
+    <script src="script.js?v=5.0_MAX_STABILITY"></script>
     <script src="background.js"></script>
     <div id="strobeOverlay"></div>
 </body>

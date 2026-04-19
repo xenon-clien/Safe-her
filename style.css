@@ -2335,3 +2335,72 @@ a {
     50% { opacity: 0.7; }
 }
 
+
+/* ============================================================
+   RESPONSIVE SHIELD v3.0 - FULL DEVICE COMPATIBILITY
+   ============================================================ */
+
+@media (max-width: 1024px) {
+    .main-container { padding: 1.5rem; }
+    .safety-dashboard { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 768px) {
+    .navbar { padding: 0.8rem 4%; }
+    .logo span { font-size: 1.2rem; }
+    
+    /* Improved Global Padding */
+    .main-container { padding: 1rem; }
+
+    .hero-header h1 { font-size: 1.8rem; line-height: 1.2; }
+    .hero-header p { font-size: 0.85rem; }
+
+    /* Dashboard stacking */
+    .safety-dashboard { 
+        grid-template-columns: repeat(2, 1fr); 
+        gap: 8px;
+        margin-bottom: 1.5rem;
+    }
+    .dash-stat { padding: 10px 8px; border-radius: 12px; }
+    .dash-val { font-size: 0.8rem; }
+    .dash-lbl { font-size: 0.6rem; }
+
+    /* Toolkit stacking */
+    .tools-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .tool-btn { padding: 15px 5px; font-size: 0.75rem; border-radius: 12px; }
+
+    /* SOS Button Scaling - Perfect for small and tall screens */
+    .sos-btn { width: 140px; height: 140px; font-size: 1.8rem; border-width: 5px; }
+    .sos-container::before, .sos-container::after { width: 140px; height: 140px; }
+    .sos-container { margin: 2rem 0; }
+
+    #map { height: 350px !important; border-radius: 1.5rem; }
+    
+    /* Auth Forms Optimization */
+    .luxury-card { width: 95% !important; border-radius: 2rem !important; padding: 1.5rem !important; }
+}
+
+@media (max-width: 380px) {
+    /* Ultra-small screens like iPhone SE */
+    .safety-dashboard { grid-template-columns: 1fr; }
+    .hero-header h1 { font-size: 1.5rem; }
+    .sos-btn { width: 120px; height: 120px; font-size: 1.5rem; }
+}
+
+/* Height-based adjustments for tall vs short phones */
+@media (max-height: 700px) {
+    .section-container { padding-top: 10px; }
+    .hero-header { margin-bottom: 0.5rem; }
+    .safety-dashboard { margin-bottom: 1rem; }
+}
+
+/* Landscape Mode Protection */
+@media (max-height: 500px) and (orientation: landscape) {
+    .navbar { display: none; }
+    .main-container { padding-top: 5px; }
+    .sos-container { transform: scale(0.5); margin: 0; }
+    .safety-dashboard { display: none; }
+    #map { height: 250px !important; }
+}
+
+
