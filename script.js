@@ -515,57 +515,70 @@ async function startTracking() {
     }, 60000);
 }
 
-// --- NEURAL SYNC MANAGER (Stabilized GPS) ---
-let globalWatchId = null;
+// --- TACTICAL GPS RESURRECTION (Stable v10) ---
+let geoWatchId = null;
 
 async function performTrackingSync() {
-    // If already watching, don't start another hardware request (prevents GPS-LOST)
-    if (globalWatchId !== null) return; 
-
     const gpsEl = document.getElementById('dashGps');
-    if (gpsEl) gpsEl.innerHTML = '<span class="text-blue-400 animate-pulse">📡 LOCKING SATELLITES...</span>';
+    if (gpsEl) gpsEl.innerHTML = '<span class="text-blue-400 animate-pulse">📡 SCANNING SATELLITES...</span>';
 
     const options = { 
         enableHighAccuracy: true, 
-        timeout: 15000, 
-        maximumAge: 5000 
+        timeout: 10000, 
+        maximumAge: 0 
     };
 
     if (navigator.geolocation) {
-        // Single Persistent Watcher for all features
-        globalWatchId = navigator.geolocation.watchPosition(
-            (pos) => handlePreciseLocation(pos),
-            (err) => {
-                console.warn("Satellite Signal Weak. Switching to IP Relay.", err);
-                if (globalWatchId) navigator.geolocation.clearWatch(globalWatchId);
-                globalWatchId = null;
-                tryIPGeolocationFallback();
-            },
-            options
-        );
+        // ALWAYS keep one active watch if possible (Infinite Healing)
+        if (!geoWatchId) {
+            geoWatchId = navigator.geolocation.watchPosition(
+                (pos) => handlePreciseLocation(pos),
+                (err) => {
+                    console.warn("GPS Weak, keeping sensor warm...", err);
+                    tryIPGeolocationFallback();
+                },
+                options
+            );
+        } else {
+            // Force a single high-precision update if already watching
+            navigator.geolocation.getCurrentPosition(
+                (pos) => handlePreciseLocation(pos),
+                (err) => console.log("Background Sync Active"),
+                options
+            );
+        }
     }
 }
 
 function handlePreciseLocation(position) {
     const { latitude, longitude, accuracy } = position.coords;
     userLatLng = { lat: latitude, lng: longitude };
-    isLocationPrecise = accuracy < 100;
+    isLocationPrecise = accuracy < 150; // Balanced for consistency
     
-    // Update all UI components from one single data stream
     const gpsEl = document.getElementById('dashGps');
     if (gpsEl) {
         const color = isLocationPrecise ? 'text-green-500' : 'text-yellow-400';
-        gpsEl.innerHTML = `<span class="${color} font-black">🛰️ SAT-LOCK [±${Math.round(accuracy)}m]</span>`;
+        const label = isLocationPrecise ? 'SAT-LOCK' : 'SIGNAL-SOFT';
+        gpsEl.innerHTML = `<span class="${color} font-black">🛰️ ${label} [±${Math.round(accuracy)}m]</span>`;
     }
     
-    // Map & Stats Update
+    // Core System Update
     if (typeof initMap === 'function') initMap(latitude, longitude);
     if (typeof updateDashboardGPS === 'function') updateDashboardGPS(latitude, longitude);
     
-    // Auto-dispatch tracking if SOS is active (High Frequency)
-    if (isSosActive) {
-        sendTrackingUpdateToServer(latitude, longitude);
-    }
+    if (isSosActive) sendTrackingUpdateToServer(latitude, longitude);
+}
+
+function sendTrackingUpdateToServer(lat, lng) {
+    const userStr = localStorage.getItem('herSafety_user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    if (!user) return;
+
+    fetch(`${API_URL}/sos-trigger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id || user._id, lat, lng, isTracking: true })
+    }).catch(e => console.warn("Live Beacon Sync Error:", e));
 }
 
 async function tryIPGeolocationFallback() {
