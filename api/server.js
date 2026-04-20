@@ -162,16 +162,34 @@ app.get('/api/get-contacts/:userId', async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// Database Connection
+// Database Connection (Sentinel Neural Reconnect)
 const connectDB = async () => {
     try {
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hersafety');
-        console.log("✅ MongoDB Connected");
+        const options = {
+            serverSelectionTimeoutMS: 15000,
+            socketTimeoutMS: 45000,
+            family: 4,
+            heartbeatFrequencyMS: 10000
+        };
+        console.log("📡 Attempting Neural Link with MongoDB...");
+        await mongoose.connect(process.env.MONGODB_URI, options);
+        console.log("✅ MongoDB Connected: Neural Link Stable");
     } catch (e) {
         console.error("❌ DB Error:", e.message);
+        console.warn("🔄 Retrying connection in 5 seconds...");
         setTimeout(connectDB, 5000);
     }
 };
+
+mongoose.connection.on('error', (err) => {
+    console.error("⚠️ Neural Link Fluctuating:", err.message);
+});
+
+mongoose.connection.on('disconnected', () => {
+    console.warn("⚠️ Neural Link Severed. Initiating Auto-Heal...");
+    connectDB();
+});
+
 connectDB();
 
 const PORT = process.env.PORT || 5000;
