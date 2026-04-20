@@ -192,32 +192,29 @@ app.post(['/api/chat', '/chat'], async (req, res) => {
     }
 });
 
-// Database Connection (Sentinel Neural Reconnect)
+// --- NEURAL PERSISTENCE: UNBREAKABLE DB LINK ---
 const connectDB = async () => {
     try {
         const options = {
             serverSelectionTimeoutMS: 15000,
-            socketTimeoutMS: 45000,
-            family: 4,
-            heartbeatFrequencyMS: 10000
+            heartbeatFrequencyMS: 5000,
+            socketTimeoutMS: 60000,
+            connectTimeoutMS: 30000,
+            autoIndex: true,
+            family: 4
         };
         console.log("📡 Attempting Neural Link with MongoDB...");
-        await mongoose.connect(process.env.MONGODB_URI, options);
-        console.log("✅ MongoDB Connected: Neural Link Stable");
+        const conn = await mongoose.connect(process.env.MONGODB_URI, options);
+        console.log(`✅ MongoDB Connected: Neural Link Stable [${conn.connection.host}]`);
     } catch (e) {
-        console.error("❌ DB Error:", e.message);
-        console.warn("🔄 Retrying connection in 5 seconds...");
+        console.error("❌ Neural Link Failed:", e.message);
         setTimeout(connectDB, 5000);
     }
 };
 
-mongoose.connection.on('error', (err) => {
-    console.error("⚠️ Neural Link Fluctuating:", err.message);
-});
-
 mongoose.connection.on('disconnected', () => {
-    console.warn("⚠️ Neural Link Severed. Initiating Auto-Heal...");
-    connectDB();
+    console.warn("🚨 DATABASE DROPPED: Initiating Emergency Neural Re-Link...");
+    setTimeout(connectDB, 3000);
 });
 
 connectDB();
