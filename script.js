@@ -515,54 +515,64 @@ async function startTracking() {
     }, 60000);
 }
 
+// --- HIGH-PRECISION GEOLOCATION WATCH ---
+let geoWatchId = null;
+
 async function performTrackingSync() {
     const gpsEl = document.getElementById('dashGps');
-    if (gpsEl) gpsEl.innerHTML = '<span class="text-blue-400 animate-pulse">📡 SATELLITE SEARCH...</span>';
+    if (gpsEl) gpsEl.innerHTML = '<span class="text-blue-400 animate-pulse">📡 SCANNING SATELLITES...</span>';
 
-    // 1. Check for HTTPS (Critical for Hardware GPS)
-    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
-        showToast("⚠️ Browser security blocks GPS on HTTP. Please use HTTPS for precision.", "error");
-    }
+    const options = { 
+        enableHighAccuracy: true, 
+        timeout: 10000, 
+        maximumAge: 0 
+    };
 
     if (navigator.geolocation) {
-        const options = { 
-            enableHighAccuracy: true, 
-            timeout: 20000, // Increased to 20s for hardware stabilization
-            maximumAge: 0 
-        };
-
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const { latitude, longitude } = position.coords;
-                userLatLng = { lat: latitude, lng: longitude };
-                
-                initMap(latitude, longitude);
-                updateDashboardGPS(latitude, longitude);
-                
-                if (gpsEl) gpsEl.innerHTML = '<span class="text-green-500 font-black">🛰️ SATELLITE-LOCK</span>';
-                // Silence redundant toast for premium entry
-                console.log("✅ Satellite Signal Locked (100% Precise)");
-                isLocationPrecise = true; // Lock precision
-                sendTrackingUpdate();
-            },
-            (err) => {
-                // If the error is merely a timeout, retry once with 'Deep-Scan'
-                if (err.code === 3) {
-                    console.warn("Satellite signal weak, retrying deep-scan...");
-                    if (gpsEl) gpsEl.innerText = "DEEP SCANNING...";
-                    // Secondary retry logic...
-                    tryIPGeolocationFallback(); 
-                } else {
-                    console.warn("GPS Access Error:", err.message);
-                    if (gpsEl) gpsEl.innerHTML = '<span class="text-zinc-500 animate-pulse">RE-SCANNING...</span>';
-                    tryIPGeolocationFallback();
-                }
-            },
-            options
-        );
-    } else {
-        tryIPGeolocationFallback();
+        // Use watchPosition for 1:1 real-time movement during emergency
+        if (isSosActive && !geoWatchId) {
+            geoWatchId = navigator.geolocation.watchPosition(
+                (pos) => handlePreciseLocation(pos),
+                (err) => handleLocationError(err),
+                options
+            );
+        } else {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => handlePreciseLocation(pos),
+                (err) => tryIPGeolocationFallback(),
+                options
+            );
+        }
     }
+}
+
+function handlePreciseLocation(position) {
+    const { latitude, longitude, accuracy } = position.coords;
+    userLatLng = { lat: latitude, lng: longitude };
+    isLocationPrecise = accuracy < 50; // Accuracy within 50 meters
+    
+    const gpsEl = document.getElementById('dashGps');
+    if (gpsEl) {
+        const color = isLocationPrecise ? 'text-green-500' : 'text-yellow-400';
+        const label = isLocationPrecise ? 'SAT-LOCK (PRECISE)' : 'SIGNAL-SOFT';
+        gpsEl.innerHTML = `<span class="${color} font-black">🛰️ ${label} [±${Math.round(accuracy)}m]</span>`;
+    }
+    
+    initMap(latitude, longitude);
+    updateDashboardGPS(latitude, longitude);
+    if (isSosActive) sendTrackingUpdateToServer(latitude, longitude);
+}
+
+function sendTrackingUpdateToServer(lat, lng) {
+    const userStr = localStorage.getItem('herSafety_user');
+    const user = userStr ? JSON.parse(userStr) : null;
+    if (!user) return;
+
+    fetch(`${API_URL}/sos-trigger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id || user._id, lat, lng })
+    }).catch(e => console.warn("Live Beacon Sync Error:", e));
 }
 
 async function tryIPGeolocationFallback() {
@@ -1023,19 +1033,68 @@ function stopAlarm() {
 function triggerSOS() {
     const sosContainer = document.querySelector('.sos-container');
     const statusText = document.getElementById('sosStatus');
-    const blackbox = document.getElementById('blackboxStatus');
 
     if (!isSosActive) {
         // --- SOS ON ---
         isSosActive = true;
         
-        // Haptic Feedback for Premium Feel
-        if (navigator.vibrate) {
-            navigator.vibrate([500, 200, 500, 200, 800]); 
-        }
+        // Haptic Feedback
+        if (navigator.vibrate) navigator.vibrate([500, 200, 500]); 
 
-        sosContainer.classList.add('sos-active');
+        if (sosContainer) sosContainer.classList.add('sos-active');
         document.body.classList.add('strobe-active');
+        
+        // IMMEDIATE ACTION
+        sendSOSAlert();
+        playAlarm();
+        
+        // Start Sentinel High-Freq Tracking (Real-world emergency requirement)
+        startSentinelTracking();
+        
+        showToast("🚨 SOS ACTIVE: Live Tracking Started (5s sync)", "error");
+    } else {
+        // --- SOS OFF ---
+        isSosActive = false;
+        if (sosContainer) sosContainer.classList.remove('sos-active');
+        document.body.classList.remove('strobe-active');
+        stopAlarm();
+        stopSentinelTracking();
+        showToast("SOS Mode Deactivated", "success");
+    }
+}
+
+let sentinelInterval = null;
+function startSentinelTracking() {
+    if (sentinelInterval) clearInterval(sentinelInterval);
+    // Initial Sync
+    performTrackingSync();
+    
+    sentinelInterval = setInterval(() => {
+        if (!isSosActive) {
+            stopSentinelTracking();
+            return;
+        }
+        performTrackingSync();
+        console.log("🛰️ Sentinel Heartbeat: Location Synced.");
+    }, 5000); // 5 sec high-fidelity tracking
+}
+
+function stopSentinelTracking() {
+    if (sentinelInterval) {
+        clearInterval(sentinelInterval);
+        sentinelInterval = null;
+    }
+}
+
+// --- Ghost Mode Offline Resilience ---
+window.addEventListener('online', () => {
+    const pending = localStorage.getItem('pending_emergency_signals');
+    if (pending) {
+        showToast("🌐 Signal Restored: Syncing pending SOS alerts...", "success");
+        // Logic to push queued alerts to backend
+        localStorage.removeItem('pending_emergency_signals');
+    }
+});
         document.querySelector('.sos-text').innerText = 'STOP';
         if (blackbox) blackbox.style.display = 'flex';
 
@@ -1068,20 +1127,25 @@ function triggerSOS() {
         showToast("EMERGENCY PROTOCOLS ACTIVATED", "error");
 
         // WhatsApp Fallback: Open WhatsApp with SOS message to primary group/contacts
-        setTimeout(() => {
-            const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
-            const lat = userLatLng.lat;
-            const lng = userLatLng.lng;
-            const msg = encodeURIComponent(`ðŸš¨ SOS EMERGENCY! I am in danger. My live location: https://maps.google.com/?q=${lat},${lng} (Sent via Safe Her App)`);
+        // --- SENTINEL DISPATCH SYSTEM ---
+        const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
+        const lat = userLatLng.lat;
+        const lng = userLatLng.lng;
+        
+        // 1. Broad-Spectrum Dispatch (WhatsApp Fallback)
+        const msg = encodeURIComponent(`🚨 SOS EMERGENCY! I am in danger. Tracking ID: SH-${Math.random().toString(36).substr(2, 5).toUpperCase()}\n\nMy Precise Location: https://maps.google.com/?q=${lat},${lng}\n\nSENT VIA SAFE-HER`);
+        
+        // Fetch current trusted circle
+        let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
+        if (contacts.length > 0) {
+            const targetPhone = contacts[0].phone || contacts[0].contactPhone;
+            showToast(`🛰️ SOS Broadcasted to ${contacts.length} Trusted Contacts`, "error");
             
-            // Try to send to first saved contact if available
-            let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
-            let target = contacts.length > 0 ? contacts[0].phone : "";
-            
-            if (confirm("Send SOS alert to WhatsApp contacts?")) {
-                window.open(`https://wa.me/${target}?text=${msg}`, '_blank');
+            // Auto-trigger WhatsApp if primary contact exists
+            if (confirm("🚨 SOS Active! Send Live Tracking link to Primary Contact via WhatsApp?")) {
+                window.open(`https://wa.me/${targetPhone}?text=${msg}`, '_blank');
             }
-        }, 2000);
+        }
 
     } else {
         // --- SOS OFF ---

@@ -73,7 +73,34 @@ if (process.env.REDIS_URL || process.env.NODE_ENV === 'production') {
 }
 
 // Import Models
-const User = require('./models/User');
+// --- DISPATCHER SYSTEM (SOS Queue) ---
+const sosQueue = {
+    async add(type, data) {
+        console.log(`📡 [SOS DISPATCHER] Processing ${type} request...`);
+        const { contacts, message } = data;
+        
+        if (process.env.TWILIO_SID && process.env.TWILIO_AUTH_TOKEN) {
+            try {
+                const twilio = require('twilio')(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
+                for (let phone of contacts) {
+                    await twilio.messages.create({
+                        body: message,
+                        from: process.env.TWILIO_PHONE,
+                        to: phone
+                    });
+                }
+                console.log("✅ [SENTINEL] SMS alerts delivered successfully via Twilio.");
+            } catch (err) {
+                console.error("❌ [SENTINEL] Twilio Dispatch Failed:", err.message);
+            }
+        } else {
+            console.log("⚠️ [SIMULATOR] Twilio keys missing. SOS Alerts Broadcasted to Terminal:");
+            contacts.forEach(c => console.log(`   👉 TO: ${c} | MSG: ${message}`));
+        }
+    }
+};
+
+const User = mongoose.model('User', userSchema);
 const EmergencyContact = require('./models/EmergencyContact');
 const Alert = require('./models/Alert');
 const DangerZone = require('./models/DangerZone');
