@@ -232,6 +232,11 @@ mongoose.connection.on('disconnected', () => {
 connectDB();
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`🚀 NEURAL CORE ONLINE [PORT: ${PORT}]`);
-});
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`🚀 NEURAL CORE ONLINE [PORT: ${PORT}]`);
+    });
+}
+
+// Ensure Vercel can consume the Express app as a serverless function
+module.exports = app;
