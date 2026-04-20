@@ -2,7 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 8080;
+const PORT = process.env.PORT || 5000;
 
 const MIME_TYPES = {
     '.html': 'text/html',
@@ -23,7 +23,9 @@ const MIME_TYPES = {
 };
 
 http.createServer((req, res) => {
-    let filePath = '.' + req.url;
+    // Strip query parameters for local file lookup
+    let cleanUrl = req.url.split('?')[0];
+    let filePath = '.' + cleanUrl;
     if (filePath === './') filePath = './index.html';
 
     const extname = String(path.extname(filePath)).toLowerCase();

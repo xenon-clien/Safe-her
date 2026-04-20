@@ -1,0 +1,6 @@
+/* NEURAL GLOBAL STYLESHEET */
+@import url('style.css');
+
+:root {
+    --neural-pulse: #9d4edd;
+}

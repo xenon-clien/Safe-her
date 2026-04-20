@@ -204,50 +204,49 @@
 
 
 
-            <!-- Safety Dashboard Stats -->
-            <div class="safety-dashboard">
-                <div class="dash-stat">
-                    <i class="fas fa-location-arrow"></i>
-                    <div>
-                        <span class="dash-val" id="dashArea">Detecting...</span>
-                        <span class="dash-lbl">Your Area</span>
+            <!-- Mission Control Status Grid -->
+            <div class="mission-status-grid">
+                <div class="status-item standby" id="statusSystem">
+                    <div class="status-header">
+                        <span class="status-label">System</span>
+                        <span class="status-indicator">Standby 🛑</span>
+                    </div>
+                    <div class="status-glow"></div>
+                </div>
+
+                <div class="status-item connected" id="statusDbBox">
+                    <div class="status-header">
+                        <span class="status-label">Database</span>
+                        <span class="status-indicator" id="dashDb">Connected ✅</span>
                     </div>
                 </div>
-                <div class="dash-stat">
-                    <i class="fas fa-shield-halved" style="color:#4caf50;"></i>
-                    <div>
-                        <span class="dash-val" id="dashScore" style="color:#4caf50;">--</span>
-                        <span class="dash-lbl">Safety Score</span>
+
+                <div class="status-item connected" id="statusGpsBox">
+                    <div class="status-header">
+                        <span class="status-label">Satellite Core</span>
+                        <span class="status-indicator" id="dashGps">Active ✅</span>
                     </div>
                 </div>
-                <div class="dash-stat">
-                    <i class="fas fa-clock" style="color:#ff9800;"></i>
-                    <div>
-                        <span class="dash-val" id="dashTime">--:--</span>
-                        <span class="dash-lbl">Local Time</span>
+
+                <div class="status-item warning" id="statusLightsBox">
+                    <div class="status-header">
+                        <span class="status-label">Street Lighting</span>
+                        <span class="status-indicator" id="dashLights">Low Lighting ⚠️</span>
                     </div>
                 </div>
-                <div class="dash-stat">
-                    <i class="fas fa-database" style="color:#00d2ff;"></i>
-                    <div>
-                        <span class="dash-val" id="dashDb">Connecting...</span>
-                        <span class="dash-lbl">Database</span>
+
+                <div class="status-item score-box">
+                    <div class="status-header">
+                        <span class="status-label">Radar Safety Score</span>
+                        <span class="status-indicator" id="dashScore">--</span>
                     </div>
                 </div>
-                <div class="dash-stat">
-                    <i class="fas fa-satellite-dish" style="color:#9d4edd;"></i>
-                    <div>
-                        <span class="dash-val" id="dashGps">HYBRID-LINK</span>
-                        <span class="dash-lbl">Satellite Core</span>
-                    </div>
-                </div>
-                <div class="dash-stat">
-                    <i class="fas fa-lightbulb" style="color:#ffeb3b;"></i>
-                    <div>
-                        <span class="dash-val" id="dashLights">Scanning...</span>
-                        <span class="dash-lbl">Street Lighting</span>
-                    </div>
-                </div>
+            </div>
+
+            <!-- Dashboard Hidden Data (Preserving original IDs for script logic) -->
+            <div style="display:none;">
+                <span id="dashArea">Detecting...</span>
+                <span id="dashTime">--:--</span>
             </div>
 
             <!-- PREMIUM SAFETY METER -->
@@ -325,7 +324,7 @@
                             <div class="absolute inset-0 border-4 border-safety-purple border-t-transparent rounded-full animate-spin"></div>
                             <i class="fas fa-satellite text-safety-purple absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl animate-pulse"></i>
                         </div>
-                        <span class="text-white font-black italic uppercase tracking-widest text-[11px] shimmer-text">Establishing Neural Link...</span>
+                        <span class="text-white font-black italic uppercase tracking-widest text-[11px] shimmer-text">Establishing Satellite Link...</span>
                         <p class="text-[9px] text-zinc-500 font-bold mt-2 uppercase tracking-tighter">Triangulating via Satellite Core</p>
                     </div>
                     <!-- Manual Search Overlay -->

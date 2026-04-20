@@ -1,4 +1,4 @@
-console.log("📁 Server file loaded...");
+console.log("📁 Safe-Her Core Initializing...");
 const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
@@ -8,247 +8,219 @@ const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const twilio = require('twilio');
 const axios = require('axios');
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { Queue, Worker } = require('bullmq');
-const IORedis = require('ioredis');
 
 // --- Configuration Loader ---
+require('dotenv').config({ path: path.join(__dirname, '.env') }); // Load api dir .env
 const rootPath = path.join(__dirname, '..');
-require('dotenv').config({ path: path.join(rootPath, '.env') }); 
+const envPath = path.join(rootPath, '.env');
+require('dotenv').config({ path: envPath }); // Merge root .env
 
-// Initialize Express App
+if (process.env.MONGODB_URI) {
+    console.log("📁 [SYSTEM] Core configuration linked.");
+    console.log("🛡️ [AUTH] Key Detect: " + (process.env.GOOGLE_CLIENT_ID ? "PRESENT ✅" : "MISSING ❌"));
+    console.log("🚀 [GROQ] Key Detect: " + (process.env.GROQ_API_KEY ? "PRESENT ✅" : "MISSING ❌"));
+    console.log("💳 [RAZORPAY] Key Detect: " + (process.env.RAZORPAY_KEY_ID ? "PRESENT ✅" : "MISSING ❌"));
+}
+
+const razorpay = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_SaxSkQwrcuFvNW',
+    key_secret: process.env.RAZORPAY_KEY_SECRET || '1OcdkE2rgXG42B3sXPPnQbQ8'
+});
+
 const app = express();
 app.use(express.json());
 app.use(cors({ origin: true, credentials: true }));
 
-// Serve frontend statically
-app.use(express.static(path.join(__dirname, '..')));
-
-// Fallback route for SPA
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'index.html'));
-});
-
-// --- SENTINEL DISPATCHER SYSTEM (SOS Queue) ---
-let sosQueue = {
-    async add(type, data) {
-        console.log(`📡 [SENTINEL DISPATCH] Processing ${type}...`);
-        const { contacts, message } = data;
-        
-        if (process.env.TWILIO_SID && process.env.TWILIO_AUTH_TOKEN) {
-            try {
-                const twilioClient = require('twilio')(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
-                for (let phone of contacts) {
-                    await twilioClient.messages.create({
-                        body: message,
-                        from: process.env.TWILIO_PHONE,
-                        to: phone
-                    });
-                }
-                console.log("✅ [SENTINEL] Twilio Alerts Delivered.");
-            } catch (err) {
-                console.error("❌ [SENTINEL] Twilio Failure:", err.message);
-            }
-        } else {
-            console.log("⚠️ [SIMULATOR] Terminal Alert Broadcast:");
-            if (contacts && Array.isArray(contacts)) {
-                contacts.forEach(c => console.log(`   👉 TO: ${c} | MSG: ${message}`));
-            }
-        }
-    }
-};
-
-// Redis Mode Activation
-if (process.env.REDIS_URL || process.env.NODE_ENV === 'production') {
+// --- PAYMENT API ---
+app.post('/api/create-order', async (req, res) => {
     try {
-        const redisConn = new IORedis(process.env.REDIS_URL, { maxRetriesPerRequest: 0 });
-        sosQueue = new Queue('sos_alerts', { connection: redisConn });
-        console.log("✅ Redis Queue Integrated.");
-    } catch (e) {
-        console.warn("⚠️ Redis fail, using direct dispatch.");
-    }
-}
-
-// Schemas & Models
-const userSchema = new mongoose.Schema({
-    name: String,
-    email: { type: String, unique: true, lowercase: true },
-    password: { type: String, required: true },
-    phone: String,
-    role: { type: String, default: 'user' },
-    isPremium: { type: Boolean, default: false }
+        const { amount } = req.body;
+        const options = {
+            amount: amount * 100, // amount in paisa
+            currency: "INR",
+            receipt: `receipt_${Date.now()}`
+        };
+        const order = await razorpay.orders.create(options);
+        res.json(order);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-userSchema.methods.matchPassword = async function(enteredPassword) {
-    return enteredPassword === this.password; // Simplified for this project
-};
+app.post('/api/verify-payment', async (req, res) => {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const body = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSignature = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '1OcdkE2rgXG42B3sXPPnQbQ8')
+        .update(body.toString())
+        .digest('hex');
 
-const User = mongoose.model('User', userSchema);
-
-const contactSchema = new mongoose.Schema({
-    userId: mongoose.Schema.Types.ObjectId,
-    contactName: String,
-    contactPhone: String
-});
-const EmergencyContact = mongoose.model('EmergencyContact', contactSchema);
-
-// --- ROUTES ---
-
-app.get('/api/health', async (req, res) => {
-    let dbStatus = "offline";
-    try {
-        if (mongoose.connection.readyState === 1) {
-            await mongoose.connection.db.admin().ping();
-            dbStatus = "connected";
-        } else if (mongoose.connection.readyState === 2) {
-            dbStatus = "connecting";
-        } else {
-            dbStatus = "offline";
-        }
-    } catch (e) {
-        dbStatus = "reconnecting";
+    if (expectedSignature === razorpay_signature) {
+        res.json({ status: "success" });
+    } else {
+        res.status(400).json({ status: "failure" });
     }
+});
 
-    res.json({
-        server: "online",
-        database: dbStatus,
-        timestamp: new Date().toISOString(),
-        g_client_id: process.env.G_CLIENT_ID || "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com"
+// --- CORE API ROUTES ---
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        version: '16.5-STABLE', 
+        status: 'online', 
+        database: mongoose.connection.readyState === 1 ? 'stable' : 'linking',
+        g_client_id: process.env.GOOGLE_CLIENT_ID || "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com",
+        rzp_key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_SaxSkQwrcuFvNW'
     });
-});
-
-app.post('/api/register', async (req, res) => {
-    try {
-        const { name, email, password, phone } = req.body;
-        const userExists = await User.findOne({ email });
-        if (userExists) return res.status(400).json({ message: "User exists" });
-        const newUser = new User({ name, email, password, phone });
-        await newUser.save();
-        res.status(201).json({ message: "Registered", userId: newUser._id });
-    } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-app.post('/api/login', async (req, res) => {
-    try {
-        let { email, password } = req.body;
-        const user = await User.findOne({ email: email.toLowerCase().trim() });
-        if (!user || !(await user.matchPassword(password))) {
-            return res.status(401).json({ message: "Invalid credentials" });
-        }
-        res.json({ user: { id: user._id, name: user.name, email: user.email, phone: user.phone } });
-    } catch (e) { res.status(500).json({ message: e.message }); }
-});
-
-app.post('/api/sos-trigger', async (req, res) => {
-    try {
-        const { userId, lat, lng } = req.body;
-        const user = await User.findById(userId);
-        const contacts = await EmergencyContact.find({ userId });
-        const alertText = `🚨 SOS EMERGENCY: ${user?.name || 'User'} needs help! 📍 maps.google.com/?q=${lat},${lng}`;
-        await sosQueue.add('send_sms', { contacts: contacts.map(c => c.contactPhone), message: alertText });
-        res.json({ message: "SOS Distributed" });
-    } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
 app.post('/api/google-login-verify', async (req, res) => {
+    const { token, origin } = req.body;
+    const client_id = process.env.GOOGLE_CLIENT_ID || "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com";
+    const client = new OAuth2Client(client_id);
+
     try {
-        const { token } = req.body;
-        const googleClient = new OAuth2Client(process.env.G_CLIENT_ID);
-        const ticket = await googleClient.verifyIdToken({
+        const ticket = await client.verifyIdToken({
             idToken: token,
-            audience: process.env.G_CLIENT_ID
+            audience: client_id,
         });
-        const { email, name } = ticket.getPayload();
-        let user = await User.findOne({ email });
+        const payload = ticket.getPayload();
+        
+        // Upsert User in DB
+        let user = await User.findOne({ email: payload.email });
         if (!user) {
-            user = new User({ name, email, password: crypto.randomBytes(16).toString('hex'), phone: "PENDING" });
+            user = new User({
+                name: payload.name,
+                email: payload.email,
+                emergencyContacts: []
+            });
             await user.save();
         }
-        res.json({ user: { id: user._id, name: user.name, email: user.email, phone: user.phone } });
-    } catch (e) { res.status(401).json({ message: "Auth Failed" }); }
+
+        res.json({ success: true, user: { id: user._id, name: user.name, email: user.email } });
+    } catch (e) {
+        console.error("❌ Auth Verify Error:", e.message);
+        res.status(401).json({ success: false, message: "Invalid Token" });
+    }
 });
 
-app.post('/api/add-contact', async (req, res) => {
+app.get('/api/danger-zones', async (req, res) => {
     try {
-        const { userId, contactName, contactPhone } = req.body;
-        const newContact = new EmergencyContact({ userId, contactName, contactPhone });
-        await newContact.save();
-        res.status(201).json({ message: "Contact Saved", contact: newContact });
-    } catch (e) { res.status(500).json({ message: e.message }); }
+        const zones = await mongoose.model('DangerZone').find({}).limit(50);
+        res.json(zones || []);
+    } catch (e) { res.status(500).json([]); }
 });
 
-// --- UNIVERSAL SAFETY ORACLE (Gemini Stable v16.2) ---
+app.get('/api/safety-score', async (req, res) => {
+    try {
+        let score = 8.5;
+        const hour = new Date().getHours();
+        if (hour > 20 || hour < 5) score -= 1.8;
+        res.json({ score, label: score > 7 ? "SECURE" : "CAUTION" });
+    } catch (e) { res.status(500).json({ score: 0, label: "OFFLINE" }); }
+});
+
 app.post(['/api/chat', '/chat'], async (req, res) => {
     try {
-        const { message, history } = req.body;
-        if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY Missing");
-        
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        
-        // Finalized to Flash for 100% Stability & Alexa Speed
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const { message } = req.body;
+        const groqKey = (process.env.GROQ_API_KEY || "").trim();
+        const openRouterKey = (process.env.OPENROUTER_API_KEY || "").trim();
 
-        const chat = model.startChat({
-            history: history || [],
-            generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
-        });
+        let aiResponse;
 
-        const prompt = `You are 'Oracle', the ultimate AI Safety Companion. 
-        Identity: Advanced Intelligence like Alexa or JARVIS.
-        Task: Respond to "${message}" with tactical precision.
-        Status: Operating on high-speed neural link.
-        Languages: English, Hindi, Hinglish.`;
+        // --- ATTEMPT 1: GROQ (Primary choice per user) ---
+        if (groqKey) {
+            try {
+                console.log("📡 [GROQ] Attempting handshake with model: llama-3.1-8b-instant");
+                const response = await axios.post("https://api.groq.com/openai/v1/chat/completions", {
+                    model: "llama-3.1-8b-instant",
+                    messages: [
+                        { role: "system", content: "SYSTEM: You are 'ALEXA SAFE', the AI protector for Safe-Her. Provide tactical, calm safety advice." },
+                        { role: "user", content: message }
+                    ]
+                }, {
+                    headers: { 'Authorization': `Bearer ${groqKey}` },
+                    timeout: 8000
+                });
+                aiResponse = response.data.choices[0].message.content;
+                console.log("✅ [GROQ] Response Successful.");
+            } catch (e) { 
+                console.error("🚀 [GROQ ERROR]:", e.response ? e.response.data : e.message); 
+                console.warn("🛡️ Switching to OpenRouter Fallback...");
+            }
+        }
 
-        const result = await chat.sendMessage(prompt);
-        const response = await result.response;
-        res.json({ reply: response.text() });
+        // --- ATTEMPT 2: OPENROUTER ---
+        if (!aiResponse && openRouterKey) {
+            try {
+                const response = await axios.post("https://openrouter.ai/api/v1/chat/completions", {
+                    model: "meta-llama/llama-3.1-8b-instruct:free",
+                    messages: [{ role: "user", content: message }]
+                }, {
+                    headers: { 'Authorization': `Bearer ${openRouterKey}`, 'X-Title': 'Safe-Her AI' },
+                    timeout: 10000
+                });
+                aiResponse = response.data.choices[0].message.content;
+            } catch (e) { 
+                console.error("❌ [OPENROUTER ERROR]:", e.message); 
+            }
+        }
+
+        if (!aiResponse) {
+            const errorMsg = (!groqKey) ? "GROQ_API_KEY is missing in .env" : "AI Satellite Lost (Check API Key Validity)";
+            throw new Error(errorMsg);
+        }
+
+        res.json({ reply: aiResponse });
     } catch (e) {
-        console.error("❌ Oracle Link Error:", e.message);
-        res.status(500).json({ reply: "Neural link stabilizing. Safety first: Use the SOS button if needed." });
+        console.error("❌ Oracle Error:", e.message);
+        res.status(500).json({ reply: `Assistant is recalibrating (${e.message}). Stay in the light.` });
     }
 });
 
-// --- NEURAL PERSISTENCE: UNBREAKABLE DB LINK (Ironclad-Sync v11.5) ---
-const connectDB = async () => {
-    if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) return;
-
+app.get('/api/get-contacts/:id', async (req, res) => {
     try {
-        const options = {
-            serverSelectionTimeoutMS: 45000,
-            heartbeatFrequencyMS: 3000,
-            socketTimeoutMS: 60000,
-            connectTimeoutMS: 60000,
-            family: 4,
-            tlsAllowInvalidCertificates: true,
-            retryWrites: true,
-            w: 'majority',
-            maxPoolSize: 10
-        };
-        const dbUri = process.env.MONGODB_URI || "mongodb://dhirajkumar9501445740_db_user:qzMRq88q6EKsTfaF@ac-uvtkyvu-shard-00-00.l2u06sf.mongodb.net:27017,ac-uvtkyvu-shard-00-01.l2u06sf.mongodb.net:27017,ac-uvtkyvu-shard-00-02.l2u06sf.mongodb.net:27017/hersafety?ssl=true&authSource=admin&retryWrites=true&w=majority";
-        console.log("📡 Attempting PIN-POINT Neural Link with MongoDB...");
-        const conn = await mongoose.connect(dbUri, options);
-        console.log(`✅ MongoDB SUCCESS: Link Stable [${conn.connection.host}]`);
+        if (req.params.id === 'guest') return res.json([]);
+        const user = await mongoose.model('User').findById(req.params.id);
+        res.json(user ? user.emergencyContacts : []);
+    } catch (e) { res.json([]); }
+});
+
+// Serving logic
+app.use(express.static(path.join(__dirname, '..')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, '..', 'index.html')));
+
+// --- DATABASE LINK ---
+const connectDB = async () => {
+    try {
+        const dbUri = process.env.MONGODB_URI;
+        if (!dbUri) throw new Error("No MongoDB URI");
+        await mongoose.connect(dbUri, { serverSelectionTimeoutMS: 30000 });
+        console.log("✅ [DATABASE] High-Speed Cloud Link Stable.");
     } catch (e) {
-        console.error("❌ Neural Link CRITICAL:", e.message);
-        setTimeout(connectDB, 8000); 
+        console.error("❌ [DATABASE] Connection failed. Retrying in 5s...");
+        setTimeout(connectDB, 5000);
     }
 };
-
-mongoose.connection.on('disconnected', () => {
-    if (mongoose.connection.readyState === 0) {
-        console.warn("🚨 DATABASE DROPPED: Emergency Neural Re-Link...");
-        setTimeout(connectDB, 3000);
-    }
-});
-
 connectDB();
 
-const PORT = process.env.PORT || 5000;
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-    app.listen(PORT, () => {
-        console.log(`🚀 NEURAL CORE ONLINE [PORT: ${PORT}]`);
+// Models Registry
+const userSchema = new mongoose.Schema({ name: String, email: { type: String, unique: true }, password: { type: String }, emergencyContacts: [] });
+const User = mongoose.models.User || mongoose.model('User', userSchema);
+
+const dangerSchema = new mongoose.Schema({ name: String, lat: Number, lng: Number, risk: String });
+const DangerZone = mongoose.models.DangerZone || mongoose.model('DangerZone', dangerSchema);
+
+let PORT = process.env.PORT || 5000;
+function startServer(p) {
+    app.listen(p, () => {
+        console.log(`🚀 [SAFE-HER ONLINE] Serving Dashboard on Port ${p}`);
+    }).on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.warn(`⚠️ Port ${p} is busy. Trying ${p + 1}...`);
+            startServer(p + 1);
+        } else {
+            console.error(`❌ [ERROR] Server failure:`, err.message);
+        }
     });
 }
+startServer(PORT);
 
-// Ensure Vercel can consume the Express app as a serverless function
 module.exports = app;

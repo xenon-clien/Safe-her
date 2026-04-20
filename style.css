@@ -285,45 +285,88 @@ a {
     font-size: 1.1rem;
 }
 
-/* Safety Dashboard */
-.safety-dashboard {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-.dash-stat {
-    background: var(--bg-card);
-    border: 1px solid var(--border-color);
-    border-radius: 14px;
-    padding: 1.2rem;
+/* Mission Control Status Grid */
+.mission-status-grid {
     display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+    padding: 1.5rem;
+    background: rgba(13, 13, 58, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 2rem;
+    backdrop-filter: blur(20px);
+}
+
+.status-item {
+    position: relative;
+    padding: 1rem 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 4px solid #444;
+    border-radius: 0.5rem 1rem 1rem 0.5rem;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.status-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateX(5px);
+}
+
+.status-header {
+    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 12px;
-    transition: 0.3s;
 }
-.dash-stat:hover {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 15px rgba(157,78,221,0.15);
+
+.status-label {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: rgba(255, 255, 255, 0.5);
 }
-.dash-stat i {
-    font-size: 1.6rem;
-    color: var(--primary-color);
-    min-width: 24px;
-}
-.dash-val {
-    display: block;
-    font-size: 1rem;
-    font-weight: 700;
+
+.status-indicator {
+    font-size: 0.9rem;
+    font-weight: 800;
     color: white;
 }
-.dash-lbl {
-    display: block;
-    font-size: 0.72rem;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-top: 2px;
+
+/* Status variants */
+.status-item.standby {
+    border-left-color: #ff3366;
+    background: rgba(255, 51, 102, 0.05);
+}
+
+.status-item.connected {
+    border-left-color: #4caf50;
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.status-item.warning {
+    border-left-color: #ff9800;
+    background: rgba(255, 152, 0, 0.05);
+}
+
+.status-item.score-box {
+    border-left-color: var(--primary-color);
+    background: rgba(157, 78, 221, 0.05);
+}
+
+.status-glow {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0);
+    transition: box-shadow 0.4s ease;
+}
+
+.status-item.standby:hover .status-glow {
+    box-shadow: 0 0 20px rgba(255, 51, 102, 0.2);
+}
+
+.status-item.connected:hover .status-glow {
+    box-shadow: 0 0 20px rgba(76, 175, 80, 0.2);
 }
 
 /* Improved Tools Grid */
