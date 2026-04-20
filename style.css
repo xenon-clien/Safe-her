@@ -2468,67 +2468,85 @@ html, body {
     box-sizing: border-box;
 }
 
-/* Tactical Sidebar HARD-FIX (No Jitter) */
-.tactical-sidebar {
-    position: fixed !important;
-    left: 15px !important;
-    top: 50% !important;
-    margin-top: -150px; 
-    transform: none !important;
-    width: 65px;
-    background: rgba(15, 15, 45, 0.95);
-    backdrop-filter: blur(25px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 2rem;
-    padding: 15px 0;
+/* ============================================================
+   NEURAL SAFETY PILL (Top Center - Dynamic Island)
+   ============================================================ */
+
+.safety-pill {
+    position: fixed;
+    top: 85px; /* Just below the main navbar */
+    left: 50%;
+    transform: translateX(-50%);
+    height: 54px;
+    background: rgba(10, 10, 40, 0.85);
+    backdrop-filter: blur(25px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 100px;
+    padding: 6px 10px;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 12px;
-    z-index: 210000;
+    gap: 8px;
+    z-index: 150000;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.6), 0 0 20px rgba(157, 78, 221, 0.1);
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.tactical-item {
-    width: 45px;
-    height: 45px;
-    border-radius: 1.2rem;
-    background: rgba(255,255,255,0.03);
+@media (max-width: 768px) {
+    .safety-pill {
+        top: 10px; /* On mobile, move it higher maybe? No, let's keep it visible below nav */
+        width: auto;
+        padding: 5px 8px;
+    }
+}
+
+.pill-item {
+    height: 42px;
+    padding: 0 16px;
+    border-radius: 100px;
+    background: rgba(255,255,255,0.02);
     border: 1px solid rgba(255,255,255,0.05);
     color: white;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     cursor: pointer;
     transition: all 0.3s;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
 }
 
-.tactical-item:hover {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    transform: translateX(5px);
+.pill-item:hover {
+    background: rgba(255,255,255,0.08);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
 }
 
-.tactical-item span {
-    font-size: 8px;
+.pill-item span {
+    font-size: 10px;
     font-weight: 900;
-    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
-.sos-burn {
+.pill-sos {
     background: linear-gradient(135deg, #ff3366, #ff0000) !important;
     border: none !important;
-    height: 65px !important;
-    box-shadow: 0 0 20px rgba(255, 51, 102, 0.4);
+    color: white !important;
+    box-shadow: 0 0 15px rgba(255, 51, 102, 0.3);
 }
 
-.tactical-divider {
-    width: 30px;
-    height: 1px;
-    background: rgba(255,255,255,0.1);
-    margin: 5px 0;
+.pill-sos:hover {
+    box-shadow: 0 0 25px rgba(255, 51, 102, 0.5);
+    transform: scale(1.05) translateY(-2px);
 }
+
+.pill-divider {
+    width: 1px;
+    height: 24px;
+    background: rgba(255,255,255,0.1);
+    margin: 0 4px;
+}
+
 
 
 @media (max-width: 768px) {
