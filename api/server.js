@@ -7,6 +7,7 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const { OAuth2Client } = require('google-auth-library');
 const twilio = require('twilio');
+const nodemailer = require('nodemailer');
 const axios = require('axios');
 
 // --- Configuration Loader ---
@@ -122,6 +123,17 @@ const twilioClient = (process.env.TWILIO_SID && process.env.TWILIO_SID !== 'your
     ? require('twilio')(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN) 
     : null;
 
+// Nodemailer transporter for fallback email alerts (use Gmail or any SMTP)
+const emailTransporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 465,
+    secure: true,
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    }
+});
+
 app.post('/api/sos-trigger', async (req, res) => {
     try {
         const { userId, lat, lng } = req.body;
@@ -150,9 +162,12 @@ app.post('/api/sos-trigger', async (req, res) => {
 
         for (const contact of contacts) {
             const phone = contact.phone || contact.number;
+            // Log contact details for debugging
+            console.log(`🔎 Contact: ${contact.name}, phone: ${phone}, whatsapp: ${contact.whatsapp || 'none'}`);
             if (!phone) continue;
 
             if (twilioClient) {
+                // Send SMS (existing behavior)
                 try {
                     const sms = await twilioClient.messages.create({
                         body: messageBody,
@@ -162,12 +177,45 @@ app.post('/api/sos-trigger', async (req, res) => {
                     results.push({ phone, sid: sms.sid });
                     console.log(`✅ SMS Sent to ${phone}`);
                 } catch (err) {
-                    console.error(`❌ Twilio Error for ${phone}:`, err.message);
+                    console.error(`❌ Twilio SMS Error for ${phone}:`, err.message);
                     results.push({ phone, error: err.message });
                 }
+                // Optional WhatsApp send if contact has a WhatsApp number
+                if (contact.whatsapp) {
+                    try {
+                        const waMsg = await twilioClient.messages.create({
+                            body: messageBody,
+                            from: process.env.WHATSAPP_FROM,
+                            to: `whatsapp:${contact.whatsapp}`
+                        });
+                        results.push({ whatsapp: contact.whatsapp, sid: waMsg.sid });
+                        console.log(`✅ WhatsApp Sent to ${contact.whatsapp}`);
+                    } catch (err) {
+                        console.error(`❌ Twilio WhatsApp Error for ${contact.whatsapp}:`, err.message);
+                        results.push({ whatsapp: contact.whatsapp, error: err.message });
+                    }
+                }
             } else {
-                console.warn(`🧪 [SIMULATION MODE] To: ${phone} | Msg: ${messageBody}`);
-                results.push({ phone, sid: 'sim_sid_' + Math.random() });
+                // Fallback: send email alert to contacts (if they have email)
+                if (contact.email) {
+                    const mailOptions = {
+                        from: process.env.SMTP_USER,
+                        to: contact.email,
+                        subject: '🚨 Emergency Alert from Safe-Her',
+                        text: `${messageBody}`
+                    };
+                    try {
+                        await emailTransporter.sendMail(mailOptions);
+                        console.log(`✅ Email sent to ${contact.email}`);
+                        results.push({ email: contact.email, status: 'sent' });
+                    } catch (e) {
+                        console.error(`❌ Email error for ${contact.email}:`, e.message);
+                        results.push({ email: contact.email, status: 'error', error: e.message });
+                    }
+                } else {
+                    console.warn(`🧪 [SIMULATION MODE] No email for contact, Msg: ${messageBody}`);
+                    results.push({ phone, sid: 'sim_sid_' + Math.random() });
+                }
             }
         }
 
@@ -321,25 +369,30 @@ const connectDB = async () => {
 connectDB();
 
 // Models Registry
-const userSchema = new mongoose.Schema({ name: String, email: { type: String, unique: true }, password: { type: String }, emergencyContacts: [] });
+const userSchema = new mongoose.Schema({
+    name: String,
+    email: { type: String, unique: true },
+    password: { type: String },
+    emergencyContacts: [{ name: String, phone: String, whatsapp: String, email: String }]
+});
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 const dangerSchema = new mongoose.Schema({ name: String, lat: Number, lng: Number, risk: String });
 const DangerZone = mongoose.models.DangerZone || mongoose.model('DangerZone', dangerSchema);
 
-let PORT = process.env.PORT || 5000;
-function startServer(p) {
-    app.listen(p, () => {
-        console.log(`🚀 [SAFE-HER ONLINE] Serving Dashboard on Port ${p}`);
-    }).on('error', (err) => {
-        if (err.code === 'EADDRINUSE') {
-            console.warn(`⚠️ Port ${p} is busy. Trying ${p + 1}...`);
-            startServer(p + 1);
-        } else {
-            console.error(`❌ [ERROR] Server failure:`, err.message);
-        }
-    });
+// --- SERVER INITIALIZATION ---
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    let PORT = process.env.PORT || 5000;
+    function startServer(p) {
+        app.listen(p, () => {
+            console.log(`🚀 [LOCAL READY] Serving API on Port ${p}`);
+        }).on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                startServer(p + 1);
+            }
+        });
+    }
+    startServer(PORT);
 }
-startServer(PORT);
 
 module.exports = app;

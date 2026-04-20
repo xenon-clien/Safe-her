@@ -9,7 +9,9 @@ let isSosActive = false;
 let audioContext, oscillator, gainNode;
 let userLatLng = { lat: 30.901, lng: 75.8573 }; 
 let isLocationPrecise = false; // GPS Accuracy Lock
-const API_URL = window.location.port === '3300' ? 'http://localhost:5000/api' : '/api';
+const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
+    ? 'http://localhost:5000/api' 
+    : '/api';
 console.log("🛰️ Satellite Link: ACTIVE");
 console.log("🛰️ Safe-Her Link Target:", API_URL);
 
