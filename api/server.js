@@ -177,28 +177,29 @@ app.post('/api/add-contact', async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// --- UNIVERSAL SAFETY ORACLE (Gemini AI) ---
+// --- UNIVERSAL SAFETY ORACLE (Gemini Advanced Pro) ---
 app.post(['/api/chat', '/chat'], async (req, res) => {
     try {
         const { message, history } = req.body;
         
-        // Critical Fix: Removed the hardcoded LEAKED key
         if (!process.env.GEMINI_API_KEY) {
             throw new Error("GEMINI_API_KEY is missing or invalid in environment variables.");
         }
         
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // Upgrade to the Pro model taking advantage of user subscription
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
         const chat = model.startChat({
             history: history || [],
-            generationConfig: { maxOutputTokens: 250 }
+            generationConfig: { maxOutputTokens: 500, temperature: 0.4 } // More tokens, highly focused
         });
 
-        const prompt = `You are the SafeHer AI Assistant. specialized in women safety and emergency protocols. 
-        Your tone is calm, professional, and tactical. 
-        If a user says they are in danger, advise them to press the SOS button immediately.
-        Keep answers short and helpful. Support Hindi and English.
+        const prompt = `You are a highly advanced AI Safety Assistant named 'Oracle', operating similarly to an elite, responsive AI like Alexa or J.A.R.V.I.S.
+        You are directly connected to the user's 'Safe-Her' security network.
+        Your tone is highly intelligent, calm, professional, and tactical. You respond naturally to voice-like conversational inputs.
+        If a user seems in danger, instantly direct them to use the SOS feature or provide immediate survival tactics. 
+        Keep your logic sharp but your replies conversational and human-like. Support fluid Hindi, Hinglish, and English.
         User says: ${message}`;
 
         const result = await chat.sendMessage(prompt);
