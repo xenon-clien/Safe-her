@@ -540,7 +540,8 @@ async function performTrackingSync() {
                 updateDashboardGPS(latitude, longitude);
                 
                 if (gpsEl) gpsEl.innerHTML = '<span class="text-green-500 font-black">🛰️ SATELLITE-LOCK</span>';
-                showToast("Satellite Signal Locked (100% Precise)", "success");
+                // Silence redundant toast for premium entry
+                console.log("✅ Satellite Signal Locked (100% Precise)");
                 isLocationPrecise = true; // Lock precision
                 sendTrackingUpdate();
             },
@@ -597,7 +598,7 @@ async function tryIPGeolocationFallback() {
                     updateDashboardGPS(userLatLng.lat, userLatLng.lng);
                     
                     if (gpsEl) gpsEl.innerHTML = '<span class="text-yellow-400 font-bold">📡 APPROXIMATE-LINK</span>';
-                    showToast("Using Internet Triangulation (Area is approximate). Click 'Refresh GPS' for precision.", "warning");
+                    console.log("📡 Using Internet Triangulation (Area is approximate)");
                     break;
                 }
             } catch (e) { console.warn(`Triangulation Source ${url} failed, trying next...`); }
