@@ -21,6 +21,14 @@ const app = express();
 app.use(express.json());
 app.use(cors({ origin: true, credentials: true }));
 
+// Serve frontend statically
+app.use(express.static(path.join(__dirname, '..')));
+
+// Fallback route for SPA
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
+});
+
 // --- SENTINEL DISPATCHER SYSTEM (SOS Queue) ---
 let sosQueue = {
     async add(type, data) {
