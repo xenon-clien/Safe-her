@@ -2313,23 +2313,43 @@ document.addEventListener('DOMContentLoaded', () => {
         // 9. Initialize Official Google Identity Services (GSI)
         window.isGSI_Ready = false;
         
-        // Fetch real Client ID from server if available (Dynamic Config)
-        fetch(`${API_URL}/health`).then(r => r.json()).then(health => {
-            const GOOGLE_CLIENT_ID = health.g_client_id && health.g_client_id !== "PENDING" 
-                ? health.g_client_id 
-                : "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com";
-
-            if (typeof google !== 'undefined') {
-                google.accounts.id.initialize({
-                    client_id: GOOGLE_CLIENT_ID,
-                    callback: handleCredentialResponse,
-                    auto_select: false,
-                    ux_mode: 'popup'
-                });
-
-                const btnLogin = document.getElementById("googleBtnLogin");
-                if (btnLogin) google.accounts.id.renderButton(btnLogin, { theme: "outline", size: "large", width: "100%" });
+        const initGSI = (clientId) => {
+            if (typeof google === 'undefined') {
+                console.warn("⚠️ Google SDK blocked or loading. Retrying...");
+                setTimeout(() => initGSI(clientId), 1000);
+                return;
             }
+
+            google.accounts.id.initialize({
+                client_id: clientId,
+                callback: handleCredentialResponse,
+                auto_select: false,
+                ux_mode: 'popup'
+            });
+
+            const renderOptions = { theme: "outline", size: "large", width: "100%", text: "continue_with", shape: "pill" };
+            const btnLogin = document.getElementById("googleBtnLogin");
+            const btnSignup = document.getElementById("googleBtnSignup");
+
+            if (btnLogin) google.accounts.id.renderButton(btnLogin, renderOptions);
+            if (btnSignup) google.accounts.id.renderButton(btnSignup, renderOptions);
+
+            // --- INCOGNITO SHIELD DETECTOR ---
+            setTimeout(() => {
+                const loginBox = document.getElementById("googleBtnLogin");
+                if (loginBox && loginBox.innerHTML.trim() === "") {
+                    console.log("🛡️ Privacy Shield detected. Showing manual fallback...");
+                    document.getElementById('googleContinueBtn')?.classList.remove('hidden');
+                    document.getElementById('googleContinueBtnSignup')?.classList.remove('hidden');
+                }
+            }, 2500);
+        };
+
+        fetch(`${API_URL}/health`).then(r => r.json()).then(health => {
+            const GOOGLE_CLIENT_ID = health.g_client_id || "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com";
+            initGSI(GOOGLE_CLIENT_ID);
+        }).catch(() => {
+            initGSI("349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com");
         });
 
     } catch (e) {
