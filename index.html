@@ -147,20 +147,16 @@
         </div>
         <ul class="nav-links" id="navLinks">
             <li><a href="#home" class="active" onclick="switchSection('home')">Home</a></li>
-            <li><a href="#route" onclick="switchSection('route')"><i class="fas fa-route"
-                        style="margin-right:5px;"></i>Route</a></li>
+            <li><a href="#route" onclick="switchSection('route')"><i class="fas fa-route"></i> Route</a></li>
             <li><a href="#contacts" onclick="switchSection('contacts')">Contacts</a></li>
             <li><a href="#records" onclick="switchSection('records')">Logs</a></li>
-            <li id="proCenterLink" style="display:none;"><a href="#pro-center" onclick="switchSection('pro-center')"
-                    class="text-premium-gold font-bold"><i class="fas fa-crown"></i> Pro Command</a></li>
             <li><a href="#tips" onclick="switchSection('tips')">Tips</a></li>
             <li><a href="#feedback" onclick="switchSection('feedback')">Feedback</a></li>
-            <li id="navLogin"><a href="#loginView" class="btn-login" onclick="switchSection('loginView')">Login</a></li>
-            <li id="navLogout" style="display:none;"><a href="#" onclick="logout()" class="text-red-500 font-bold"><i
-                        class="fas fa-sign-out-alt"></i> Logout</a></li>
-            <li id="goPremiumNav"><button onclick="initiateRazorpayPayment()"
-                    class="bg-gradient-to-r from-premium-gold to-yellow-600 text-black px-4 py-2 rounded-full font-bold ml-2 hover:scale-105 transition-transform"><i
-                        class="fas fa-crown"></i> Go Premium</button></li>
+            <li id="navLogout" style="display:none;"><a href="#" onclick="logout()" class="font-bold"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+            <li id="navLogin"><a href="#loginView" class="btn-login" onclick="switchSection('loginView')">Login / Guest</a></li>
+            <li id="goPremiumNav"><button onclick="showPremiumPlans()"
+                    class="bg-gradient-to-r from-premium-gold to-yellow-600 text-black px-6 py-2 rounded-full font-black ml-4 hover:scale-105 transition-transform shadow-lg shadow-premium-gold/20"><i
+                        class="fas fa-crown mr-2"></i> Go Premium</button></li>
         </ul>
         <div class="hamburger" onclick="toggleMobileMenu()">
             <i class="fas fa-bars"></i>
@@ -195,50 +191,77 @@
     <main class="main-container">
 
         <!-- 1. HOME SECTION -->
-        <section id="home" class="section-container" style="display: none;">
+        <section id="home" class="section-container active-section" style="display: flex;">
 
             <div class="hero-header">
                 <h1>We are here to help you.</h1>
                 <p>Your personal safety companion — armed with AI-powered tools.</p>
+                
+                <div class="flex justify-center mt-6">
+                    <div class="bg-black/40 backdrop-blur-xl border border-white/10 rounded-full px-6 py-2 flex items-center gap-4 shadow-2xl">
+                        <button onclick="sendSOSAlert()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-600/30"> <i class="fas fa-biohazard mr-1"></i> SOS</button>
+                        <i class="fas fa-phone-alt text-white/40 text-xs cursor-pointer hover:text-white transition-colors"></i>
+                        <i class="fas fa-bell text-white/40 text-xs cursor-pointer hover:text-white transition-colors"></i>
+                        <i class="fas fa-broadcast-tower text-white/40 text-xs cursor-pointer hover:text-white transition-colors"></i>
+                    </div>
+                </div>
             </div>
 
 
 
             <!-- Mission Control Status Grid -->
-            <div class="mission-status-grid">
-                <div class="status-item standby" id="statusSystem">
-                    <div class="status-header">
-                        <span class="status-label">System</span>
-                        <span class="status-indicator">Standby 🛑</span>
+            <div class="mission-status-grid quantum-grid">
+                <!-- Card 1: Area -->
+                <div class="status-item connected" id="statusAreaBox" onclick="performTrackingSync()" style="cursor: pointer;">
+                    <div class="status-icon"><i class="fas fa-location-arrow"></i></div>
+                    <div class="status-content">
+                        <span class="status-value" id="dashArea">Daba</span>
+                        <span class="status-label">YOUR AREA</span>
                     </div>
-                    <div class="status-glow"></div>
                 </div>
 
+                <!-- Card 2: Safety Score -->
+                <div class="status-item connected" id="statusScoreBox">
+                    <div class="status-icon"><i class="fas fa-shield-alt"></i></div>
+                    <div class="status-content">
+                        <span class="status-value" id="dashScore">7.5 / 10</span>
+                        <span class="status-label">SAFETY SCORE</span>
+                    </div>
+                </div>
+
+                <!-- Card 3: Local Time -->
+                <div class="status-item connected">
+                    <div class="status-icon"><i class="fas fa-clock"></i></div>
+                    <div class="status-content">
+                        <span class="status-value" id="dashTime">9:08:59 PM</span>
+                        <span class="status-label">LOCAL TIME</span>
+                    </div>
+                </div>
+
+                <!-- Card 4: Database -->
                 <div class="status-item connected" id="statusDbBox">
-                    <div class="status-header">
-                        <span class="status-label">Database</span>
-                        <span class="status-indicator" id="dashDb">Connected ✅</span>
+                    <div class="status-icon"><i class="fas fa-database"></i></div>
+                    <div class="status-content">
+                        <span class="status-value" id="dashDb">Online</span>
+                        <span class="status-label">DATABASE</span>
                     </div>
                 </div>
 
-                <div class="status-item connected" id="statusGpsBox">
-                    <div class="status-header">
-                        <span class="status-label">Satellite Core</span>
-                        <span class="status-indicator" id="dashGps">Active ✅</span>
+                <!-- Card 5: Satellite Core -->
+                <div class="status-item connected" id="statusGpsBox" onclick="performTrackingSync()" style="cursor: pointer;">
+                    <div class="status-icon"><i class="fas fa-satellite-dish"></i></div>
+                    <div class="status-content">
+                        <span class="status-value" id="dashGps">Connected</span>
+                        <span class="status-label">SATELLITE CORE</span>
                     </div>
                 </div>
 
+                <!-- Card 6: Street Lighting -->
                 <div class="status-item warning" id="statusLightsBox">
-                    <div class="status-header">
-                        <span class="status-label">Street Lighting</span>
-                        <span class="status-indicator" id="dashLights">Low Lighting ⚠️</span>
-                    </div>
-                </div>
-
-                <div class="status-item score-box">
-                    <div class="status-header">
-                        <span class="status-label">Radar Safety Score</span>
-                        <span class="status-indicator" id="dashScore">--</span>
+                    <div class="status-icon"><i class="fas fa-lightbulb"></i></div>
+                    <div class="status-content">
+                        <span class="status-value" id="dashLights">Low Lighting</span>
+                        <span class="status-label">STREET LIGHTING</span>
                     </div>
                 </div>
             </div>
@@ -251,38 +274,39 @@
 
             <!-- PREMIUM SAFETY METER -->
             <div class="safety-meter-container">
-                <div class="meter-header">
-                    <span class="text-xs uppercase tracking-[0.2em] text-white/40">Radar Safety Score</span>
-                    <span id="safetyMeterLabel" class="text-[10px] font-black px-2 py-0.5 rounded-full bg-green-500/20 text-green-500 border border-green-500/30">ANALYZING...</span>
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-white/30">Radar Safety Score</h3>
+                    <div id="safetyMeterLabel" class="text-[9px] bg-green-500/10 text-green-500 px-3 py-1 rounded-full border border-green-500/20 font-black">ANALYZING...</div>
                 </div>
-                <div class="meter-bar-vault">
-                    <div id="safetyMeterBar" class="meter-fill" style="width: 0%;"></div>
+
+                <div class="meter-bar-vault" style="height: 2px; background: rgba(255,255,255,0.05); border-radius: 10px; overflow: hidden;">
+                    <div id="safetyMeterBar" class="meter-fill" style="width: 75%; height: 100%; background: var(--primary-color);"></div>
                 </div>
-                <div class="flex justify-between mt-2">
-                    <span class="text-[9px] text-zinc-600 font-bold">DANGER</span>
-                    <span id="safetyMeterValue" class="text-xl font-black italic">--</span>
-                    <span class="text-[9px] text-zinc-600 font-bold">SECURE</span>
+
+                <div class="flex justify-between mt-3 mb-10">
+                    <span class="text-[9px] font-black text-white/10 tracking-[0.2em]">DANGER</span>
+                    <span class="text-[9px] font-black text-white/10 tracking-[0.2em]">SECURE</span>
+                </div>
+
+                <div class="grid grid-cols-3 gap-8">
+                    <div class="flex flex-col items-center">
+                        <i class="fas fa-sun text-yellow-500 text-xs mb-3"></i>
+                        <span class="text-[7px] font-black uppercase tracking-[0.3em] text-white/20 mb-1">Morning</span>
+                        <span class="text-white font-black text-xs">8.5</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <i class="fas fa-cloud-sun text-orange-500 text-xs mb-3"></i>
+                        <span class="text-[7px] font-black uppercase tracking-[0.3em] text-white/20 mb-1">Evening</span>
+                        <span class="text-white font-black text-xs">7.5</span>
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <i class="fas fa-moon text-blue-400 text-xs mb-3"></i>
+                        <span class="text-[7px] font-black uppercase tracking-[0.3em] text-white/20 mb-1">Night</span>
+                        <span class="text-white font-black text-xs">6.0</span>
+                    </div>
                 </div>
             </div>
 
-            <!-- Daily Safety Forecast UI -->
-            <div class="safety-forecast-row">
-                <div class="forecast-card">
-                    <i class="fas fa-sun text-yellow-400"></i>
-                    <span class="forecast-time">Morning</span>
-                    <span class="forecast-score" id="scoreMorning">--</span>
-                </div>
-                <div class="forecast-card">
-                    <i class="fas fa-cloud-sun text-orange-400"></i>
-                    <span class="forecast-time">Evening</span>
-                    <span class="forecast-score" id="scoreEvening">--</span>
-                </div>
-                <div class="forecast-card">
-                    <i class="fas fa-moon text-blue-400"></i>
-                    <span class="forecast-time">Night</span>
-                    <span class="forecast-score" id="scoreNight">--</span>
-                </div>
-            </div>
 
             <!-- SOS Button SECTION (Moved Right Above the Map) -->
             <div class="flex flex-col items-center justify-center pt-6 pb-6 w-full animate-fadeInUp">
@@ -534,8 +558,8 @@
             </p>
         </section>
 
-        <!-- 2. CONTACTS SECTION -->
-        <section id="contacts" class="section-container" style="display: none;">
+        <!-- 4. SOS SECTION -->
+        <section id="contacts" class="flex-column section-container" style="display: none;">
             <div class="section-header">
                 <h2>Emergency Contacts</h2>
                 <p>Your trusted circle and emergency services.</p>
@@ -579,7 +603,7 @@
             <div class="max-w-6xl mx-auto py-12 px-6">
                 <!-- Pro Header -->
                 <div class="text-center mb-12 animate-fadeIn">
-                    <h2 class="text-5xl font-black text-white italic uppercase tracking-tighter mb-4">Pro Command Center
+                    <h2 class="text-5xl font-black text-white italic uppercase tracking-tighter mb-4 text-gold-shimmer">Pro Command Center
                     </h2>
                     <div
                         class="inline-flex items-center bg-premium-gold text-black px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-premium-gold/20">
@@ -1025,8 +1049,8 @@
         </section>
 
         <!-- 5. AUTHENTICATION SECTION -->
-        <!-- 5. LOGIN SECTION -->
-        <section id="loginView" class="section-container premium-auth-bg active-section">
+        <!-- 6. LOGIN VIEW -->
+        <section id="loginView" class="section-container premium-auth-bg" style="display: none;">
             <div class="auth-box auth-midnight-gold luxury-card">
                 <div class="auth-header">
                     <h2 class="text-gold shimmer-text">Secure Access</h2>
@@ -1210,11 +1234,17 @@
                         <span class="block text-[9px] text-green-400 font-bold uppercase">Ready to Assist</span>
                     </div>
                 </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button id="stopSpeechBtn" onclick="window.speechSynthesis.cancel(); showToast('AI Speech Stopped', 'info')" title="Stop AI Speaking" class="alexa-header-btn text-yellow-500">
+                        <i class="fas fa-stop-circle"></i>
+                    </button>
                     <button id="voiceToggle" onclick="toggleVoice()" title="Toggle Voice Assistant" class="alexa-header-btn">
                         <i class="fas fa-volume-up"></i>
                     </button>
-                    <button class="close-chat" onclick="toggleChat()"><i class="fas fa-times"></i></button>
+                    <button onclick="shutdownAI()" title="Turn Off AI" class="alexa-header-btn text-red-500">
+                        <i class="fas fa-power-off"></i>
+                    </button>
+                    <button class="close-chat" onclick="toggleChat()" title="Minimize"><i class="fas fa-times"></i></button>
                 </div>
             </div>
 
@@ -1434,7 +1464,57 @@
     <!-- AUDIO FOR FAKE CALL RELAY -->
     <audio id="fakeRelayAudio" src="https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3" loop></audio>
 
-    <script src="script.js?v=14.0_NANO_SYNC"></script>
+    <!-- 💎 ELITE MEMBERSHIP PRICING MODAL -->
+    <div id="premiumPlansModal" class="fixed inset-0 z-[300000] bg-black/95 backdrop-blur-3xl hidden items-center justify-center p-6 transition-all duration-700">
+        <div class="max-w-4xl w-full">
+            <div class="text-center mb-12">
+                <h2 class="text-5xl font-black text-white italic uppercase tracking-tighter mb-4">Elevate Your Protection</h2>
+                <p class="text-premium-gold font-bold tracking-[0.3em] text-xs uppercase">Select Your Elite Security Tier</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Standard Pro -->
+                <div class="bg-zinc-900 border border-white/5 p-10 rounded-[3rem] hover:border-premium-gold/30 transition-all group relative overflow-hidden">
+                    <div class="absolute -top-12 -right-12 w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
+                    <h3 class="text-2xl font-bold text-white mb-2">Standard Pro</h3>
+                    <p class="text-zinc-500 text-sm mb-8">Essential tactical upgrades for daily safety.</p>
+                    <div class="mb-8">
+                        <span class="text-4xl font-black text-white">₹1.00</span>
+                        <span class="text-zinc-600 font-bold ml-2">/ month</span>
+                    </div>
+                    <ul class="space-y-4 mb-10">
+                        <li class="flex items-center text-zinc-400 text-sm"><i class="fas fa-check text-premium-gold mr-3"></i> Advanced AI Oracle Access</li>
+                        <li class="flex items-center text-zinc-400 text-sm"><i class="fas fa-check text-premium-gold mr-3"></i> Professional Fake Call</li>
+                        <li class="flex items-center text-zinc-400 text-sm"><i class="fas fa-check text-premium-gold mr-3"></i> Intelligent Shake SOS</li>
+                    </ul>
+                    <button onclick="initiateRazorpayPayment(1)" class="w-full py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl font-black uppercase tracking-widest transition-all">Select Pro</button>
+                </div>
+
+                <!-- Elite Sentinel -->
+                <div class="bg-zinc-950 border border-premium-gold/40 p-10 rounded-[3rem] shadow-[0_0_50px_rgba(212,175,55,0.15)] relative overflow-hidden transform scale-105">
+                    <div class="absolute -top-12 -right-12 w-40 h-40 bg-premium-gold/10 rounded-full blur-3xl"></div>
+                    <div class="absolute top-6 right-8 bg-premium-gold text-black text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Most Elite</div>
+                    <h3 class="text-2xl font-bold text-premium-gold mb-2">Elite Sentinel</h3>
+                    <p class="text-zinc-500 text-sm mb-8">The ultimate safety shield for high-risk zones.</p>
+                    <div class="mb-8">
+                        <span class="text-4xl font-black text-white">₹999.00</span>
+                        <span class="text-zinc-600 font-bold ml-2">/ year</span>
+                    </div>
+                    <ul class="space-y-4 mb-10">
+                        <li class="flex items-center text-zinc-300 text-sm"><i class="fas fa-crown text-premium-gold mr-3"></i> All Pro Tactical Features</li>
+                        <li class="flex items-center text-zinc-300 text-sm"><i class="fas fa-crown text-premium-gold mr-3"></i> Unlimited Digital Blackbox</li>
+                        <li class="flex items-center text-zinc-300 text-sm"><i class="fas fa-crown text-premium-gold mr-3"></i> Real-time AI Sentinel Guard</li>
+                        <li class="flex items-center text-zinc-300 text-sm"><i class="fas fa-crown text-premium-gold mr-3"></i> Elite 24/7 Priority Support</li>
+                    </ul>
+                    <button onclick="initiateRazorpayPayment(999)" class="w-full py-4 bg-premium-gold hover:scale-105 text-black rounded-2xl font-black uppercase tracking-widest transition-all shadow-lg shadow-premium-gold/30">Go Elite</button>
+                </div>
+            </div>
+
+            <button onclick="closePremiumPlans()" class="w-full mt-12 text-zinc-600 hover:text-white font-black uppercase tracking-[0.3em] text-[10px] transition-all">Discard Changes</button>
+        </div>
+    </div>
+
+    <script src="script.js?v=20.0_ULTRA_ELITE"></script>
     <script src="background.js"></script>
     <div id="strobeOverlay"></div>
 </body>

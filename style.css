@@ -216,13 +216,54 @@ a {
     align-items: center;
 }
 
+/* Full Background Quantum Grid */
+.main-container {
+    padding: 100px 20px 50px 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+    position: relative;
+}
+
+.main-container::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: 
+        linear-gradient(rgba(157, 78, 221, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(157, 78, 221, 0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.main-container::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(circle at 50% 50%, rgba(157, 78, 221, 0.05) 0%, transparent 80%);
+    z-index: -1;
+    pointer-events: none;
+}
+
+.luxury-card {
+    background: rgba(13, 13, 45, 0.7);
+    border: 1px solid rgba(157, 78, 221, 0.15);
+    border-radius: 2.5rem;
+    backdrop-filter: blur(30px) saturate(180%);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
 .nav-links a {
-    color: var(--text-main);
-    font-weight: 500;
-    transition: 0.3s ease;
+    color: white;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: 0.3s;
+    opacity: 0.7;
 }
 
 .nav-links a:hover, .nav-links a.active {
+    opacity: 1;
     color: var(--primary-color);
 }
 
@@ -245,13 +286,29 @@ a {
 
 /* ================== CONTAINERS ================== */
 .main-container {
-    max-width: 1100px;
+    padding: 100px 5% 50px 5%;
+    max-width: 1250px;
     margin: 0 auto;
-    padding: 2rem;
+    position: relative;
+    width: 100%;
+}
+
+@media (max-width: 768px) {
+    .main-container {
+        padding: 85px 15px 40px 15px;
+    }
 }
 
 .section-container {
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
     animation: fadeIn 0.4s ease-in-out;
+}
+
+.section-container.active-section {
+    display: flex !important;
 }
 
 @keyframes fadeIn {
@@ -274,78 +331,111 @@ a {
 /* ================== HOME SECTION ================== */
 .hero-header {
     text-align: center;
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    padding-top: 10px;
+    width: 100%;
+    display: block;
 }
 .hero-header h1 {
-    font-size: 2.5rem;
-    margin-bottom: 10px;
+    font-size: clamp(1.8rem, 5vw, 3.25rem);
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 0.4rem;
+    line-height: 1.1;
+    text-transform: uppercase;
 }
 .hero-header p {
     color: var(--text-muted);
-    font-size: 1.1rem;
+    font-size: clamp(0.85rem, 2vw, 1.05rem);
+    max-width: 700px;
+    margin: 0 auto;
+    opacity: 0.8;
 }
 
-/* Mission Control Status Grid */
-.mission-status-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    margin-bottom: 2.5rem;
-    padding: 1.5rem;
-    background: rgba(13, 13, 58, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 2rem;
-    backdrop-filter: blur(20px);
+/* Mission Control Status Grid (Quantum Style - SINGLE ROW SQUARE) */
+.mission-status-grid.quantum-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 1rem;
+    margin: 2rem 0;
+    width: 100%;
+}
+
+@media (max-width: 1200px) {
+    .mission-status-grid.quantum-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (max-width: 650px) {
+    .mission-status-grid.quantum-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
 .status-item {
     position: relative;
-    padding: 1rem 1.5rem;
-    background: rgba(255, 255, 255, 0.03);
-    border-left: 4px solid #444;
-    border-radius: 0.5rem 1rem 1rem 0.5rem;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.status-item:hover {
-    background: rgba(255, 255, 255, 0.06);
-    transform: translateX(5px);
-}
-
-.status-header {
+    padding: 1rem;
+    background: rgba(13, 13, 40, 0.5);
+    border: 1px solid rgba(157, 78, 221, 0.2);
+    border-radius: 1.2rem;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(20px);
+    text-align: center;
+    aspect-ratio: 1 / 1;
+}
+.status-icon {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+    transition: transform 0.3s ease;
+}
+
+#statusAreaBox .status-icon { color: #9d4edd; }
+#statusScoreBox .status-icon { color: #4caf50; }
+.status-item:nth-child(3) .status-icon { color: #ffeb3b; }
+#statusDbBox .status-icon { color: #00e5ff; }
+#statusGpsBox .status-icon { color: #e040fb; }
+#statusLightsBox .status-icon { color: #ff9800; }
+
+@media (max-width: 768px) {
+    .status-item {
+        padding: 1.2rem 0.8rem;
+    }
+}
+
+.status-value {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: white;
+    letter-spacing: -0.2px;
 }
 
 .status-label {
-    font-size: 0.75rem;
+    font-size: 0.6rem;
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.3);
 }
 
-.status-indicator {
-    font-size: 0.9rem;
-    font-weight: 800;
-    color: white;
+.safety-meter-container {
+    background: transparent !important;
+    border: none;
+    border-radius: 2rem;
+    padding: 1rem 2rem;
+    backdrop-filter: blur(10px);
+    margin: 0.5rem 0;
+    width: 100%;
 }
 
-/* Status variants */
-.status-item.standby {
-    border-left-color: #ff3366;
-    background: rgba(255, 51, 102, 0.05);
-}
-
-.status-item.connected {
-    border-left-color: #4caf50;
-    background: rgba(76, 175, 80, 0.05);
-}
-
-.status-item.warning {
-    border-left-color: #ff9800;
-    background: rgba(255, 152, 0, 0.05);
+.status-item.warning .status-icon {
+    color: #ff9800;
+    background: rgba(255, 152, 0, 0.1);
 }
 
 .status-item.score-box {
@@ -578,8 +668,14 @@ a {
 }
 
 .sos-active .sos-btn {
-    animation: urgentBlink 0.5s infinite alternate;
+    animation: urgentBlink 0.5s infinite alternate, sosShrinkBurst 0.6s ease-out forwards;
     background: #ff0000;
+}
+
+@keyframes sosShrinkBurst {
+    0% { transform: scale(1.1); }
+    30% { transform: scale(0.85); box-shadow: 0 0 50px #ff0000; }
+    100% { transform: scale(1); }
 }
 
 @keyframes urgentBlink {

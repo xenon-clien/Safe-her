@@ -9,7 +9,7 @@ let isSosActive = false;
 let audioContext, oscillator, gainNode;
 let userLatLng = { lat: 30.901, lng: 75.8573 }; 
 let isLocationPrecise = false; // GPS Accuracy Lock
-const API_URL = '/api';
+const API_URL = window.location.port === '3300' ? 'http://localhost:5000/api' : '/api';
 console.log("🛰️ Satellite Link: ACTIVE");
 console.log("🛰️ Safe-Her Link Target:", API_URL);
 
@@ -18,6 +18,7 @@ window.addEventListener('unhandledrejection', (e) => {
     console.error("Critical Neural Error:", e.reason);
     if (typeof showToast === 'function') showToast("Signal Lost: " + (e.reason.message || "Network Error"), "error");
 });
+
 // Auto-check connection on load
 window.addEventListener('load', () => {
     if (typeof startDashboardClock === 'function') startDashboardClock();
@@ -26,17 +27,25 @@ window.addEventListener('load', () => {
     const areaEl = document.getElementById('dashArea');
     if (areaEl) areaEl.innerText = "Synchronizing Location...";
     performTrackingSync();
+
+    // Dismiss Loader Screen
+    const loader = document.getElementById('loaderScreen');
+    if (loader) {
+        setTimeout(() => {
+            loader.classList.add('fade-out');
+            document.body.classList.add('loaded');
+        }, 1200);
+    }
 });
+
 // Initial check removed
 const _dummy = () => { if (false) {
     fetch(`${API_URL}/health`)
         .then(r => r.json())
-        .then(d => console.log("âœ… Core System Linked:", d.server))
-        .catch(e => console.error("âŒ System Link Failed. Make sure server is running on port 5000."));
+        .then(d => console.log("✅ Core System Linked:", d.server))
+        .catch(e => console.error("❌ System Link Failed. Make sure server is running on port 5000."));
     }
 };
-// --- GLOBAL NAVIGATION ENGINE ---
-// [REDUNDANT DUPLICATE switchSection REMOVED]
 
 let pendingPaymentResponse = null; 
 let liveBeaconInterval = null;
@@ -45,23 +54,15 @@ let audioCtx = null;
 let sirenOscillator = null;
 let sirenGain = null;
 
-/**
- * Sends the initial SOS alert to the backend.
- */
-/**
- * Sends the advanced SOS alert with real-time geocoding and SMS triggers.
- */
 async function sendSOSAlert() {
     const userStr = localStorage.getItem('herSafety_user');
     const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : { id: 'guest', name: 'Guest' };
-
     const payload = {
         userId: user.id || user._id,
         lat: userLatLng.lat,
         lng: userLatLng.lng,
         timestamp: new Date().toISOString()
     };
-
     try {
         const response = await fetch(`${API_URL}/sos-trigger`, {
             method: 'POST',
@@ -69,12 +70,11 @@ async function sendSOSAlert() {
             body: JSON.stringify(payload)
         });
         const data = await response.json();
-        
         if (response.ok) {
             addSecurityLog('SOS', `Broadcast via Twilio: ${data.address || 'Location Shared'}`);
             if (data.address) {
                 const statusEl = document.getElementById('sosStatus');
-                if (statusEl) statusEl.innerHTML = `ðŸš¨ Help is on the way to:<br><b>${data.address}</b>`;
+                if (statusEl) statusEl.innerHTML = `🚨 Help is on the way to:<br><b>${data.address}</b>`;
             }
         }
     } catch (error) {
@@ -82,21 +82,24 @@ async function sendSOSAlert() {
     }
 }
 
+// --- GLOBAL NAVIGATION ENGINE ---
+// [REDUNDANT DUPLICATE switchSection REMOVED]
+
+
 // GLOBAL NEURAL DANGER DATABASE (Expanded from SafeRoute)
 const CRIME_HOTSPOTS = [
     { name: "Dhandari Kalan", lat: 30.8690, lng: 75.9189, risk: 9, type: "Industrial/Snatching" },
     { name: "Giaspura", lat: 30.8752, lng: 75.8926, risk: 8, type: "Labor Belt/High Theft" },
     { name: "Sherpur Circle", lat: 30.8931, lng: 75.8893, risk: 8, type: "Poor Lighting/Robbery" },
-    { name: "Focal Point", lat: 30.8845, lng: 75.9080, risk: 7, type: "Industrial/Unsafe at Night" },
-    { name: "Railway Station Area", lat: 30.9025, lng: 75.8505, risk: 7, type: "Pickpocketing/Crowded" },
+    { name: "Focal Point Phase 8", lat: 30.8845, lng: 75.9080, risk: 8, type: "Isolated Ind. Zone" },
+    { name: "Daba Chowk Area", lat: 30.8795, lng: 75.8850, risk: 7, type: "Snatching Reports" },
+    { name: "Shimlapuri Backlanes", lat: 30.8720, lng: 75.8750, risk: 6, type: "Poor Street Lighting" },
+    { name: "Gill Chowk", lat: 30.8890, lng: 75.8580, risk: 5, type: "Traffic/Crowded" },
+    { name: "Model Town (Safe)", lat: 30.8950, lng: 75.8420, risk: 2, type: "High Security Area" },
+    { name: "Sarabha Nagar (Safe)", lat: 30.9010, lng: 75.8150, risk: 1, type: "Elite Residential" },
     // Migrated from SafeRoute Java Core
-    { lat: 28.6139, lng: 77.2090, name: "Connaught Place Dark Alley", risk: 9, type: "High Risk Area" },
-    { lat: 28.6280, lng: 77.2195, name: "Old Delhi Narrow Lanes", risk: 8, type: "Poor Lighting" },
-    { lat: 28.6353, lng: 77.2250, name: "Chandni Chowk Backstreet", risk: 6, type: "Isolated" },
-    { lat: 28.6100, lng: 77.2300, name: "Pragati Maidan Underpass", risk: 9, type: "Stalking Reports" },
-    { lat: 19.0760, lng: 72.8777, name: "Mumbai Central Back Road", risk: 8, type: "Dark Alley" },
-    { lat: 19.0330, lng: 72.8440, name: "Worli Naka Area", risk: 5, type: "Isolated Seafaces" },
-    { lat: 12.9716, lng: 77.5946, name: "MG Road Back Alley", risk: 7, type: "Commercial Dark Spots" }
+    { lat: 28.6139, lng: 77.2090, name: "Connaught Place", risk: 9, type: "High Risk Area" },
+    { lat: 28.6280, lng: 77.2195, name: "Old Delhi", risk: 8, type: "Poor Lighting" }
 ];
 
 function initMap(lat, lng) {
@@ -445,31 +448,36 @@ async function performTrackingSync() {
     };
 
     if (navigator.geolocation) {
-        // ALWAYS keep one active watch if possible (Infinite Healing)
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                showToast("🛰️ Locked Precise Satellite Signal", "success");
+                handlePreciseLocation(pos);
+            },
+            (err) => {
+                console.warn("GPS Denied or Timeout:", err.message);
+                showToast("⚠️ GPS Signal Lost. Using Cellular IP Fallback.", "warning");
+                tryIPGeolocationFallback();
+            },
+            options
+        );
+
         if (!geoWatchId) {
             geoWatchId = navigator.geolocation.watchPosition(
                 (pos) => handlePreciseLocation(pos),
-                (err) => {
-                    console.warn("GPS Weak, keeping sensor warm...", err);
-                    tryIPGeolocationFallback();
-                },
-                options
-            );
-        } else {
-            // Force a single high-precision update if already watching
-            navigator.geolocation.getCurrentPosition(
-                (pos) => handlePreciseLocation(pos),
-                (err) => console.log("Background Sync Active"),
+                null,
                 options
             );
         }
+    } else {
+        showToast("⚠️ Device lacks GPS hardware.", "error");
+        tryIPGeolocationFallback();
     }
 }
 
 function handlePreciseLocation(position) {
     const { latitude, longitude, accuracy } = position.coords;
     userLatLng = { lat: latitude, lng: longitude };
-    isLocationPrecise = accuracy < 150; // Balanced for consistency
+    isLocationPrecise = accuracy < 100; // More strict: 100m for "Exact"
     
     const gpsEl = document.getElementById('dashGps');
     if (gpsEl) {
@@ -989,14 +997,17 @@ function triggerSOS() {
         if (sosContainer) sosContainer.classList.add('sos-active');
         document.body.classList.add('strobe-active');
         
-        // IMMEDIATE ACTION
-        sendSOSAlert();
-        playAlarm();
+        // --- SHRINK & SYNC LOGIC ---
+        showToast("🚨 SOS PROTOCOL: Locking Coordinates...", "error");
         
-        // Start Sentinel High-Freq Tracking (Real-world emergency requirement)
-        startSentinelTracking();
-        
-        showToast("🚨 SOS ACTIVE: Live Tracking Started (5s sync)", "error");
+        setTimeout(() => {
+            sendSOSAlert();
+            playAlarm();
+            startSentinelTracking();
+            
+            showToast("🛰️ LOCATION SYNCED: Family members notified via SMS!", "success");
+            if (typeof speakSafeHer === 'function') speakSafeHer("SOS activated. Your location has been shared with your family.");
+        }, 500); // Wait for shrink animation
     } else {
         // --- SOS OFF ---
         isSosActive = false;
@@ -1132,7 +1143,8 @@ function forceMapRefresh() {
 function switchSection(sectionId) {
     // --- GATEKEEPER CHECK ---
     const isAuth = localStorage.getItem('herSafety_user');
-    const protectedSections = ['home', 'arsenal', 'route', 'contacts', 'records', 'pro-center', 'tips', 'feedback', 'pro-dashboard'];
+    // HOME, ROUTE, TIPS, FEEDBACK, CONTACTS are now public
+    const protectedSections = ['records', 'pro-center', 'pro-dashboard'];
 
     if (!isAuth && protectedSections.includes(sectionId)) {
         showToast("Please login to access this area", "info");
@@ -1141,15 +1153,20 @@ function switchSection(sectionId) {
     }
 
     const sections = document.querySelectorAll('.section-container');
-    sections.forEach(s => s.style.display = 'none');
+    sections.forEach(s => {
+        s.style.display = 'none';
+        s.classList.remove('active-section');
+    });
 
     const target = document.getElementById(sectionId);
     if (target) {
-        target.style.display = 'block';
+        // Use flex to match the active-section styling
+        target.style.display = 'flex';
+        target.classList.add('active-section');
         window.scrollTo(0, 0);
     }
 
-    // âœ… FIX: Invalidate Leaflet map size when home section is shown to prevent shrinking
+    // ✅ FIX: Invalidate Leaflet map size when home section is shown to prevent shrinking
     if (sectionId === 'route') { initRouteMap(); }
     if (sectionId === 'home' && map) {
         setTimeout(() => {
@@ -1160,6 +1177,11 @@ function switchSection(sectionId) {
     // Also fix route map size when route section opens
     if (sectionId === 'route' && typeof routeMap !== 'undefined' && routeMap) {
         setTimeout(() => { routeMap.invalidateSize(); }, 200);
+    }
+    
+    // ✅ RE-RENDER CONTACTS
+    if (sectionId === 'contacts') {
+        renderCustomContacts();
     }
 
     // Update active nav link
@@ -1235,16 +1257,145 @@ function switchAuthTab(type) {
 }
 
 // --- Chatbot Logic ---
+let recognition = null;
+let isListening = false;
+
+function toggleMic() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        showToast("Voice input not supported in this browser.", "error");
+        return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!recognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'hi-IN'; // Default to Hindi/Hinglish
+
+        recognition.onstart = () => {
+            isListening = true;
+            document.getElementById('micBtn').classList.add('pulse-active');
+            document.getElementById('alexaWaveform').style.display = 'flex';
+            showToast("Listening...", "info");
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            document.getElementById('chatInput').value = transcript;
+            sendMessage();
+        };
+
+        recognition.onerror = (event) => {
+            console.error("STT Error:", event.error);
+            stopMic();
+        };
+
+        recognition.onend = () => {
+            stopMic();
+        };
+    }
+
+    if (isListening) {
+        recognition.stop();
+    } else {
+        recognition.start();
+    }
+}
+
+function stopMic() {
+    isListening = false;
+    document.getElementById('micBtn').classList.remove('pulse-active');
+    document.getElementById('alexaWaveform').style.display = 'none';
+}
+
+function shutdownAI() {
+    window.speechSynthesis.cancel();
+    const chatWrapper = document.querySelector('.chat-wrapper');
+    if (chatWrapper) chatWrapper.style.display = 'none';
+    showToast("AI Assistant Offline", "warning");
+}
+
 function toggleChat() {
     const chatBox = document.getElementById('chatBox');
+    const chatWrapper = document.querySelector('.chat-wrapper');
+    
+    // Ensure wrapper is visible if it was shut down
+    if (chatWrapper) chatWrapper.style.display = 'block';
+
     if (chatBox.style.display === 'flex') {
         chatBox.style.display = 'none';
     } else {
         chatBox.style.display = 'flex';
-        // Scroll to bottom
         const body = document.getElementById('chatBody');
         body.scrollTop = body.scrollHeight;
     }
+}
+
+/**
+ * 🛰️ NEURAL LOGIC ENGINE (Offline AI Oracle)
+ * Provides instant safety intelligence without external API calls.
+ */
+function getNeuralLocalResponse(message, userLang) {
+    const msg = message.toLowerCase();
+    
+    // 🏛️ BILINGUAL LOCAL INTELLIGENCE
+    const localSpots = {
+        "daba": {
+            hi: "Daba इलाका अभी AI की नज़र में है। सुरक्षित रहने के लिए रोशनी वाली गलियों में ही रहें।",
+            en: "Daba area is under AI surveillance. Stay in well-lit lanes to stay secure."
+        },
+        "focal point": {
+            hi: "फ़ोकल पॉइंट (Focal Point) में अभी खतरा हो सकता है। रात को अकेले यहाँ न रुकें।",
+            en: "Focal Point might be risky now. Avoid staying here alone at night."
+        },
+        "gill road": {
+            hi: "Gill Road पर ट्रैफ़िक है पर यह सुरक्षित है। बस सावधानी बरतें।",
+            en: "Gill Road is busy but safe. Just stay alert."
+        },
+        "chowk": {
+            hi: "चौकों पर पुलिस और AI की नज़र है। आप सुरक्षित महसूस कर सकती हैं।",
+            en: "Chowks are monitored by police and AI. You can feel secure."
+        }
+    };
+
+    // Check for local spot mentions
+    for (const spot in localSpots) {
+        if (msg.includes(spot)) {
+            const reply = localSpots[spot][userLang];
+            return { reply: `🛰️ [Neural Info]: ${reply}`, voice: reply };
+        }
+    }
+
+    // 1. Emergency Protocols
+    if (msg.includes("help") || msg.includes("bachao") || msg.includes("sos") || msg.includes("danger") || msg.includes("khatra")) {
+        return {
+            reply: userLang === 'hi' ? "🚨 अलर्ट: क्या मैं आपके परिवार को बता दूँ? पुष्टि के लिए 'YES' लिखें।" : "🚨 ALERT: Should I notify your family? Type 'YES' to confirm.",
+            action: "ACTIVATE_SOS_PROMPT",
+            voice: userLang === 'hi' ? "क्या मैं आपके परिवार को बता दूँ?" : "Should I notify your family?"
+        };
+    }
+    
+    // 2. Location
+    if (msg.includes("location") || msg.includes("kahan") || msg.includes("where")) {
+        const area = document.getElementById('dashArea').innerText;
+        return {
+            reply: userLang === 'hi' ? `📍 आप अभी ${area} में हैं। मैं आपको ट्रैक कर रही हूँ।` : `📍 You are at ${area}. I am tracking your safety.`,
+            action: "AUTO_MAP_FOCUS"
+        };
+    }
+
+    // Default Oracle Tips
+    if (msg.includes("tip") || msg.includes("advice") || msg.includes("salah")) {
+        const tips = {
+            hi: ["हमेशा अपनी लाइव लोकेशन शेयर रखें।", "रात को सुनसान रास्ते न चुनें।", "डाबा रोड सुरक्षित है, बस सावधानी रखें।"],
+            en: ["Always keep live location shared.", "Avoid isolated paths at night.", "Daba road is safe, just stay alert."]
+        };
+        const tip = tips[userLang][Math.floor(Math.random() * 3)];
+        return { reply: `💡 ${tip}`, voice: tip };
+    }
+
+    return null;
 }
 
 async function sendMessage() {
@@ -1252,57 +1403,58 @@ async function sendMessage() {
     const msg = input.value.trim();
     if (!msg) return;
 
-    // Append User message
     appendMessage(msg, 'user');
     input.value = '';
 
-    // Typing indicator — Advanced Orbit Animation
+    // LANGUAGE DETECTION
+    const isHindi = /[\u0900-\u097F]/.test(msg) || ['hai', 'kyo', 'kya', 'nahi', 'rha', 'karo', 'meri', 'kahan', 'bhai', 'ji', 'haan'].some(w => msg.toLowerCase().includes(w));
+    const userLang = isHindi ? 'hi' : 'en';
+
     const typingId = 'typing-' + Date.now();
-    appendMessage("Oracle is thinking...", 'bot', typingId);
+    appendMessage(userLang === 'hi' ? "AI सोच रहा है..." : "Neural Oracle is processing...", 'bot', typingId);
 
-    try {
-        const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
-        const res = await fetch(`${API_URL}/chat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: msg, userId: user.id || user._id })
-        });
-        const data = await res.json();
-        const botReply = data.reply || "I am connected. How can I protect you?";
-        
-        // Remove typing
-        const typingEl = document.getElementById(typingId);
-        if (typingEl) typingEl.remove();
+    let localRes = getNeuralLocalResponse(msg, userLang);
+    const lastBotMsg = document.querySelector('.message.bot:last-child')?.innerText || "";
 
-        // --- SENTINEL COMMAND PARSING ---
-        let cleanReply = botReply;
-        
-        // 1. AI-Driven Map Focus
-        if (botReply.includes("FOCUS_MAP:")) {
-            const area = botReply.split("FOCUS_MAP:")[1].trim();
-            showToast(`🛰️ AI Redirecting Radar: ${area}`, "info");
-            const searchInput = document.getElementById('manualLocationInput');
-            if (searchInput) { searchInput.value = area; handleManualSearch(); }
+    if (msg.toLowerCase() === 'yes' || msg.toLowerCase() === 'haan' || msg.toLowerCase() === 'ji') {
+        if (lastBotMsg.includes("SOS") || lastBotMsg.includes("अलर्ट")) {
+            localRes = { 
+                reply: userLang === 'hi' ? "🚨 समझ गई! इमरजेंसी SOS शुरू कर रही हूँ।" : "🚨 UNDERSTOOD. TRIGGERING EMERGENCY SOS!", 
+                action: "TRIGGER_SOS" 
+            };
         }
-
-        // 2. Urgent Protocol: SOS
-        if (botReply.toLowerCase().includes("activate_sos")) {
-            showToast("🚨 AI EMERGENCY OVERRIDE: Triggering SOS!", "error");
-            triggerSOS();
-        }
-
-        appendMessage(cleanReply, 'bot');
-        
-        // Multilingual Voice Feedback
-        if (typeof speakSafeHer === 'function') speakSafeHer(cleanReply);
-
-    } catch (err) {
-        const typingEl = document.getElementById(typingId);
-        if (typingEl) typingEl.remove();
-        const fallbackMsg = "Main connect hone ki koshish kar rahi hoon. Aapka internet slow ho sakta hai. Agar aap kisi musibat mein hain, toh turant SOS button dabaiye.";
-        appendMessage(fallbackMsg, 'bot');
-        if (typeof speakSafeHer === 'function') speakSafeHer(fallbackMsg);
     }
+    
+    setTimeout(async () => {
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+
+        if (localRes) {
+            appendMessage(localRes.reply, 'bot');
+            speakSafeHer(localRes.voice || localRes.reply);
+            
+            if (localRes.action === "TRIGGER_SOS") setTimeout(() => sendSOSAlert(), 1000);
+            if (localRes.action === "AUTO_MAP_FOCUS" && map) map.setView([userLatLng.lat, userLatLng.lng], 18);
+            return;
+        }
+
+        // CLOUD FALLBACK
+        try {
+            const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
+            const res = await fetch(`${API_URL}/chat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg, userId: user.id || user._id, lang: userLang })
+            });
+            const data = await res.json();
+            appendMessage(data.reply, 'bot');
+            speakSafeHer(data.reply);
+        } catch (err) {
+            const fallback = userLang === 'hi' ? "सिग्नल नहीं है। आप SOS बटन दबाएँ।" : "No signal. Please use SOS button.";
+            appendMessage(fallback, 'bot');
+            speakSafeHer(fallback);
+        }
+    }, 800);
 }
 
 let isVoiceEnabled = false;
@@ -1342,9 +1494,13 @@ function speakSafeHer(text) {
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
         
-        const utterance = new SpeechSynthesisUtterance(text);
+        // --- ACCENT FIX: Remove Emojis that cause speech glitches ---
+        let cleanText = text.replace(/[\u{1F300}-\u{1F9FF}]/gu, ''); 
+        cleanText = cleanText.replace(/[🚨📍🌙💡⚠️🛰️]/g, '');
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.rate = 1.0;
-        utterance.pitch = 1.0; 
+        utterance.pitch = 1.1; 
         
         // --- Smart Language Detection ---
         const hasHindiScript = /[\u0900-\u097F]/.test(text);
@@ -1353,11 +1509,12 @@ function speakSafeHer(text) {
         
         const isLikelyHindi = hasHindiScript || hasHinglish;
         utterance.lang = isLikelyHindi ? 'hi-IN' : 'en-US';
+        utterance.rate = isLikelyHindi ? 0.9 : 1.0; 
 
         let selectedVoice = null;
         if (isLikelyHindi) {
-            // Find any Indian-sounding voice
-            selectedVoice = availableVoices.find(v => v.lang.includes('hi') || v.name.includes('India') || v.name.includes('Hindi') || v.name.includes('Kalpana'));
+            const hiVoices = availableVoices.filter(v => v.lang.startsWith('hi'));
+            selectedVoice = hiVoices.find(v => v.name.includes("Google") || v.name.includes("Hindi")) || hiVoices[0];
         }
 
         if (!selectedVoice) {
@@ -1389,9 +1546,6 @@ function speakSafeHer(text) {
 }
 
 // --- ALEXA VOICE INPUT (STT) ---
-let recognition;
-let isListening = false;
-
 function toggleMic() {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         showToast("Voice input not supported in this browser.", "error");
@@ -1670,18 +1824,15 @@ let isPremium = localStorage.getItem('hersafety_premium') === 'true';
 
 function updatePremiumUI() {
     const isPremium = localStorage.getItem('hersafety_premium') === 'true';
-    const proLink = document.getElementById('proCenterLink');
     const goPremiumNav = document.getElementById('goPremiumNav');
 
     if (isPremium) {
-        if (proLink) proLink.style.display = 'block';
         if (goPremiumNav) goPremiumNav.style.display = 'none';
 
         // Update any remaining home page labels
         const dashScore = document.getElementById('dashScore');
         if (dashScore) dashScore.innerText = "PRO";
     } else {
-        if (proLink) proLink.style.display = 'none';
         if (goPremiumNav) goPremiumNav.style.display = 'block';
     }
 }
@@ -1691,7 +1842,24 @@ let otpTimerInterval = null;
 let currentOtpEmail = null;
 let currentPaymentId = null;
 
-async function initiateRazorpayPayment() {
+function showPremiumPlans() {
+    const modal = document.getElementById('premiumPlansModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function closePremiumPlans() {
+    const modal = document.getElementById('premiumPlansModal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+async function initiateRazorpayPayment(amount = 1) {
+    closePremiumPlans();
     const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
     if (!user.email) {
         showToast("Please login first to upgrade to Pro", "warning");
@@ -1706,7 +1874,7 @@ async function initiateRazorpayPayment() {
         const response = await fetch(`${API_URL}/create-order`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ amount: 1 })
+            body: JSON.stringify({ amount: amount })
         });
 
         if (!response.ok) throw new Error('Order creation failed');
@@ -2318,15 +2486,19 @@ function enterGuestMode() {
 function updateUserUI() {
     const userStr = localStorage.getItem('herSafety_user');
     const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
-    const userInfo = document.getElementById('userInfo');
-    const userNameDisplay = document.getElementById('userNameDisplay');
+    const loginLink = document.getElementById('navLogin');
+    const logoutLink = document.getElementById('navLogout');
 
-    if (user && userInfo && userNameDisplay) {
-        userInfo.style.display = 'flex';
-        userNameDisplay.innerText = user.name || user.email.split('@')[0];
-        userNameDisplay.title = user.email; // Tooltip for full email
-    } else if (userInfo) {
-        userInfo.style.display = 'none';
+    if (user) {
+        if (loginLink) {
+            loginLink.innerHTML = `<a href="#home" class="btn-login"><i class="fas fa-user-circle"></i> ${user.name.split(' ')[0]}</a>`;
+        }
+        if (logoutLink) logoutLink.style.display = 'block';
+    } else {
+        if (loginLink) {
+            loginLink.innerHTML = `<a href="#loginView" class="btn-login" onclick="switchSection('loginView')">Login / Guest</a>`;
+        }
+        if (logoutLink) logoutLink.style.display = 'none';
     }
 }
 
@@ -2381,12 +2553,10 @@ async function addCustomContact(e) {
     if (e) e.preventDefault();
     const nameInput = document.getElementById('contactName');
     const phoneInput = document.getElementById('contactPhone');
-    const user = JSON.parse(localStorage.getItem('herSafety_user'));
+    const userStr = localStorage.getItem('herSafety_user');
+    const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : { id: 'guest', name: 'Guest' };
 
-    if (!nameInput || !phoneInput || !user) {
-        showToast("Please login to save contacts", "error");
-        return;
-    }
+    if (!nameInput || !phoneInput) return;
 
     const name = nameInput.value.trim();
     const phone = phoneInput.value.trim();
@@ -2394,39 +2564,48 @@ async function addCustomContact(e) {
     if (!name || !phone) return;
 
     try {
-        const res = await fetch(`${API_URL}/add-contact`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId: user.id || user._id,
-                contactName: name,
-                contactPhone: phone
-            })
-        });
-
-        const data = await res.json();
-
-        if (res.ok) {
-            let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
-            contacts.push({ id: data.contact._id || Date.now(), name, phone });
-            localStorage.setItem('herSafety_contacts', JSON.stringify(contacts));
-            nameInput.value = '';
-            phoneInput.value = '';
-            showToast("Contact Saved & Synced", "success");
-            renderCustomContacts();
+        if (user.id !== 'guest') {
+            const res = await fetch(`${API_URL}/add-contact`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user.id || user._id,
+                    contactName: name,
+                    contactPhone: phone
+                })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                saveLocalContact(data.contact._id || Date.now(), name, phone);
+                showToast("Contact Saved & Synced", "success");
+            } else {
+                showToast(data.message || "Sync failed", "error");
+            }
         } else {
-            showToast(data.message || "Sync failed", "error");
+            saveLocalContact(Date.now(), name, phone);
+            showToast("Contact saved locally (Guest Mode)", "success");
         }
     } catch (err) {
         console.warn("Contact Sync Offline:", err);
-        // Fallback to local
-        let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
-        contacts.push({ id: Date.now(), name, phone });
-        localStorage.setItem('herSafety_contacts', JSON.stringify(contacts));
-        nameInput.value = '';
-        phoneInput.value = '';
+        saveLocalContact(Date.now(), name, phone);
         showToast("Saved locally (Sync Offline)", "warning");
+    }
+}
+
+function saveLocalContact(id, name, phone) {
+    let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
+    contacts.push({ id, name, phone });
+    localStorage.setItem('herSafety_contacts', JSON.stringify(contacts));
+    
+    const nameInput = document.getElementById('contactName');
+    const phoneInput = document.getElementById('contactPhone');
+    if (nameInput) nameInput.value = '';
+    if (phoneInput) phoneInput.value = '';
+    
+    if (typeof renderCustomContacts === 'function') {
         renderCustomContacts();
+    } else if (typeof renderContacts === 'function') {
+        renderContacts();
     }
 }
 
@@ -3413,17 +3592,14 @@ function checkAuthGate() {
     const user = localStorage.getItem('herSafety_user');
     const loginLink = document.getElementById('navLogin');
     const logoutLink = document.getElementById('navLogout');
-    const proLink = document.getElementById('proCenterLink');
+    const proLink = document.getElementById('proLink');
 
     if (user) {
         if (loginLink) loginLink.style.display = 'none';
         if (logoutLink) logoutLink.style.display = 'block';
 
-        // Let updatePremiumUI handle proLink & goPremiumNav visibility
         updatePremiumUI();
 
-        // âœ… FIX: If user is logged in, always go to home dashboard
-        // Don't rely on URL hash which is empty on fresh reload
         const visibleSection = document.querySelector('.section-container[style*="block"], .section-container.active-section');
         const visibleId = visibleSection ? visibleSection.id : null;
         if (!visibleId || visibleId === 'loginView' || visibleId === 'signupView') {
@@ -3433,14 +3609,13 @@ function checkAuthGate() {
         if (loginLink) loginLink.style.display = 'block';
         if (logoutLink) logoutLink.style.display = 'none';
 
-        // Hide premium features for logged-out users
         updatePremiumUI();
 
-        // âœ… FIX: Check the currently visible section instead of URL hash
         const visibleSection = document.querySelector('.section-container[style*="block"], .section-container.active-section');
         const visibleId = visibleSection ? visibleSection.id : null;
-        const protectedSections = ['home', 'route', 'contacts', 'records', 'pro-center', 'tips', 'feedback', 'pro-dashboard'];
-        if (!visibleId || protectedSections.includes(visibleId)) {
+        const protectedSections = ['records', 'pro-center', 'feedback', 'pro-dashboard'];
+        if (visibleId && protectedSections.includes(visibleId)) {
+            showToast("Please login to access this feature", "info");
             switchSection('loginView');
         }
     }

@@ -11,7 +11,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "aws-sdk": "^2.1693.0",
-    "axios": "^1.15.0",
+    "axios": "^1.15.1",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.73.4",
     "cors": "^2.8.6",

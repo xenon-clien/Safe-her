@@ -65,7 +65,7 @@ app.get('/api/health', (req, res) => {
     res.json({ 
         version: '16.5-STABLE', 
         status: 'online', 
-        database: mongoose.connection.readyState === 1 ? 'stable' : 'linking',
+        database: mongoose.connection.readyState === 1 ? 'connected' : 'linking',
         g_client_id: process.env.GOOGLE_CLIENT_ID || "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com",
         rzp_key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_SaxSkQwrcuFvNW'
     });
@@ -115,6 +115,125 @@ app.get('/api/safety-score', async (req, res) => {
         if (hour > 20 || hour < 5) score -= 1.8;
         res.json({ score, label: score > 7 ? "SECURE" : "CAUTION" });
     } catch (e) { res.status(500).json({ score: 0, label: "OFFLINE" }); }
+});
+
+// --- TWILIO RED-ALERT LOGIC ---
+const twilioClient = (process.env.TWILIO_SID && process.env.TWILIO_SID !== 'your_twilio_sid_here') 
+    ? require('twilio')(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN) 
+    : null;
+
+app.post('/api/sos-trigger', async (req, res) => {
+    try {
+        const { userId, lat, lng } = req.body;
+        console.log(`🚨 SOS SIGNAL RECEIVED FROM USER: ${userId} at ${lat}, ${lng}`);
+
+        let user;
+        if (userId === 'guest') {
+            user = { name: "Guest User", emergencyContacts: [] };
+        } else {
+            user = await User.findById(userId);
+        }
+
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
+        const contacts = user.emergencyContacts || [];
+        const googleMapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
+        const messageBody = `🚨 EMERGENCY ALERT from Safe-Her: ${user.name} is in danger! Live Location: ${googleMapsLink}`;
+
+        console.log(`💬 Plan: Sending alerts to ${contacts.length} contacts.`);
+
+        const results = [];
+        // If no contacts, we still return success but notify in result
+        if (contacts.length === 0) {
+            console.warn("⚠️ No emergency contacts found for this user.");
+        }
+
+        for (const contact of contacts) {
+            const phone = contact.phone || contact.number;
+            if (!phone) continue;
+
+            if (twilioClient) {
+                try {
+                    const sms = await twilioClient.messages.create({
+                        body: messageBody,
+                        from: process.env.TWILIO_PHONE,
+                        to: phone
+                    });
+                    results.push({ phone, sid: sms.sid });
+                    console.log(`✅ SMS Sent to ${phone}`);
+                } catch (err) {
+                    console.error(`❌ Twilio Error for ${phone}:`, err.message);
+                    results.push({ phone, error: err.message });
+                }
+            } else {
+                console.warn(`🧪 [SIMULATION MODE] To: ${phone} | Msg: ${messageBody}`);
+                results.push({ phone, sid: 'sim_sid_' + Math.random() });
+            }
+        }
+
+        res.json({
+            success: true,
+            alertsSent: results.length,
+            details: results,
+            address: `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`
+        });
+
+    } catch (e) {
+        console.error("❌ SOS Processing Error:", e);
+        res.status(500).json({ success: false, message: e.message });
+    }
+});
+
+app.post('/api/add-contact', async (req, res) => {
+    try {
+        const { userId, contactName, contactPhone } = req.body;
+        if (userId === 'guest') return res.json({ success: true, contact: { _id: Date.now(), name: contactName, phone: contactPhone } });
+
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ success: false, message: "User not found" });
+        
+        const newContact = { name: contactName, phone: contactPhone, _id: new mongoose.Types.ObjectId() };
+        user.emergencyContacts.push(newContact);
+        await user.save();
+        
+        res.json({ success: true, contact: newContact });
+    } catch (e) {
+        console.error("❌ Add Contact Error:", e.message);
+        res.status(500).json({ success: false });
+    }
+});
+
+app.post('/api/delete-contact', async (req, res) => {
+    try {
+        const { userId, contactId } = req.body;
+        if (userId === 'guest') return res.json({ success: true });
+
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ success: false });
+
+        user.emergencyContacts = user.emergencyContacts.filter(c => 
+            (c._id && c._id.toString() !== contactId) && (c.id !== contactId)
+        );
+        await user.save();
+        
+        res.json({ success: true });
+    } catch (e) {
+        console.error("❌ Delete Contact Error:", e.message);
+        res.status(500).json({ success: false });
+    }
+});
+
+app.post('/api/save-contacts', async (req, res) => {
+    try {
+        const { userId, contacts } = req.body;
+        if (userId === 'guest') return res.json({ success: true, message: "Guest mode: Not saved to DB" });
+        
+        const user = await User.findByIdAndUpdate(userId, { emergencyContacts: contacts }, { new: true });
+        res.json({ success: true, contacts: user.emergencyContacts });
+    } catch (e) {
+        console.error("❌ Save Contacts Error:", e.message);
+        res.status(500).json({ success: false });
+    }
 });
 
 app.post(['/api/chat', '/chat'], async (req, res) => {
