@@ -177,37 +177,41 @@ app.post('/api/add-contact', async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// --- UNIVERSAL SAFETY ORACLE (Gemini Advanced Pro) ---
+// --- UNIVERSAL SAFETY ORACLE (Gemini Advanced Pro with Titan-Failover) ---
 app.post(['/api/chat', '/chat'], async (req, res) => {
     try {
         const { message, history } = req.body;
-        
-        if (!process.env.GEMINI_API_KEY) {
-            throw new Error("GEMINI_API_KEY is missing or invalid in environment variables.");
-        }
+        if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY Missing");
         
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        // Upgrade to the Pro model taking advantage of user subscription
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+        
+        let model;
+        try {
+            // Priority 1: Advanced Pro Model
+            model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+            const testChat = model.startChat(); // Quick probe
+        } catch (mErr) {
+            console.warn("⚠️ Pro Model unavailable, falling back to Flash...");
+            // Priority 2: High Speed Flash Model
+            model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        }
 
         const chat = model.startChat({
             history: history || [],
-            generationConfig: { maxOutputTokens: 500, temperature: 0.4 } // More tokens, highly focused
+            generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
         });
 
-        const prompt = `You are a highly advanced AI Safety Assistant named 'Oracle', operating similarly to an elite, responsive AI like Alexa or J.A.R.V.I.S.
-        You are directly connected to the user's 'Safe-Her' security network.
-        Your tone is highly intelligent, calm, professional, and tactical. You respond naturally to voice-like conversational inputs.
-        If a user seems in danger, instantly direct them to use the SOS feature or provide immediate survival tactics. 
-        Keep your logic sharp but your replies conversational and human-like. Support fluid Hindi, Hinglish, and English.
-        User says: ${message}`;
+        const prompt = `You are 'Oracle', the elite AI Safety Companion for the Safe-Her network. 
+        Operation Mode: Alexa/JARVIS Responsive intelligence. 
+        Context: Respond tactically to: ${message}.
+        Instructions: Be human-like, sharp, and prioritize safety. Support Hindi/English.`;
 
         const result = await chat.sendMessage(prompt);
         const response = await result.response;
         res.json({ reply: response.text() });
     } catch (e) {
-        console.error("AI Error:", e.message);
-        res.status(500).json({ reply: "I'm currently syncing with satellite servers. For emergencies, please use the SOS button immediately." });
+        console.error("❌ AI ORACLE CRITICAL ERROR:", e.message);
+        res.status(500).json({ reply: "Neural link stabilizing. Please use the SOS button for immediate emergencies." });
     }
 });
 
