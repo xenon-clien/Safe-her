@@ -165,11 +165,31 @@ app.post('/api/add-contact', async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-app.get('/api/get-contacts/:userId', async (req, res) => {
+// --- UNIVERSAL SAFETY ORACLE (Gemini AI) ---
+app.post('/api/chat', async (req, res) => {
     try {
-        const contacts = await EmergencyContact.find({ userId: req.params.userId });
-        res.json({ contacts });
-    } catch (e) { res.status(500).json({ message: e.message }); }
+        const { message, history } = req.body;
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "YOUR_FREE_KEY_HERE");
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+        const chat = model.startChat({
+            history: history || [],
+            generationConfig: { maxOutputTokens: 250 }
+        });
+
+        const prompt = `You are the SafeHer AI Assistant. specialized in women safety and emergency protocols. 
+        Your tone is calm, professional, and tactical. 
+        If a user says they are in danger, advise them to press the SOS button immediately.
+        Keep answers short and helpful. Support Hindi and English.
+        User says: ${message}`;
+
+        const result = await chat.sendMessage(prompt);
+        const response = await result.response;
+        res.json({ reply: response.text() });
+    } catch (e) {
+        console.error("AI Error:", e.message);
+        res.status(500).json({ reply: "I'm currently syncing with satellite servers. For emergencies, please use the SOS button immediately." });
+    }
 });
 
 // Database Connection (Sentinel Neural Reconnect)

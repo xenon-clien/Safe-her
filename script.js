@@ -1304,9 +1304,9 @@ async function sendMessage() {
     appendMessage(msg, 'user');
     input.value = '';
 
-    // Typing indicator
+    // Typing indicator — Advanced Orbit Animation
     const typingId = 'typing-' + Date.now();
-    appendMessage("AI is thinking...", 'bot', typingId);
+    appendMessage("Oracle is analyzing satellite data...", 'bot', typingId);
 
     try {
         const user = JSON.parse(localStorage.getItem('herSafety_user') || '{}');
@@ -1316,58 +1316,40 @@ async function sendMessage() {
             body: JSON.stringify({ message: msg, userId: user.id || user._id })
         });
         const data = await res.json();
-        const botReply = data.response || "I'm processing your request...";
+        const botReply = data.reply || "I am connected. How can I protect you?";
         
         // Remove typing
         const typingEl = document.getElementById(typingId);
         if (typingEl) typingEl.remove();
 
-        // --- MAP & ACTION INTEGRATION: Parse Tokens ---
+        // --- SENTINEL COMMAND PARSING ---
         let cleanReply = botReply;
         
-        // 1. Map Focus
-        if (botReply.includes("MAP_FOCUS:")) {
-            const parts = botReply.split("MAP_FOCUS:");
-            cleanReply = parts[0].trim();
-            const locationQuery = parts[1].trim();
-            showToast(`📍 AI Focusing Map: ${locationQuery}`, "info");
+        // 1. AI-Driven Map Focus
+        if (botReply.includes("FOCUS_MAP:")) {
+            const area = botReply.split("FOCUS_MAP:")[1].trim();
+            showToast(`🛰️ AI Redirecting Radar: ${area}`, "info");
             const searchInput = document.getElementById('manualLocationInput');
-            if (searchInput) {
-                searchInput.value = locationQuery;
-                handleManualSearch();
-            }
+            if (searchInput) { searchInput.value = area; handleManualSearch(); }
         }
 
-        // 2. SOS Trigger
-        if (botReply.includes("SOS_TRIGGER")) {
-            cleanReply = cleanReply.replace("SOS_TRIGGER", "").trim();
-            showToast("🚨 AI recognized emergency! Activating SOS...", "error");
-            if (typeof triggerSOS === 'function') triggerSOS();
-        }
-
-        // 3. Tracking Trigger
-        if (botReply.includes("START_TRACKING")) {
-            cleanReply = cleanReply.replace("START_TRACKING", "").trim();
-            showToast("🛰️ Starting Live Tracking...", "success");
-            if (typeof startTracking === 'function') startTracking();
-        }
-
-        // 4. Fake Call Trigger
-        if (botReply.includes("FAKE_CALL_TRIGGER")) {
-            cleanReply = cleanReply.replace("FAKE_CALL_TRIGGER", "").trim();
-            showToast("📞 Simulating Fake Call...", "info");
-            if (typeof simulateCall === 'function') simulateCall("Safe-Her Support");
+        // 2. Urgent Protocol: SOS
+        if (botReply.toLowerCase().includes("activate_sos")) {
+            showToast("🚨 AI EMERGENCY OVERRIDE: Triggering SOS!", "error");
+            triggerSOS();
         }
 
         appendMessage(cleanReply, 'bot');
-        speakSafeHer(cleanReply);
+        
+        // Multilingual Voice Feedback
+        if (typeof speakSafeHer === 'function') speakSafeHer(cleanReply);
+
     } catch (err) {
         const typingEl = document.getElementById(typingId);
         if (typingEl) typingEl.remove();
-        console.error("Chat Error:", err);
-        const errorMsg = "Maaf kijiye, connection mein thodi deri ho rahi hai. Par main yahin hoon, aap bilkul chinta na karein.";
-        appendMessage(errorMsg, 'bot');
-        speakSafeHer(errorMsg);
+        const fallbackMsg = "Main raaste mein hoon aur satellite link check kar rahi hoon. Agar aap kisi musibat mein hain, toh turant SOS button dabaiye.";
+        appendMessage(fallbackMsg, 'bot');
+        if (typeof speakSafeHer === 'function') speakSafeHer(fallbackMsg);
     }
 }
 
