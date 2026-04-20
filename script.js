@@ -2405,39 +2405,67 @@ document.addEventListener('DOMContentLoaded', () => {
                 : "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com";
 
             if (typeof google !== 'undefined') {
-                console.log("🛠️ GSI DEBUG: Initializing with ID:", GOOGLE_CLIENT_ID);
-                
                 google.accounts.id.initialize({
                     client_id: GOOGLE_CLIENT_ID,
                     callback: handleCredentialResponse,
                     auto_select: false,
-                    itp_support: true,
                     ux_mode: 'popup'
                 });
 
-                window.isGSI_Ready = !GOOGLE_CLIENT_ID.includes("v1v8v1");
-                
-                if (window.isGSI_Ready) {
-                    console.log("✅ Google Sign-In Initialized.");
-                    const opt = { theme: "outline", size: "large", width: "100%", text: "continue_with", shape: "pill" };
-                    
-                    const btnLogin = document.getElementById("googleBtnLogin");
-                    const btnSignup = document.getElementById("googleBtnSignup");
-                    if (btnLogin) google.accounts.id.renderButton(btnLogin, opt);
-                    if (btnSignup) google.accounts.id.renderButton(btnSignup, opt);
-                }
+                const btnLogin = document.getElementById("googleBtnLogin");
+                if (btnLogin) google.accounts.id.renderButton(btnLogin, { theme: "outline", size: "large", width: "100%" });
             }
-        }).catch(err => {
-            console.warn("GSI Fetch failed. Social Sync fallback active.", err);
         });
 
     } catch (e) {
-        console.error("Initialization Warning (Non-Fatal):", e);
-        const loader = document.getElementById('loaderScreen');
-        if (loader) loader.style.display = 'none';
-        document.body.classList.add('loaded');
+        console.error("Auth Init Error:", e);
     }
 });
+
+/**
+ * NEURAL AUTH SHIELD: Handles Google Token and provides Fail-Safe and Guest Login
+ */
+async function handleCredentialResponse(response) {
+    showToast("🔐 Authenticating Securely...", "info");
+    
+    // Auth Timeout Shield: If backend takes > 8s, trigger Emergency Guest Mode
+    const authTimeout = setTimeout(() => {
+        showToast("⚠️ Authentication Delayed. Entering Guest Safety Mode.", "warning");
+        enterGuestMode();
+    }, 8000);
+
+    try {
+        const res = await fetch(`${API_URL}/google-login-verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: response.credential })
+        });
+        
+        clearTimeout(authTimeout);
+        const data = await res.json();
+        
+        if (res.ok) {
+            localStorage.setItem('herSafety_user', JSON.stringify(data.user));
+            showToast(`✅ Welcome, ${data.user.name}`, "success");
+            location.reload(); // Hard refresh to clear auth state
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (e) {
+        clearTimeout(authTimeout);
+        console.error("Auth Shield Triggered:", e.message);
+        showToast("Auth Sync Failed. Using Guest Protocol.", "warning");
+        enterGuestMode();
+    }
+}
+
+function enterGuestMode() {
+    const guestUser = { id: 'guest_'+Math.random().toString(36).substr(2,9), name: 'Protected Guest', email: 'guest@safeher.internal' };
+    localStorage.setItem('herSafety_user', JSON.stringify(guestUser));
+    switchSection('home');
+    updateUserUI();
+}
+
 
 function updateUserUI() {
     const userStr = localStorage.getItem('herSafety_user');
