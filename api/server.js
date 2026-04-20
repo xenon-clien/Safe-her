@@ -198,15 +198,18 @@ app.post(['/api/chat', '/chat'], async (req, res) => {
 
 // --- NEURAL PERSISTENCE: UNBREAKABLE DB LINK (Hyper-Fixed) ---
 const connectDB = async () => {
+    // Only attempt connection if not already connecting/connected
+    if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) return;
+
     try {
         const options = {
             serverSelectionTimeoutMS: 30000,
-            heartbeatFrequencyMS: 3000,
+            heartbeatFrequencyMS: 5000,
             socketTimeoutMS: 60000,
             connectTimeoutMS: 60000,
             autoIndex: true,
             family: 4,
-            tlsAllowInvalidCertificates: true, // Bypass local SSL issues
+            tlsAllowInvalidCertificates: true,
             retryWrites: true,
             w: 'majority'
         };
@@ -215,14 +218,15 @@ const connectDB = async () => {
         console.log(`✅ MongoDB Connected: Neural Link Stable [${conn.connection.host}]`);
     } catch (e) {
         console.error("❌ Neural Link Failed:", e.message);
-        console.warn("🔄 Retrying hyper-link in 5 seconds...");
-        setTimeout(connectDB, 5000);
+        setTimeout(connectDB, 10000); // Slower retry for failed boots
     }
 };
 
 mongoose.connection.on('disconnected', () => {
-    console.warn("🚨 DATABASE DROPPED: Initiating Emergency Neural Re-Link...");
-    setTimeout(connectDB, 3000);
+    if (mongoose.connection.readyState === 0) {
+        console.warn("🚨 DATABASE DROPPED: Re-establishing Neural Link...");
+        setTimeout(connectDB, 5000);
+    }
 });
 
 connectDB();

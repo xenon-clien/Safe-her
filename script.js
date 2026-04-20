@@ -10,14 +10,12 @@ let audioContext, oscillator, gainNode;
 let userLatLng = { lat: 30.901, lng: 75.8573 }; 
 let isLocationPrecise = false; // Accuracy Persistence Shield
 const API_URL = (function() {
-    const h = location.hostname;
-    const p = location.port;
-    // 1. Production or same-origin serving
-    if (p === '5000' || (h && !['localhost', '127.0.0.1', ''].includes(h) && !h.startsWith('192.'))) {
+    // Neural Link: Protocol-Agnostic Relative Routing (Incognito Friendly)
+    if (window.location.hostname && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
         return '/api';
     }
-    // 2. Development (hitting local server from separate port or file)
-    return 'http://localhost:5000/api';
+    // Local Dev Fallback (Auto-detect protocol)
+    return window.location.protocol + '//' + window.location.hostname + ':5000/api';
 })();
 console.log("🛰️ Neural Link Target:", API_URL);
 
