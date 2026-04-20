@@ -177,7 +177,7 @@ app.post('/api/add-contact', async (req, res) => {
     } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
-// --- UNIVERSAL SAFETY ORACLE (Gemini Advanced Pro with Titan-Failover) ---
+// --- UNIVERSAL SAFETY ORACLE (Gemini Pro v16.1) ---
 app.post(['/api/chat', '/chat'], async (req, res) => {
     try {
         const { message, history } = req.body;
@@ -185,33 +185,35 @@ app.post(['/api/chat', '/chat'], async (req, res) => {
         
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         
-        let model;
-        try {
-            // Priority 1: Advanced Pro Model
-            model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
-            const testChat = model.startChat(); // Quick probe
-        } catch (mErr) {
-            console.warn("⚠️ Pro Model unavailable, falling back to Flash...");
-            // Priority 2: High Speed Flash Model
-            model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        }
+        // Finalized Model Selection: Premium Pro for Advanced users
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
 
         const chat = model.startChat({
             history: history || [],
-            generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
+            generationConfig: { maxOutputTokens: 800, temperature: 0.7 }
         });
 
-        const prompt = `You are 'Oracle', the elite AI Safety Companion for the Safe-Her network. 
-        Operation Mode: Alexa/JARVIS Responsive intelligence. 
-        Context: Respond tactically to: ${message}.
-        Instructions: Be human-like, sharp, and prioritize safety. Support Hindi/English.`;
+        const prompt = `You are 'Oracle', the ultimate AI Safety Companion. 
+        Identity: Advanced Intelligence like Alexa or JARVIS.
+        Task: Respond to "${message}" using your full tactical data.
+        Style: Professional, human-like, and highly responsive. 
+        Safety: If danger is detected, provide immediate SOS instructions.
+        Languages: English, Hindi, Hinglish.`;
 
         const result = await chat.sendMessage(prompt);
         const response = await result.response;
         res.json({ reply: response.text() });
     } catch (e) {
-        console.error("❌ AI ORACLE CRITICAL ERROR:", e.message);
-        res.status(500).json({ reply: "Neural link stabilizing. Please use the SOS button for immediate emergencies." });
+        console.error("❌ Oracle Link Error:", e.message);
+        // Instant Internal Fallback
+        try {
+            const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const result = await model.generateContent(`User needs help, but Pro link is weak. Respond to: ${message}`);
+            res.json({ reply: result.response.text() });
+        } catch (fErr) {
+            res.status(500).json({ reply: "Neural link stabilizing. Safety first: Use the SOS button if needed." });
+        }
     }
 });
 
