@@ -43,6 +43,43 @@ const _dummy = () => { if (false) {
         .catch(e => console.error("âŒ System Link Failed. Make sure server is running on port 5000."));
     }
 };
+// --- GLOBAL NAVIGATION ENGINE ---
+function switchSection(sectionId) {
+    console.log("🚀 Switching Neural View:", sectionId);
+    
+    // 1. Hide all sections
+    const sections = ['home', 'route', 'contacts', 'records', 'tips', 'feedback', 'loginView', 'signupView', 'premium', 'pro-center'];
+    sections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
+
+    // 2. Show target section
+    const target = document.getElementById(sectionId);
+    if (target) {
+        target.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // 3. Update Nav Links (Top Navbar)
+    document.querySelectorAll('.nav-links a').forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + sectionId) link.classList.add('active');
+    });
+
+    // 4. Update Mobile Bottom Nav
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    const bottomBtn = document.getElementById('btn-nav-' + sectionId);
+    if (bottomBtn) bottomBtn.classList.add('active');
+
+    // 5. Special Handlers
+    if (sectionId === 'route' && window.map) {
+        setTimeout(() => window.map.invalidateSize(), 400);
+    }
+}
+
 let pendingPaymentResponse = null; 
 let liveBeaconInterval = null;
 let sirenInterval = null;
@@ -87,13 +124,21 @@ async function sendSOSAlert() {
     }
 }
 
-// REAL-WORLD CRIME HOTSPOTS (Ludhiana Focus)
+// GLOBAL NEURAL DANGER DATABASE (Expanded from SafeRoute)
 const CRIME_HOTSPOTS = [
     { name: "Dhandari Kalan", lat: 30.8690, lng: 75.9189, risk: 9, type: "Industrial/Snatching" },
     { name: "Giaspura", lat: 30.8752, lng: 75.8926, risk: 8, type: "Labor Belt/High Theft" },
     { name: "Sherpur Circle", lat: 30.8931, lng: 75.8893, risk: 8, type: "Poor Lighting/Robbery" },
     { name: "Focal Point", lat: 30.8845, lng: 75.9080, risk: 7, type: "Industrial/Unsafe at Night" },
-    { name: "Railway Station Area", lat: 30.9025, lng: 75.8505, risk: 7, type: "Pickpocketing/Crowded" }
+    { name: "Railway Station Area", lat: 30.9025, lng: 75.8505, risk: 7, type: "Pickpocketing/Crowded" },
+    // Migrated from SafeRoute Java Core
+    { lat: 28.6139, lng: 77.2090, name: "Connaught Place Dark Alley", risk: 9, type: "High Risk Area" },
+    { lat: 28.6280, lng: 77.2195, name: "Old Delhi Narrow Lanes", risk: 8, type: "Poor Lighting" },
+    { lat: 28.6353, lng: 77.2250, name: "Chandni Chowk Backstreet", risk: 6, type: "Isolated" },
+    { lat: 28.6100, lng: 77.2300, name: "Pragati Maidan Underpass", risk: 9, type: "Stalking Reports" },
+    { lat: 19.0760, lng: 72.8777, name: "Mumbai Central Back Road", risk: 8, type: "Dark Alley" },
+    { lat: 19.0330, lng: 72.8440, name: "Worli Naka Area", risk: 5, type: "Isolated Seafaces" },
+    { lat: 12.9716, lng: 77.5946, name: "MG Road Back Alley", risk: 7, type: "Commercial Dark Spots" }
 ];
 
 function initMap(lat, lng) {

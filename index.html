@@ -87,10 +87,38 @@
     </div>
 
     <!-- Navigation Bar -->
+    <!-- Tactical Edge Sidebar (Floating Safety Arsenal) -->
+    <div class="tactical-sidebar">
+        <button onclick="triggerSOS()" class="tactical-item sos-burn" title="TRIGGER EMERGENCY SOS">
+            <i class="fas fa-biohazard"></i>
+            <span>SOS</span>
+        </button>
+        <div class="tactical-divider"></div>
+        <button onclick="initiateProfessionalFakeCall()" class="tactical-item" title="Fake Call">
+            <i class="fas fa-phone-volume"></i>
+        </button>
+        <button onclick="playAlarm()" class="tactical-item" title="High-Pitch Alarm">
+            <i class="fas fa-bell"></i>
+        </button>
+        <button onclick="quickShareLocation()" class="tactical-item" title="Share Live Location">
+            <i class="fas fa-satellite-dish"></i>
+        </button>
+        <button onclick="toggleShadowGuardian()" class="tactical-item" title="Shadow Guardian">
+            <i class="fas fa-user-secret"></i>
+        </button>
+    </div>
+
     <nav class="navbar">
-        <div class="logo">
-            <i class="fas fa-shield-heart"></i>
-            <span>Safe Her</span>
+        <div class="nav-logo">
+            <div class="logo-aura"></div>
+            <div class="flex items-center gap-3">
+                <i class="fas fa-shield-heart text-2xl text-safety-purple mb-1"></i>
+                <div class="flex flex-col">
+                    <span class="text-xl font-black text-white tracking-tighter leading-none">SAFE HER</span>
+                    <span class="text-[8px] font-bold text-safety-purple uppercase tracking-[0.3em] leading-none mt-1">Quantum Security</span>
+                </div>
+            </div>
+        </div>
             <!-- AURA RADAR SYSTEM -->
             <div id="auraRadar"
                 class="hidden fixed inset-0 z-[100000] bg-black/90 backdrop-blur-3xl flex items-center justify-center transition-all duration-700">
@@ -141,6 +169,30 @@
             <i class="fas fa-bars"></i>
         </div>
     </nav>
+
+    <!-- App-Style Bottom Navigation (Mobile Only) -->
+    <div class="mobile-bottom-nav">
+        <button onclick="switchSection('home')" class="nav-item active" id="btn-nav-home">
+            <i class="fas fa-home"></i>
+            <span>Home</span>
+        </button>
+        <button onclick="switchSection('route')" class="nav-item" id="btn-nav-route">
+            <i class="fas fa-route"></i>
+            <span>Route</span>
+        </button>
+        <button onclick="switchSection('contacts')" class="nav-item" id="btn-nav-contacts">
+            <i class="fas fa-users"></i>
+            <span>Contacts</span>
+        </button>
+        <button onclick="switchSection('records')" class="nav-item" id="btn-nav-records">
+            <i class="fas fa-shield"></i>
+            <span>Vault</span>
+        </button>
+        <button onclick="switchSection('loginView')" class="nav-item" id="btn-nav-login">
+            <i class="fas fa-user-circle"></i>
+            <span>Profile</span>
+        </button>
+    </div>
 
     <!-- Main Content Area -->
     <main class="main-container">

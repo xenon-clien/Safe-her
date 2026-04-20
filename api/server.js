@@ -395,14 +395,14 @@ const connectDB = async () => {
     isConnecting = true;
     try {
         console.log("📍 Neural Link: Attempting to synchronize with Atlas Cluster...");
-        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hersafety', {
-            serverSelectionTimeoutMS: 10000, 
-            socketTimeoutMS: 45000,
-            connectTimeoutMS: 10000,
+        const options = {
+            serverSelectionTimeoutMS: 20000,
             heartbeatFrequencyMS: 2000,
-            maxPoolSize: 50,
-            autoIndex: true
-        });
+            socketTimeoutMS: 45000,
+            bufferCommands: false,
+            family: 4 
+        };
+        await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/hersafety', options);
         console.log("✅ Neural Link: Synchronization Successful");
         lastDbError = null;
     } catch (e) {
