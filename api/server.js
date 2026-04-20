@@ -181,7 +181,13 @@ app.post('/api/add-contact', async (req, res) => {
 app.post(['/api/chat', '/chat'], async (req, res) => {
     try {
         const { message, history } = req.body;
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "AIzaSyClZFyLy0YPhwHvOTZN7UZeomajAeHLcJQ");
+        
+        // Critical Fix: Removed the hardcoded LEAKED key
+        if (!process.env.GEMINI_API_KEY) {
+            throw new Error("GEMINI_API_KEY is missing or invalid in environment variables.");
+        }
+        
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         const chat = model.startChat({
