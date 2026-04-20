@@ -196,22 +196,26 @@ app.post(['/api/chat', '/chat'], async (req, res) => {
     }
 });
 
-// --- NEURAL PERSISTENCE: UNBREAKABLE DB LINK ---
+// --- NEURAL PERSISTENCE: UNBREAKABLE DB LINK (Hyper-Fixed) ---
 const connectDB = async () => {
     try {
         const options = {
-            serverSelectionTimeoutMS: 15000,
-            heartbeatFrequencyMS: 5000,
+            serverSelectionTimeoutMS: 30000,
+            heartbeatFrequencyMS: 3000,
             socketTimeoutMS: 60000,
-            connectTimeoutMS: 30000,
+            connectTimeoutMS: 60000,
             autoIndex: true,
-            family: 4
+            family: 4,
+            tlsAllowInvalidCertificates: true, // Bypass local SSL issues
+            retryWrites: true,
+            w: 'majority'
         };
         console.log("📡 Attempting Neural Link with MongoDB...");
         const conn = await mongoose.connect(process.env.MONGODB_URI, options);
         console.log(`✅ MongoDB Connected: Neural Link Stable [${conn.connection.host}]`);
     } catch (e) {
         console.error("❌ Neural Link Failed:", e.message);
+        console.warn("🔄 Retrying hyper-link in 5 seconds...");
         setTimeout(connectDB, 5000);
     }
 };
