@@ -166,7 +166,7 @@ app.post('/api/add-contact', async (req, res) => {
 });
 
 // --- UNIVERSAL SAFETY ORACLE (Gemini AI) ---
-app.post('/api/chat', async (req, res) => {
+app.post(['/api/chat', '/chat'], async (req, res) => {
     try {
         const { message, history } = req.body;
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "AIzaSyClZFyLy0YPhwHvOTZN7UZeomajAeHLcJQ");
