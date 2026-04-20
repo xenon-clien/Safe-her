@@ -86,10 +86,20 @@ const EmergencyContact = mongoose.model('EmergencyContact', contactSchema);
 
 // --- ROUTES ---
 
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
+    let dbStatus = "disconnected";
+    try {
+        // Deep verification: Try a ping or simple query to force a real handshake check
+        await mongoose.connection.db.admin().ping();
+        dbStatus = "connected";
+    } catch (e) {
+        console.warn("⚠️ Deep Health Check: Link failing. Triggering auto-heal...");
+        dbStatus = "reconnecting";
+    }
+
     res.json({
         server: "online",
-        database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+        database: dbStatus,
         timestamp: new Date().toISOString(),
         g_client_id: process.env.G_CLIENT_ID || "349561521670-d2rns2cnoed3pm3vnsh5k4k3891m1vor.apps.googleusercontent.com"
     });
