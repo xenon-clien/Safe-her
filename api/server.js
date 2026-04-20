@@ -212,8 +212,9 @@ const connectDB = async () => {
             w: 'majority',
             maxPoolSize: 10
         };
+        const dbUri = process.env.MONGODB_URI || "mongodb://dhirajkumar9501445740_db_user:qzMRq88q6EKsTfaF@ac-uvtkyvu-shard-00-00.l2u06sf.mongodb.net:27017,ac-uvtkyvu-shard-00-01.l2u06sf.mongodb.net:27017,ac-uvtkyvu-shard-00-02.l2u06sf.mongodb.net:27017/hersafety?ssl=true&authSource=admin&retryWrites=true&w=majority";
         console.log("📡 Attempting PIN-POINT Neural Link with MongoDB...");
-        const conn = await mongoose.connect(process.env.MONGODB_URI, options);
+        const conn = await mongoose.connect(dbUri, options);
         console.log(`✅ MongoDB SUCCESS: Link Stable [${conn.connection.host}]`);
     } catch (e) {
         console.error("❌ Neural Link CRITICAL:", e.message);
