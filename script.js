@@ -2490,57 +2490,38 @@ function runLoader() {
     const status = document.getElementById('loaderStatus');
     let progress = 0;
 
-    console.log("🚀 Initializing Safe Her Core Systems...");
+    // --- EMERGENCY BYPASS (Sentinel v7.6) ---
+    // If system takes > 5s to load, FORCE DISMISS to save user.
+    const forceDismiss = setTimeout(() => {
+        console.warn("⚠️ Loader Safety Timeout Triggered. Forcing interactive state.");
+        dismissLoader();
+    }, 5000);
 
     const interval = setInterval(() => {
-        // Random professional increments
-        progress += Math.floor(Math.random() * 15) + 5;
-        if (progress > 100) progress = 100;
-
-        if (bar) bar.style.width = progress + '%';
-
-        // Dynamic Status Updates
-        if (progress < 30) {
-            if (status) status.innerText = "Initializing security protocols...";
-        } else if (progress < 60) {
-            if (status) status.innerText = "Connecting to safe-haven relay...";
-        } else if (progress < 90) {
-            if (status) status.innerText = "Syncing local database and logs...";
-        } else {
-            if (status) status.innerText = "System Ready. Secure Connection Established.";
-        }
-
-        if (progress === 100) {
+        progress += Math.floor(Math.random() * 20) + 5;
+        if (progress >= 100) {
+            progress = 100;
             clearInterval(interval);
-            setTimeout(() => {
-                const loader = document.getElementById('loaderScreen');
-                if (loader) {
-                    loader.style.opacity = '0';
-                    loader.style.transform = 'scale(1.1)'; // Subtle zoom out effect
-                    setTimeout(() => {
-                        loader.style.display = 'none';
-                        document.body.classList.add('loaded');
-                        console.log("✅ Core Systems Loaded.");
-                        
-                        // Start app logic
-                        try {
-                            if (typeof updatePremiumUI === 'function') updatePremiumUI();
-                            startTracking();
-                            startDashboardClock();
-                            
-                            // FORCE MAP RE-CALIBRATION AFTER LOADER
-                            setTimeout(() => {
-                                if (map) map.invalidateSize();
-                                if (routeMap) routeMap.invalidateSize();
-                            }, 500);
-                        } catch (err) {
-                            console.error("Post-loader startup failed:", err);
-                        }
-                    }, 500);
-                }
-            }, 600);
+            clearTimeout(forceDismiss);
+            setTimeout(dismissLoader, 300);
         }
+        if (bar) bar.style.width = progress + '%';
+        if (status) status.innerText = progress < 50 ? "Syncing protocols..." : "Ready.";
     }, 150);
+}
+
+function dismissLoader() {
+    const loader = document.getElementById('loaderScreen');
+    if (loader) {
+        loader.style.opacity = '0';
+        loader.style.pointerEvents = 'none';
+        setTimeout(() => {
+            loader.style.display = 'none';
+            document.body.classList.add('loaded');
+            // Late Map Init to prevent UI hang
+            if (typeof initMap === 'function') initMap(30.901, 75.8573);
+        }, 500);
+    }
 }
 
 /**
