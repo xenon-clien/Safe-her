@@ -169,7 +169,7 @@ app.post('/api/add-contact', async (req, res) => {
 app.post('/api/chat', async (req, res) => {
     try {
         const { message, history } = req.body;
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "YOUR_FREE_KEY_HERE");
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "AIzaSyClZFyLy0YPhwHvOTZN7UZeomajAeHLcJQ");
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         const chat = model.startChat({
