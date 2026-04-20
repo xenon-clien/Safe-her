@@ -688,8 +688,8 @@ async function checkDatabaseStatus() {
             dbFailCount = 0;
             dbEl.innerText = 'Online ✅';
             dbEl.style.color = '#4caf50';
-        } else if (data.database === 'connecting') {
-            dbFailCount = 0; // It's trying, so don't count as fail
+        } else if (data.database === 'connecting' || data.database === 'reconnecting') {
+            dbFailCount = 0; 
             dbEl.innerText = 'Stabilizing... 🚀';
             dbEl.style.color = '#ff9800';
         } else {

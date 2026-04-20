@@ -87,13 +87,17 @@ const EmergencyContact = mongoose.model('EmergencyContact', contactSchema);
 // --- ROUTES ---
 
 app.get('/api/health', async (req, res) => {
-    let dbStatus = "disconnected";
+    let dbStatus = "offline";
     try {
-        // Deep verification: Try a ping or simple query to force a real handshake check
-        await mongoose.connection.db.admin().ping();
-        dbStatus = "connected";
+        if (mongoose.connection.readyState === 1) {
+            await mongoose.connection.db.admin().ping();
+            dbStatus = "connected";
+        } else if (mongoose.connection.readyState === 2) {
+            dbStatus = "connecting";
+        } else {
+            dbStatus = "offline";
+        }
     } catch (e) {
-        console.warn("⚠️ Deep Health Check: Link failing. Triggering auto-heal...");
         dbStatus = "reconnecting";
     }
 
