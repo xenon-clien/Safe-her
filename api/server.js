@@ -196,36 +196,35 @@ app.post(['/api/chat', '/chat'], async (req, res) => {
     }
 });
 
-// --- NEURAL PERSISTENCE: UNBREAKABLE DB LINK (Hyper-Fixed) ---
+// --- NEURAL PERSISTENCE: UNBREAKABLE DB LINK (Ironclad-Sync v11.5) ---
 const connectDB = async () => {
-    // Only attempt connection if not already connecting/connected
     if (mongoose.connection.readyState === 1 || mongoose.connection.readyState === 2) return;
 
     try {
         const options = {
-            serverSelectionTimeoutMS: 30000,
-            heartbeatFrequencyMS: 5000,
+            serverSelectionTimeoutMS: 45000,
+            heartbeatFrequencyMS: 3000,
             socketTimeoutMS: 60000,
             connectTimeoutMS: 60000,
-            autoIndex: true,
             family: 4,
             tlsAllowInvalidCertificates: true,
             retryWrites: true,
-            w: 'majority'
+            w: 'majority',
+            maxPoolSize: 10
         };
-        console.log("📡 Attempting Neural Link with MongoDB...");
+        console.log("📡 Attempting PIN-POINT Neural Link with MongoDB...");
         const conn = await mongoose.connect(process.env.MONGODB_URI, options);
-        console.log(`✅ MongoDB Connected: Neural Link Stable [${conn.connection.host}]`);
+        console.log(`✅ MongoDB SUCCESS: Link Stable [${conn.connection.host}]`);
     } catch (e) {
-        console.error("❌ Neural Link Failed:", e.message);
-        setTimeout(connectDB, 10000); // Slower retry for failed boots
+        console.error("❌ Neural Link CRITICAL:", e.message);
+        setTimeout(connectDB, 8000); 
     }
 };
 
 mongoose.connection.on('disconnected', () => {
     if (mongoose.connection.readyState === 0) {
-        console.warn("🚨 DATABASE DROPPED: Re-establishing Neural Link...");
-        setTimeout(connectDB, 5000);
+        console.warn("🚨 DATABASE DROPPED: Emergency Neural Re-Link...");
+        setTimeout(connectDB, 3000);
     }
 });
 
@@ -233,5 +232,5 @@ connectDB();
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-    console.log(`🚀 SERVER ONLINE ON PORT ${PORT}`);
+    console.log(`🚀 NEURAL CORE ONLINE [PORT: ${PORT}]`);
 });
