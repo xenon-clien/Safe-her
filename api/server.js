@@ -29,7 +29,18 @@ const razorpay = new Razorpay({
 });
 
 const app = express();
+// Standard Middlewares
+app.use(cors());
 app.use(express.json());
+
+// --- MERGED FRONTEND SERVING ---
+// Serve static files from the root directory (where index.html is)
+app.use(express.static(path.join(__dirname, '..')));
+
+// Route for the main app
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
+});
 app.use(cors({ origin: true, credentials: true }));
 
 // --- PAYMENT API ---
@@ -134,10 +145,24 @@ const emailTransporter = nodemailer.createTransport({
     }
 });
 
+// --- TELEGRAM BOT LOGIC (FREE ALTERNATIVE) ---
+const sendTelegramMessage = async (chatId, text) => {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token || !chatId) return null;
+    try {
+        const url = `https://api.telegram.org/bot${token}/sendMessage`;
+        const res = await axios.post(url, { chat_id: chatId, text: text, parse_mode: 'Markdown' });
+        return res.data;
+    } catch (e) {
+        console.error("❌ Telegram Send Error:", e.response ? e.response.data : e.message);
+        return null;
+    }
+};
+
 app.post('/api/sos-trigger', async (req, res) => {
     try {
-        const { userId, lat, lng } = req.body;
-        console.log(`🚨 SOS SIGNAL RECEIVED FROM USER: ${userId} at ${lat}, ${lng}`);
+        const { userId, lat, lng, isTracking } = req.body;
+        console.log(`🚨 SOS SIGNAL [${isTracking ? 'TRACKING' : 'INITIAL'}] FROM USER: ${userId} at ${lat}, ${lng}`);
 
         let user;
         if (userId === 'guest') {
@@ -150,71 +175,83 @@ app.post('/api/sos-trigger', async (req, res) => {
 
         const contacts = user.emergencyContacts || [];
         const googleMapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
-        const messageBody = `🚨 EMERGENCY ALERT from Safe-Her: ${user.name} is in danger! Live Location: ${googleMapsLink}`;
+        
+        let messageBody;
+        if (isTracking) {
+            messageBody = `📍 Live Location Update: ${user.name} is on the move. Current position: ${googleMapsLink}`;
+        } else {
+            messageBody = `🚨 *EMERGENCY ALERT* from Safe-Her: *${user.name}* is in danger! \n\n📍 Live Location: ${googleMapsLink}\n\n⚠️ Please take immediate action!`;
+        }
 
         console.log(`💬 Plan: Sending alerts to ${contacts.length} contacts.`);
 
         const results = [];
-        // If no contacts, we still return success but notify in result
         if (contacts.length === 0) {
             console.warn("⚠️ No emergency contacts found for this user.");
         }
 
         for (const contact of contacts) {
             const phone = contact.phone || contact.number;
-            // Log contact details for debugging
-            console.log(`🔎 Contact: ${contact.name}, phone: ${phone}, whatsapp: ${contact.whatsapp || 'none'}`);
-            if (!phone) continue;
+            const telegramId = contact.telegram || contact.telegramId;
+            const email = contact.email;
+            
+            console.log(`🔎 Contact: ${contact.name}, phone: ${phone}, telegram: ${telegramId}`);
 
-            if (twilioClient) {
-                // Send SMS (existing behavior)
+            // 1. TELEGRAM (Primary Free Alternative)
+            if (telegramId && process.env.TELEGRAM_BOT_TOKEN) {
+                const tgRes = await sendTelegramMessage(telegramId, messageBody);
+                if (tgRes) {
+                    results.push({ type: 'telegram', id: telegramId, status: 'sent' });
+                    console.log(`✅ Telegram Sent to ${telegramId}`);
+                }
+            }
+
+            // 2. TWILIO SMS
+            if (phone && twilioClient) {
                 try {
                     const sms = await twilioClient.messages.create({
-                        body: messageBody,
+                        body: isTracking ? `Safe-Her: ${user.name} location update: ${googleMapsLink}` : messageBody.replace(/\*/g, ''),
                         from: process.env.TWILIO_PHONE,
                         to: phone
                     });
-                    results.push({ phone, sid: sms.sid });
+                    results.push({ type: 'sms', phone, sid: sms.sid });
                     console.log(`✅ SMS Sent to ${phone}`);
                 } catch (err) {
                     console.error(`❌ Twilio SMS Error for ${phone}:`, err.message);
-                    results.push({ phone, error: err.message });
+                    results.push({ type: 'sms', phone, error: err.message });
                 }
-                // Optional WhatsApp send if contact has a WhatsApp number
-                if (contact.whatsapp) {
-                    try {
-                        const waMsg = await twilioClient.messages.create({
-                            body: messageBody,
-                            from: process.env.WHATSAPP_FROM,
-                            to: `whatsapp:${contact.whatsapp}`
-                        });
-                        results.push({ whatsapp: contact.whatsapp, sid: waMsg.sid });
-                        console.log(`✅ WhatsApp Sent to ${contact.whatsapp}`);
-                    } catch (err) {
-                        console.error(`❌ Twilio WhatsApp Error for ${contact.whatsapp}:`, err.message);
-                        results.push({ whatsapp: contact.whatsapp, error: err.message });
-                    }
+            }
+
+            // 3. WHATSAPP (Twilio)
+            if (contact.whatsapp && twilioClient && process.env.WHATSAPP_FROM) {
+                try {
+                    const waMsg = await twilioClient.messages.create({
+                        body: isTracking ? `Safe-Her: ${user.name} location update: ${googleMapsLink}` : messageBody.replace(/\*/g, ''),
+                        from: process.env.WHATSAPP_FROM,
+                        to: `whatsapp:${contact.whatsapp}`
+                    });
+                    results.push({ type: 'whatsapp', phone: contact.whatsapp, sid: waMsg.sid });
+                    console.log(`✅ WhatsApp Sent to ${contact.whatsapp}`);
+                } catch (err) {
+                    console.error(`❌ Twilio WhatsApp Error for ${contact.whatsapp}:`, err.message);
+                    results.push({ type: 'whatsapp', phone: contact.whatsapp, error: err.message });
                 }
-            } else {
-                // Fallback: send email alert to contacts (if they have email)
-                if (contact.email) {
-                    const mailOptions = {
-                        from: process.env.SMTP_USER,
-                        to: contact.email,
-                        subject: '🚨 Emergency Alert from Safe-Her',
-                        text: `${messageBody}`
-                    };
-                    try {
-                        await emailTransporter.sendMail(mailOptions);
-                        console.log(`✅ Email sent to ${contact.email}`);
-                        results.push({ email: contact.email, status: 'sent' });
-                    } catch (e) {
-                        console.error(`❌ Email error for ${contact.email}:`, e.message);
-                        results.push({ email: contact.email, status: 'error', error: e.message });
-                    }
-                } else {
-                    console.warn(`🧪 [SIMULATION MODE] No email for contact, Msg: ${messageBody}`);
-                    results.push({ phone, sid: 'sim_sid_' + Math.random() });
+            }
+
+            // 4. EMAIL FALLBACK
+            if (email && !isTracking) { // Only send email for initial alert to avoid spamming
+                const mailOptions = {
+                    from: process.env.SMTP_USER,
+                    to: email,
+                    subject: '🚨 Emergency Alert from Safe-Her',
+                    text: messageBody.replace(/\*/g, '')
+                };
+                try {
+                    await emailTransporter.sendMail(mailOptions);
+                    console.log(`✅ Email sent to ${email}`);
+                    results.push({ type: 'email', email, status: 'sent' });
+                } catch (e) {
+                    console.error(`❌ Email error for ${email}:`, e.message);
                 }
             }
         }
@@ -223,6 +260,7 @@ app.post('/api/sos-trigger', async (req, res) => {
             success: true,
             alertsSent: results.length,
             details: results,
+            isTracking: !!isTracking,
             address: `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`
         });
 
@@ -234,13 +272,19 @@ app.post('/api/sos-trigger', async (req, res) => {
 
 app.post('/api/add-contact', async (req, res) => {
     try {
-        const { userId, contactName, contactPhone } = req.body;
-        if (userId === 'guest') return res.json({ success: true, contact: { _id: Date.now(), name: contactName, phone: contactPhone } });
+        const { userId, contactName, contactPhone, contactTelegram, contactEmail } = req.body;
+        if (userId === 'guest') return res.json({ success: true, contact: { _id: Date.now(), name: contactName, phone: contactPhone, telegram: contactTelegram, email: contactEmail } });
 
         const user = await User.findById(userId);
         if (!user) return res.status(404).json({ success: false, message: "User not found" });
         
-        const newContact = { name: contactName, phone: contactPhone, _id: new mongoose.Types.ObjectId() };
+        const newContact = { 
+            name: contactName, 
+            phone: contactPhone, 
+            telegram: contactTelegram, 
+            email: contactEmail, 
+            _id: new mongoose.Types.ObjectId() 
+        };
         user.emergencyContacts.push(newContact);
         await user.save();
         
@@ -373,7 +417,13 @@ const userSchema = new mongoose.Schema({
     name: String,
     email: { type: String, unique: true },
     password: { type: String },
-    emergencyContacts: [{ name: String, phone: String, whatsapp: String, email: String }]
+    emergencyContacts: [{ 
+        name: String, 
+        phone: String, 
+        whatsapp: String, 
+        email: String,
+        telegram: String
+    }]
 });
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 

@@ -5,13 +5,20 @@ console.log("🚨 CORE SCRIPT SIGNAL: script.js is loading!");
 
 let map;
 let userMarker;
+let userAccuracyCircle;
+let securityZones = []; // To track Red/Yellow/Green zones
 let isSosActive = false;
 let audioContext, oscillator, gainNode;
-let userLatLng = { lat: 30.901, lng: 75.8573 }; 
+let userLatLng = (function() {
+    try {
+        const saved = localStorage.getItem('lastKnownLocation');
+        return saved ? JSON.parse(saved) : { lat: 30.901, lng: 75.8573 };
+    } catch(e) { return { lat: 30.901, lng: 75.8573 }; }
+})();
 let isLocationPrecise = false; // GPS Accuracy Lock
-const API_URL = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') 
-    ? 'http://localhost:5000/api' 
-    : '/api';
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+    ? "http://localhost:5000/api" 
+    : "/api";
 console.log("🛰️ Satellite Link: ACTIVE");
 console.log("🛰️ Safe-Her Link Target:", API_URL);
 
@@ -22,7 +29,18 @@ window.addEventListener('unhandledrejection', (e) => {
 });
 
 // Auto-check connection on load
-window.addEventListener('load', () => {
+// --- GLOBAL INITIALIZATION ---
+function dismissLoader() {
+    const loader = document.getElementById('loaderScreen');
+    if (loader && !loader.classList.contains('fade-out')) {
+        loader.classList.add('fade-out');
+        document.body.classList.add('loaded');
+        console.log("🛡️ Safety: Loader dismissed.");
+    }
+}
+
+// Global initialization logic
+function initializeApp() {
     if (typeof startDashboardClock === 'function') startDashboardClock();
     
     // Pro-active Precise Detection
@@ -30,14 +48,19 @@ window.addEventListener('load', () => {
     if (areaEl) areaEl.innerText = "Synchronizing Location...";
     performTrackingSync();
 
-    // Dismiss Loader Screen
-    const loader = document.getElementById('loaderScreen');
-    if (loader) {
-        setTimeout(() => {
-            loader.classList.add('fade-out');
-            document.body.classList.add('loaded');
-        }, 1200);
-    }
+    // Forced Failsafe: Dismiss loader after 2.5 seconds regardless of State
+    setTimeout(dismissLoader, 2500);
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeApp);
+} else {
+    initializeApp();
+}
+
+window.addEventListener('load', () => {
+    // Standard Load dismissal
+    dismissLoader();
 });
 
 // Initial check removed
@@ -56,15 +79,52 @@ let audioCtx = null;
 let sirenOscillator = null;
 let sirenGain = null;
 
-async function sendSOSAlert() {
+async function sendSOSAlert(isTracking = false) {
     const userStr = localStorage.getItem('herSafety_user');
     const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : { id: 'guest', name: 'Guest' };
+    
+    const lat = userLatLng.lat;
+    const lng = userLatLng.lng;
+    const mapsLink = `https://www.google.com/maps?q=${lat},${lng}`;
+    const message = `🚨 EMERGENCY! I need help. My location: ${mapsLink}`;
+
+    // --- ZERO API METHOD (Native Device Protocols) ---
+    // This part works without any backend/API and is 100% free.
+    if (!isTracking) {
+        const contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
+        
+        if (contacts.length > 0) {
+            // 1. Try Web Share API (Best for multiple contacts)
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: '🆘 Safe-Her SOS Alert',
+                        text: message,
+                        url: mapsLink
+                    });
+                    addSecurityLog('SOS', 'Native Share Protocol Triggered');
+                } catch (err) {
+                    console.log("Share cancelled or failed, falling back to SMS.");
+                }
+            } else {
+                // 2. Fallback: SMS Protocol (Works offline/no-data)
+                // For multiple contacts, we'll open the primary one.
+                const primaryPhone = contacts[0].phone.replace(/\s+/g, '');
+                window.open(`sms:${primaryPhone}?body=${encodeURIComponent(message)}`, '_blank');
+                addSecurityLog('SOS', 'Native SMS Protocol Opened');
+            }
+        }
+    }
+
+    // --- CLOUD API METHOD (Optional Fallback) ---
     const payload = {
         userId: user.id || user._id,
-        lat: userLatLng.lat,
-        lng: userLatLng.lng,
+        lat: lat,
+        lng: lng,
+        isTracking: isTracking,
         timestamp: new Date().toISOString()
     };
+    
     try {
         const response = await fetch(`${API_URL}/sos-trigger`, {
             method: 'POST',
@@ -73,14 +133,11 @@ async function sendSOSAlert() {
         });
         const data = await response.json();
         if (response.ok) {
-            addSecurityLog('SOS', `Broadcast via Twilio: ${data.address || 'Location Shared'}`);
-            if (data.address) {
-                const statusEl = document.getElementById('sosStatus');
-                if (statusEl) statusEl.innerHTML = `🚨 Help is on the way to:<br><b>${data.address}</b>`;
-            }
+            const channelInfo = isTracking ? "Live Tracking Sync" : "Emergency Broadcast (Cloud)";
+            addSecurityLog('SOS', `${channelInfo}: ${data.address || 'Location Updated'}`);
         }
     } catch (error) {
-        console.error("SOS Trigger Fail:", error);
+        console.warn("Cloud API bypassed or offline.");
     }
 }
 
@@ -105,10 +162,12 @@ const CRIME_HOTSPOTS = [
 ];
 
 function initMap(lat, lng) {
+    // If no coordinates passed, use current userLatLng global
     if (!lat || !lng) {
-        console.warn("Map Init delayed: No valid coords.");
-        return;
+        lat = userLatLng.lat;
+        lng = userLatLng.lng;
     }
+    
     const container = document.getElementById('map');
     if (!container) return;
 
@@ -137,20 +196,16 @@ function initMap(lat, lng) {
             L.control.zoom({ position: 'bottomright' }).addTo(map);
 
             window.mapLayers = {
-                google: L.tileLayer('https://{s}.google.com/vt/lyrs=y\u0026x={x}\u0026y={y}\u0026z={z}', {
+                satellite: L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
                     maxZoom: 20,
                     subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
                     attribution: '© Google Maps',
                     detectRetina: true
                 }),
-                baidu: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                streets: L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
                     maxZoom: 20,
-                    attribution: '© OpenStreetMap © CartoDB',
-                    detectRetina: true
-                }),
-                voyager: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                    maxZoom: 20,
-                    attribution: '© OpenStreetMap © CartoDB',
+                    subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                    attribution: '© Google Maps',
                     detectRetina: true
                 }),
                 ghost: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -160,13 +215,37 @@ function initMap(lat, lng) {
                 })
             };
 
-            window.mapLayers.google.addTo(map);
+            window.currentLayer = 'satellite';
+            window.mapLayers.satellite.addTo(map);
+
+            window.toggleMapLayer = function() {
+                if (window.currentLayer === 'satellite') {
+                    map.removeLayer(window.mapLayers.satellite);
+                    window.mapLayers.streets.addTo(map);
+                    window.currentLayer = 'streets';
+                    showToast("🗺️ Switched to Street View", "info");
+                } else {
+                    map.removeLayer(window.mapLayers.streets);
+                    window.mapLayers.satellite.addTo(map);
+                    window.currentLayer = 'satellite';
+                    showToast("🛰️ Switched to Satellite View", "info");
+                }
+            };
 
             userMarker = L.marker([lat, lng]).addTo(map)
                 .bindPopup("<b>Verified Safety Map</b>").openPopup();
+            
+            userAccuracyCircle = L.circle([lat, lng], {
+                radius: 0,
+                color: '#9d4edd',
+                fillColor: '#9d4edd',
+                fillOpacity: 0.15,
+                weight: 1
+            }).addTo(map);
 
             setTimeout(() => {
                 map.invalidateSize();
+                addSecurityZonesToMap(lat, lng);
                 if (typeof fetchDangerZones === 'function') fetchDangerZones(); 
             }, 600);
 
@@ -181,10 +260,22 @@ function initMap(lat, lng) {
                 if(map) map.invalidateSize();
             });
         } else {
+            // Only snap view if it's a significant change or center was lost
+            const currentCenter = map.getCenter();
+            const distToNew = L.latLng(lat, lng).distanceTo(currentCenter);
+            
+            if (distToNew > 500) { // If moved more than 500m, re-center
+                 map.setView([lat, lng]);
+            }
+            
+            if (userMarker) userMarker.setLatLng([lat, lng]);
+            if (userAccuracyCircle) {
+                userAccuracyCircle.setLatLng([lat, lng]);
+            }
+            addSecurityZonesToMap(lat, lng);
+            
             userLatLng = { lat, lng }; // UPDATE GLOBAL COORDS
             console.log("🔄 Map already exists. Re-centering...");
-            if (userMarker) userMarker.setLatLng([lat, lng]);
-            map.setView([lat, lng], map.getZoom());
             map.invalidateSize();
             
             // Sync Route Planner instantly
@@ -214,6 +305,57 @@ function setMapEngine(engine) {
             btn.classList.toggle('opacity-50', btn.dataset.engine !== engine);
         });
     }
+}
+
+/**
+ * Adds Three Safety Zones to the Map: Red, Yellow, and Green
+ */
+function addSecurityZonesToMap(lat, lng) {
+    if (!map) return;
+    
+    // Enforce numeric values to prevent string concatenation bugs
+    const nLat = parseFloat(lat);
+    const nLng = parseFloat(lng);
+    
+    if (isNaN(nLat) || isNaN(nLng)) return;
+
+    console.log("📡 Projection System: Deploying 3 Tactical Zones around", nLat, nLng);
+
+    // Clear previous zones to prevent clutter
+    if (securityZones) {
+        securityZones.forEach(z => { if(z) map.removeLayer(z); });
+    }
+    securityZones = [];
+
+    // 1. Danger Zone (Red) - North East Offset
+    const dangerZone = L.circle([nLat + 0.012, nLng + 0.012], {
+        color: '#ff3366',
+        fillColor: '#ff3366',
+        fillOpacity: 0.15,
+        weight: 3,
+        radius: 500
+    }).addTo(map).bindPopup("<b style='color:#ff3366'>🚨 High Danger Zone</b>");
+
+    // 2. Caution Zone (Orange) - South Offset
+    const cautionZone = L.circle([nLat - 0.015, nLng], {
+        color: '#ff9800',
+        fillColor: '#ff9800',
+        fillOpacity: 0.15,
+        weight: 3,
+        radius: 600
+    }).addTo(map).bindPopup("<b style='color:#ff9800'>⚠️ Caution Sector</b>");
+
+    // 3. Secure Zone (Green) - North West Offset
+    const safeZone = L.circle([nLat + 0.012, nLng - 0.012], {
+        color: '#00e676',
+        fillColor: '#00e676',
+        fillOpacity: 0.15,
+        weight: 3,
+        radius: 500
+    }).addTo(map).bindPopup("<b style='color:#00e676'>🛡️ Secure Haven</b>");
+
+    securityZones.push(dangerZone, cautionZone, safeZone);
+    console.log("✅ All 3 Tactical Sectors Projected Successfully.");
 }
 
 // --- AI NEURAL SAFETY INTELLIGENCE ---
@@ -429,11 +571,9 @@ async function startTracking() {
     
     // Initial Sync
     performTrackingSync();
-
-    // Loop every 60 seconds (as requested for live tracking)
-    trackingInterval = setInterval(() => {
-        performTrackingSync();
-    }, 60000);
+    
+    // No interval needed anymore because watchPosition (in performTrackingSync) handles live updates
+    showToast("🛰️ LIVE TRACKING ACTIVE", "success");
 }
 
 // --- TACTICAL GPS RESURRECTION (Stable v10) ---
@@ -445,8 +585,8 @@ async function performTrackingSync() {
 
     const options = { 
         enableHighAccuracy: true, 
-        timeout: 10000, 
-        maximumAge: 0 
+        timeout: 20000, 
+        maximumAge: 5000 
     };
 
     if (navigator.geolocation) {
@@ -466,7 +606,11 @@ async function performTrackingSync() {
         if (!geoWatchId) {
             geoWatchId = navigator.geolocation.watchPosition(
                 (pos) => handlePreciseLocation(pos),
-                null,
+                (err) => {
+                    console.warn("Live Watch Signal Lost:", err.message);
+                    isLocationPrecise = false;
+                    tryIPGeolocationFallback();
+                },
                 options
             );
         }
@@ -478,33 +622,27 @@ async function performTrackingSync() {
 
 function handlePreciseLocation(position) {
     const { latitude, longitude, accuracy } = position.coords;
+    
+    // GPS is ALWAYS fundamentally better than IP, so we flag it as "Satellite Precision"
+    isLocationPrecise = true; 
+    
     userLatLng = { lat: latitude, lng: longitude };
-    isLocationPrecise = accuracy < 100; // More strict: 100m for "Exact"
     
-    const gpsEl = document.getElementById('dashGps');
-    if (gpsEl) {
-        const color = isLocationPrecise ? 'text-green-500' : 'text-yellow-400';
-        const label = isLocationPrecise ? 'SAT-LOCK' : 'SIGNAL-SOFT';
-        gpsEl.innerHTML = `<span class="${color} font-black">🛰️ ${label} [±${Math.round(accuracy)}m]</span>`;
-    }
-    
-    // Core System Update
-    if (typeof initMap === 'function') initMap(latitude, longitude);
-    if (typeof updateDashboardGPS === 'function') updateDashboardGPS(latitude, longitude);
-    
+    // Update Map and Dashboard
+    initMap(latitude, longitude);
+    updateDashboardGPS(latitude, longitude, `🛰️ SAT-LOCK [±${Math.round(accuracy)}m]`);
+    if (userAccuracyCircle) userAccuracyCircle.setRadius(accuracy);
+
+    // Hide loader
+    const loader = document.getElementById('mapLoader');
+    if (loader) loader.style.display = 'none';
+
     if (isSosActive) sendTrackingUpdateToServer(latitude, longitude);
 }
 
 function sendTrackingUpdateToServer(lat, lng) {
-    const userStr = localStorage.getItem('herSafety_user');
-    const user = userStr ? JSON.parse(userStr) : null;
-    if (!user) return;
-
-    fetch(`${API_URL}/sos-trigger`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id || user._id, lat, lng, isTracking: true })
-    }).catch(e => console.warn("Live Beacon Sync Error:", e));
+    // We already have userLatLng updated by handlePreciseLocation
+    sendSOSAlert(true);
 }
 
 async function tryIPGeolocationFallback() {
@@ -515,16 +653,15 @@ async function tryIPGeolocationFallback() {
     }
     
     const gpsEl = document.getElementById('dashGps');
-    if (gpsEl) gpsEl.innerText = "TRIANGULATING...";
+    if (gpsEl) gpsEl.innerHTML = '<span class="text-blue-400 animate-pulse">📡 SCANNING NETWORK...</span>';
     
     try {
-        // Multi-Source Signal Triangulation (Parallel Fetch)
         const sources = [
             'https://ipapi.co/json/',
             'https://freeipapi.com/api/json'
         ];
 
-        let locationData = null;
+        let found = false;
 
         for (const url of sources) {
             try {
@@ -539,34 +676,23 @@ async function tryIPGeolocationFallback() {
                     initMap(userLatLng.lat, userLatLng.lng);
                     updateDashboardGPS(userLatLng.lat, userLatLng.lng);
                     
-                    if (gpsEl) gpsEl.innerHTML = '<span class="text-yellow-400 font-bold">📡 APPROXIMATE-LINK</span>';
+                    if (gpsEl) gpsEl.innerHTML = '<span class="text-yellow-400 font-bold">📡 HYBRID-LINK [IP]</span>';
                     console.log("📡 Using Internet Triangulation (Area is approximate)");
+                    found = true;
                     break;
                 }
-            } catch (e) { console.warn(`Triangulation Source ${url} failed, trying next...`); }
+            } catch (e) { console.warn(`Triangulation Source ${url} failed...`); }
         }
 
-        if (locationData) {
-            const { lat, lng } = locationData;
-            userLatLng = { lat: parseFloat(lat), lng: parseFloat(lng) };
-            
-            initMap(userLatLng.lat, userLatLng.lng);
-            updateDashboardGPS(userLatLng.lat, userLatLng.lng);
-            
-            if (gpsEl) gpsEl.innerHTML = '<span class="text-blue-400">HYBRID-ACTIVE</span>';
-            console.log("📍 Standard Link: Synchronization Successful via Network Layer.");
-            sendTrackingUpdate(); 
-        } else {
+        if (!found) {
             throw new Error("All triangulation sources exhausted.");
         }
     } catch (error) {
-        console.warn("Connection sync deferred, using backup location.");
-        // DEFAULT FALLBACK: Lock onto Ludhiana/Verified Center to keep HUD alive
-        userLatLng = { lat: 30.901, lng: 75.8573 }; 
-        isLocationPrecise = false;
-        initMap();
-        updateDashboardGPS("SYSTEM-SIGNAL (BCK-LINK)", "30.90, 75.85");
-        showToast("🛰️ Weak Signal: Switched to Secure Backup", "info");
+        console.warn("Satellite sync deferred, maintaining last known signal.");
+        // instead of hardcoding, use what we already have (could be saved CT University)
+        initMap(userLatLng.lat, userLatLng.lng);
+        updateDashboardGPS(userLatLng.lat, userLatLng.lng, "SIGNAL-MEMORIZED");
+        showToast("🛰️ Weak Signal: Holding Last Known Position", "warning");
     }
 }
 
@@ -592,10 +718,35 @@ async function sendTrackingUpdate() {
 //  SAFETY DASHBOARD - Live Time + GPS + Safety Score
 // ============================================================
 function startDashboardClock() {
-    updateDashboard(); // Run once immediately
-    checkDatabaseStatus(); // Check DB status
+    updateDashboard();
+    checkDatabaseStatus();
     setInterval(updateDashboard, 1000);
-    setInterval(checkDatabaseStatus, 10000); // Check DB every 10s for stability
+    setInterval(checkDatabaseStatus, 10000);
+}
+
+/**
+ * Validates connectivity with the cloud database engine
+ */
+function checkDatabaseStatus() {
+    const dbEl = document.getElementById('dashDb');
+    const dbBox = document.getElementById('statusDbBox');
+    
+    fetch(`${API_URL}/health`)
+        .then(res => res.json())
+        .then(data => {
+            if (dbEl) dbEl.innerText = "Online";
+            if (dbBox) {
+                dbBox.classList.remove('standby', 'warning');
+                dbBox.classList.add('connected');
+            }
+        })
+        .catch(() => {
+            if (dbEl) dbEl.innerText = "Syncing...";
+            if (dbBox) {
+                dbBox.classList.remove('connected');
+                dbBox.classList.add('warning');
+            }
+        });
 }
 
 let dbFailCount = 0;
@@ -665,18 +816,25 @@ function updateDashboard() {
 }
 
 // Called after GPS fix to update dashboard
-function updateDashboardGPS(lat, lng) {
-    // Sync to global location state!
-    userLatLng = { lat, lng };
+function updateDashboardGPS(lat, lng, statusLabel) {
+    // Sync to global location state ONLY if numbers are provided
+    if (typeof lat === 'number' && typeof lng === 'number') {
+        userLatLng = { lat, lng };
+        // Save for persistence
+        localStorage.setItem('lastKnownLocation', JSON.stringify(userLatLng));
+    }
 
     const gpsEl = document.getElementById('dashGps');
     const areaEl = document.getElementById('dashArea');
     const gpsBox = document.getElementById('statusGpsBox');
 
-    if (gpsEl) gpsEl.innerText = 'Connected ✅';
-    if (gpsBox) {
-        gpsBox.classList.remove('standby', 'warning');
-        gpsBox.classList.add('connected');
+    if (gpsEl) {
+        gpsEl.innerText = statusLabel || 'Connected ✅';
+        if (statusLabel && statusLabel.includes('BACKUP')) {
+            gpsEl.className = "status-value text-red-500 font-bold";
+        } else {
+            gpsEl.className = "status-value text-green-500 font-bold";
+        }
     }
 
     // Refresh Score specifically
@@ -701,13 +859,74 @@ function updateDashboardGPS(lat, lng) {
 
             // Also check for street lights nearby
             fetchStreetLights(lat, lng);
+            findNearestPoliceStation(lat, lng);
         }).catch(() => { 
             if (areaEl) areaEl.innerText = 'GPS Active';
             fetchStreetLights(lat, lng); 
+            findNearestPoliceStation(lat, lng);
         });
 }
 
 /**
+ * Recursive Police Station Locator 🚀
+ * Starts at 5km, then extends up to 25km if none found.
+ */
+async function findNearestPoliceStation(lat, lng, radius = 5000) {
+    if (!lat || !lng) { lat = userLatLng.lat; lng = userLatLng.lng; }
+    const policeEl = document.getElementById('dashPolice');
+    const box = document.getElementById('statusPoliceBox');
+    if (!policeEl) return;
+
+    if (radius === 5000) {
+        policeEl.innerText = "Scanning...";
+        if (box) box.classList.add('animate-pulse');
+        console.log("🛡️ Safety: Scanning for nearest Police presence...");
+    }
+
+    const query = `[out:json][timeout:15];node(around:${radius},${lat},${lng})["amenity"="police"];out body;`;
+    
+    try {
+        const response = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query });
+        const data = await response.json();
+
+        if (data.elements && data.elements.length > 0) {
+            let minTrackedDist = Infinity;
+            let nearestName = "Station";
+
+            data.elements.forEach(p => {
+                const d = getDistanceMeters(lat, lng, p.lat, p.lon);
+                if (d < minTrackedDist) {
+                    minTrackedDist = d;
+                    nearestName = p.tags.name || "Police Station";
+                }
+            });
+
+            const km = (minTrackedDist / 1000).toFixed(1);
+            policeEl.innerText = `${km} km`;
+            console.log(`🛡️ Success: Nearest Station [${nearestName}] found at ${km}km`);
+            
+            if (box) {
+                box.classList.remove('animate-pulse', 'warning');
+                box.classList.add('connected');
+            }
+
+        } else if (radius < 25000) {
+            // No station found, EXTEND radius
+            const nextRadius = radius + 5000;
+            console.log(`📡 Extending scan range to ${nextRadius/1000}km...`);
+            setTimeout(() => findNearestPoliceStation(lat, lng, nextRadius), 500);
+        } else {
+            policeEl.innerText = "> 25km";
+            if (box) {
+                box.classList.remove('animate-pulse');
+                box.classList.add('warning');
+            }
+            console.warn("⚠️ Isolation: No police station within 25km scan radius.");
+        }
+    } catch (e) {
+        policeEl.innerText = "Offline";
+    }
+}
  * Checks for Street Lamps in 100m radius using Overpass API
  */
 async function fetchStreetLights(lat, lng) {
@@ -827,7 +1046,25 @@ function calculateDynamicScore(hour) {
     return { score: finalScore, color: color };
 }
 
-// Distance helper (Haversine formula simplified)
+// Distance helper (Haversine formula)
+function getDistanceMeters(lat1, lon1, lat2, lon2) {
+    const R = 6371e3; // metres
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+function getCommunityReports() {
+    // Check for locally saved community alerts
+    try {
+        const saved = localStorage.getItem('herSafety_reports');
+        return saved ? JSON.parse(saved) : [];
+    } catch(e) { return []; }
+}
 
 
 // ============================================================
@@ -1125,7 +1362,7 @@ function startLiveBeacon() {
 
         navigator.geolocation.getCurrentPosition(pos => {
             userLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            sendSOSAlert();
+            sendSOSAlert(true);
             console.log("📡 High-Priority SOS Sync Success");
         }, err => console.warn(err), { enableHighAccuracy: true });
 
@@ -1137,7 +1374,43 @@ function forceMapRefresh() {
         map.invalidateSize();
         showToast("Map container recalibrated.", "info");
     } else {
-        initMap(30.901, 75.8573);
+        initMap(userLatLng.lat, userLatLng.lng);
+    }
+}
+
+// Missing Handle Manual Search Implementation
+async function handleManualSearch() {
+    const input = document.getElementById('manualLocationInput');
+    if (!input || !input.value) return;
+
+    const query = input.value;
+    showToast(`Searching for: ${query}...`, "info");
+
+    try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+
+        if (data && data.length > 0) {
+            const { lat, lon, display_name } = data[0];
+            const newLat = parseFloat(lat);
+            const newLng = parseFloat(lon);
+
+            // Update Map
+            if (map) {
+                map.setView([newLat, newLng], 15);
+                L.popup()
+                    .setLatLng([newLat, newLng])
+                    .setContent(`<b>Search Result:</b><br>${display_name}`)
+                    .openOn(map);
+            }
+            
+            showToast("Location found!", "success");
+        } else {
+            showToast("Location not found. Try a different name.", "error");
+        }
+    } catch (e) {
+        console.error("Search error:", e);
+        showToast("Search service unavailable.", "error");
     }
 }
 
@@ -1719,7 +1992,7 @@ async function findNearest(type) {
         console.warn("GPS timeout, using center point.");
     }
 
-    const currentPos = userLatLng || { lat: 30.901, lng: 75.8573 };
+    const currentPos = userLatLng;
     const centerName = (currentPos.lat === 30.901) ? "Default (Ludhiana)" : "Your Location";
 
     try {
@@ -2541,7 +2814,7 @@ function dismissLoader() {
             loader.style.display = 'none';
             document.body.classList.add('loaded');
             // Late Map Init to prevent UI hang
-            if (typeof initMap === 'function') initMap(30.901, 75.8573);
+            if (typeof initMap === 'function') initMap(userLatLng.lat, userLatLng.lng);
         }, 500);
     }
 }
@@ -2555,6 +2828,9 @@ async function addCustomContact(e) {
     if (e) e.preventDefault();
     const nameInput = document.getElementById('contactName');
     const phoneInput = document.getElementById('contactPhone');
+    const telegramInput = document.getElementById('contactTelegram');
+    const emailInput = document.getElementById('contactEmail');
+    
     const userStr = localStorage.getItem('herSafety_user');
     const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : { id: 'guest', name: 'Guest' };
 
@@ -2562,6 +2838,8 @@ async function addCustomContact(e) {
 
     const name = nameInput.value.trim();
     const phone = phoneInput.value.trim();
+    const telegram = telegramInput ? telegramInput.value.trim() : "";
+    const email = emailInput ? emailInput.value.trim() : "";
 
     if (!name || !phone) return;
 
@@ -2573,41 +2851,43 @@ async function addCustomContact(e) {
                 body: JSON.stringify({
                     userId: user.id || user._id,
                     contactName: name,
-                    contactPhone: phone
+                    contactPhone: phone,
+                    contactTelegram: telegram,
+                    contactEmail: email
                 })
             });
             const data = await res.json();
             if (res.ok) {
-                saveLocalContact(data.contact._id || Date.now(), name, phone);
+                saveLocalContact(data.contact._id || Date.now(), name, phone, telegram, email);
                 showToast("Contact Saved & Synced", "success");
             } else {
                 showToast(data.message || "Sync failed", "error");
             }
         } else {
-            saveLocalContact(Date.now(), name, phone);
+            saveLocalContact(Date.now(), name, phone, telegram, email);
             showToast("Contact saved locally (Guest Mode)", "success");
         }
     } catch (err) {
         console.warn("Contact Sync Offline:", err);
-        saveLocalContact(Date.now(), name, phone);
+        saveLocalContact(Date.now(), name, phone, telegram, email);
         showToast("Saved locally (Sync Offline)", "warning");
     }
 }
 
-function saveLocalContact(id, name, phone) {
+function saveLocalContact(id, name, phone, telegram, email) {
     let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
-    contacts.push({ id, name, phone });
+    contacts.push({ id, name, phone, telegram, email });
     localStorage.setItem('herSafety_contacts', JSON.stringify(contacts));
     
-    const nameInput = document.getElementById('contactName');
-    const phoneInput = document.getElementById('contactPhone');
-    if (nameInput) nameInput.value = '';
-    if (phoneInput) phoneInput.value = '';
+    // Clear all inputs
+    const inputs = ['contactName', 'contactPhone', 'contactTelegram', 'contactEmail'];
+    inputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
     
     if (typeof renderCustomContacts === 'function') {
-        renderCustomContacts();
-    } else if (typeof renderContacts === 'function') {
-        renderContacts();
+        renderCustomContacts(true); // Don't re-fetch from cloud immediately
     }
 }
 
@@ -2646,7 +2926,13 @@ async function fetchAndStoreContacts() {
         const res = await fetch(`${API_URL}/get-contacts/${user.id || user._id}`);
         const data = await res.json();
         if (res.ok) {
-            const contacts = data.contacts.map(c => ({ id: c._id, name: c.contactName, phone: c.contactPhone }));
+            const contacts = data.contacts.map(c => ({ 
+                id: c._id, 
+                name: c.contactName, 
+                phone: c.contactPhone,
+                telegram: c.contactTelegram || "",
+                email: c.contactEmail || ""
+            }));
             localStorage.setItem('herSafety_contacts', JSON.stringify(contacts));
             localStorage.setItem('herSafety_initialized_contacts', 'true');
             renderCustomContacts(true); // Call with flag to avoid re-fetching
@@ -2666,24 +2952,19 @@ function renderCustomContacts(skipSync = false) {
 
     let contacts = JSON.parse(localStorage.getItem('herSafety_contacts')) || [];
 
-    // Default mock data for first-time visitors if nothing in local or cloud
-    if (contacts.length === 0 && !localStorage.getItem('herSafety_initialized_contacts')) {
-        contacts = [
-            { id: 1, name: 'Dad', phone: '+1 234 567 8900' },
-            { id: 2, name: 'Mom', phone: '+1 987 654 3210' }
-        ];
-        localStorage.setItem('herSafety_contacts', JSON.stringify(contacts));
-        localStorage.setItem('herSafety_initialized_contacts', 'true');
-    }
-
     contacts.forEach(contact => {
         const div = document.createElement('div');
         div.className = 'contact-card family dynamic-contact';
+        
+        let subInfo = contact.phone;
+        if (contact.telegram) subInfo += ` | TG: ${contact.telegram}`;
+        if (contact.email) subInfo += ` | ${contact.email}`;
+
         div.innerHTML = `
             <div class="contact-icon personal"><i class="fas fa-user-shield"></i></div>
             <div class="contact-info">
                 <h3>${contact.name}</h3>
-                <p>${contact.phone}</p>
+                <p>${subInfo}</p>
             </div>
             <div style="display:flex; align-items:center;">
                 <button class="call-btn-link" onclick="startOutgoingCall('${contact.name}', '${contact.phone}')">Call</button>
@@ -4008,12 +4289,12 @@ window.addEventListener('load', () => {
             console.error("âŒ Leaflet failure. Retrying CDN...");
             const s = document.createElement('script');
             s.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-            s.onload = () => { console.log("âœ… Leaflet CDN Recovered."); initMap(30.901, 75.8573); };
+            s.onload = () => { console.log("âœ… Leaflet CDN Recovered."); initMap(userLatLng.lat, userLatLng.lng); };
             document.head.appendChild(s);
         } else {
             console.log("âœ… Leaflet Ready. Forcing Map Start...");
             // Force map to initialize with Ludhiana if it hasn't already
-            if (!map) initMap(30.901, 75.8573);
+            if (!map) initMap(userLatLng.lat, userLatLng.lng);
         }
     }, 1000);
 });

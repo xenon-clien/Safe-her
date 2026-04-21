@@ -92,6 +92,12 @@ a {
     pointer-events: none;
 }
 
+/* Radar Safety Score Transparency Enhancement */
+.status-item.score-box {
+    background: transparent !important;
+    backdrop-filter: none !important;
+}
+
 .loader-content {
     text-align: center;
     animation: loaderEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -355,7 +361,7 @@ a {
 /* Mission Control Status Grid (Quantum Style - SINGLE ROW SQUARE) */
 .mission-status-grid.quantum-grid {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     gap: 1rem;
     margin: 2rem 0;
     width: 100%;

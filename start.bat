@@ -1,15 +1,16 @@
 @echo off
-echo 🚀 STARTING SAFE-HER CORE SYSTEM...
+cd /d "%~dp0"
+echo 🚀 STARTING SAFE-HER UNIFIED SYSTEM...
 echo.
-echo [1/2] Starting Backend API (Port 5000)...
-start "Safe-Her Backend" cmd /c "npm run dev"
+
+echo [1/1] Starting Merged Server (Port 5000)...
+echo 🔗 Link: http://127.0.0.1:5000
 echo.
-echo [2/2] Starting Frontend Server (Port 3300)...
-start "Safe-Her Frontend" cmd /c "node serve.js"
-echo.
-echo ✅ ALL SYSTEMS INITIALIZING.
-echo 🔗 Open: http://localhost:3300
-echo.
-echo ⚠️ PLEASE CHECK FOR TWO NEW BLACK WINDOWS IN YOUR TASKBAR.
-echo.
+
+node api/server.js
+if %errorlevel% neq 0 (
+    echo.
+    echo ❌ ERROR: Server failed to start!
+    echo Check if Node.js is installed or if port 5000 is busy.
+)
 pause

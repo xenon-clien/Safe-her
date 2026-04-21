@@ -29,7 +29,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <!-- Google Services -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA_placeholder&libraries=places"></script>
+    <!-- Google Services (Removed broken placeholder to fix page load) -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <!-- App Styling -->
@@ -260,8 +260,17 @@
                 <div class="status-item warning" id="statusLightsBox">
                     <div class="status-icon"><i class="fas fa-lightbulb"></i></div>
                     <div class="status-content">
-                        <span class="status-value" id="dashLights">Low Lighting</span>
-                        <span class="status-label">STREET LIGHTING</span>
+                        <span class="status-value" id="dashLights">Scanning...</span>
+                        <span class="status-label">STREET LIGHTS</span>
+                    </div>
+                </div>
+
+                <!-- Card 7: Nearest Police (NEW) -->
+                <div class="status-item connected" id="statusPoliceBox" style="cursor: pointer;" onclick="findNearestPoliceStation()">
+                    <div class="status-icon"><i class="fas fa-shield-halved"></i></div>
+                    <div class="status-content">
+                        <span class="status-value" id="dashPolice">-- km</span>
+                        <span class="status-label">NEAREST POLICE</span>
                     </div>
                 </div>
             </div>
@@ -568,10 +577,17 @@
             <div class="add-contact-container">
                 <h3><i class="fas fa-user-plus"></i> Add Personal Contact</h3>
                 <form id="addContactForm" class="add-contact-form" onsubmit="addCustomContact(event)">
-                    <div class="input-row">
-                        <input type="text" id="contactName" placeholder="Contact Name (e.g. Alice)" required>
-                        <input type="tel" id="contactPhone" placeholder="Phone Number" required>
-                        <button type="submit" class="add-btn">Save Contact</button>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <input type="text" id="contactName" placeholder="Full Name (e.g. Papa)" class="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm" required>
+                        <input type="tel" id="contactPhone" placeholder="Phone (with +91)" class="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm" required>
+                        <input type="text" id="contactTelegram" placeholder="Telegram Chat ID (Optional)" class="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm">
+                        <input type="email" id="contactEmail" placeholder="Email (Optional)" class="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm">
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <button type="submit" class="w-full bg-safety-purple hover:bg-safety-purple/80 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-safety-purple/20">Save Contact</button>
+                        <p class="text-[10px] text-zinc-500 text-center uppercase tracking-widest">
+                            Tip: For Telegram, search <b>@SafeHerBot</b> and send /start to get Chat ID.
+                        </p>
                     </div>
                 </form>
             </div>
@@ -795,6 +811,16 @@
 
             <div class="tips-grid">
                 <!-- ... existing tips ... -->
+                <div id="map" class="map-container relative">
+                <!-- Map Layer Switcher -->
+                <div class="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
+                    <button onclick="toggleMapLayer()" id="layerToggleBtn" class="bg-black/60 backdrop-blur-md border border-white/20 text-white p-3 rounded-2xl shadow-2xl hover:bg-white/10 transition-all group">
+                        <i class="fas fa-layer-group text-lg group-hover:scale-110 transition-transform"></i>
+                        <span class="text-[10px] block font-black uppercase mt-1">View</span>
+                    </button>
+                </div>
+                
+                <div id="mapLoader" class="map-loader">
                 <div class="tip-card">
                     <div class="tip-icon"><i class="fas fa-walking"></i></div>
                     <h4>Stay Aware</h4>
@@ -1516,7 +1542,6 @@
 
     <script src="script.js?v=20.0_ULTRA_ELITE"></script>
     <script src="background.js"></script>
-    <div id="strobeOverlay"></div>
 </body>
 
 </html>
